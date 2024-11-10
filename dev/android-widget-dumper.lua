@@ -1,8 +1,10 @@
 -- name = "Android widgets dumper"
 
 -- Place app package name with widget here
-app_pkg = "com.weather.Weather"
---app_pkg = "com.google.android.apps.tasks"
+--app_pkg = "org.isoron.uhabits"
+--app_pkg = "com.calm.android"
+app_pkg = "au.com.ingdirect.android"
+--app_pkg = "au.com.up.money"
 --app_pkg = "com.android.chrome"
 --app_pkg = "com.whatsapp"
 
