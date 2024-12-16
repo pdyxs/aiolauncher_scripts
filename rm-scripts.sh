@@ -1,6 +1,6 @@
 source ./env
 
-TO_RM="ru samples"
+TO_RM="ru samples community"
 
 for repo in $TO_RM; do
     cd $repo

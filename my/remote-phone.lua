@@ -6,13 +6,13 @@
 
 function on_resume()
     local my_gui = gui{
-        {"button", "%%fa:phone%% %%fa:star%%"}, 
+        {"button", "%%fa:phone%% %%fa:star%%", {expand=true}}, 
         {"spacer", 1 },
-        {"button", "%%fa:phone%% %%fa:address-book%%"}, 
+        {"button", "%%fa:phone%% %%fa:address-book%%", {expand=true}}, 
         {"spacer", 1 },
-        {"button", "%%fa:phone%% %%fa:clock-rotate-left%%"},
+        {"button", "%%fa:phone%% %%fa:clock-rotate-left%%", {expand=true}},
         {"spacer", 1 },
-        {"button", "%%fa:phone%% %%fa:hashtag%%"}
+        {"button", "%%fa:phone%% %%fa:hashtag%%", {expand=true}}
     }
     my_gui.render();
 end
