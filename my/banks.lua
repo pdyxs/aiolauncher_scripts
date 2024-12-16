@@ -49,8 +49,6 @@ function on_app_widget_updated(bridge)
         {"button", "%%fa:paw-claws%% "..(ing_balance or "??")},
         {"spacer", 1},
         {"button", "fa:rotate-right"},
-        {"new_line", 1},
-        {"button", "%%fa:l%% ??"}
     }
     my_gui.render()
 end
@@ -62,8 +60,6 @@ function on_click(idx)
         w_ing_bridge:click("button_1")
     elseif idx == 1 then
         apps:launch("au.com.up.money")
-    elseif idx == 7 then
-        apps:launch("com.latitudefinancial.latitudeapp")
     end
 end
 
@@ -77,7 +73,8 @@ function setup_up_widget()
 end
 
 function setup_ing_widget()
-    local id = widgets:setup("au.com.ingdirect.android/o.PF")
+    local ing_widgets = widgets:list("au.com.ingdirect.android")
+    local id = widgets:setup(ing_widgets[1].provider)
     if (id ~= nil) then
         prefs.ing_wid = id
     else
