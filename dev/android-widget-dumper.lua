@@ -9,7 +9,8 @@
 --app_pkg = "com.whatsapp"
 --app_pkg = "com.ticktick.task"
 --app_pkg = "com.vivaldi.browser"
-app_pkg = "com.openai.chatgpt"
+--app_pkg = "com.openai.chatgpt"
+app_pkg = "com.calm.android"
 
 -- Globals
 labels = {}
