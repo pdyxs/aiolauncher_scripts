@@ -9,6 +9,7 @@ local fmt = require "fmt"
 
 local w_bridge = nil
 local lines = {}
+local link_numbers = {}
 
 function on_resume()
     if not widgets:bound(prefs.wid) then
@@ -33,20 +34,49 @@ function on_app_widget_updated(bridge)
 
     w_bridge = bridge
     if (ui:folding_flag()) then
+        local line1 = lines[1]
+        if #lines == 1 then
+            line1 = fmt.secondary("All done!").." %%fa:party-horn%%"
+        end
+
+        local extra = ""
+        if #lines > 2 then
+            extra = fmt.secondary(" (+"..(#lines - 2)..")")
+        end
+
+        my_gui = gui{
+            {"text", strings[1]..": "},
+            {"text", line1..extra},
+            {"icon", "fa:square-plus", {gravity="right"}},
+            {"spacer", 3}
+        }
+        my_gui.render()
         lines[1] = strings[1]..": "..lines[1]
     else
         table.insert(lines, 1, strings[1])
+        ui:show_lines(lines)
     end
-    ui:show_lines(lines)
 end
 
 function on_click(idx)
-    if idx == #lines then
-        -- "Plus" button
-        w_bridge:click("image_3")
+    if (ui:folding_flag()) then
+        if idx == 1 then
+            w_bridge:click("text_"..link_numbers[idx])
+        elseif idx == 2 then
+            if (#lines > 1) then
+                w_bridge:click("text_"..link_numbers[idx])
+            end
+        else
+            w_bridge:click("image_3")
+        end
     else
-        -- First task name
-        w_bridge:click("text_2")
+        if idx == #lines then
+            -- "Plus" button
+            w_bridge:click("image_3")
+        else
+            -- First task name
+            w_bridge:click("text_"..link_numbers[idx])
+        end
     end
 end
 
@@ -69,11 +99,15 @@ end
 function combine_lines(lines)
     local result = {}
     local temp_lines = {}
+    local last_count = 2
+    local counts = {1}
 
     for i, line in ipairs(lines) do
         if line == "1x1" then
             if #temp_lines > 0 then
                 table.insert(result, concat_lines(temp_lines))
+                table.insert(counts, last_count)
+                last_count = last_count + #temp_lines
                 temp_lines = {}
             end
         else
@@ -83,8 +117,10 @@ function combine_lines(lines)
 
     if #temp_lines > 0 then
         table.insert(result, concat_lines(temp_lines))
+        table.insert(counts, last_count)
     end
 
+    link_numbers = counts
     return result
 end
 

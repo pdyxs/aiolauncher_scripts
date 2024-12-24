@@ -7,10 +7,10 @@
 --app_pkg = "au.com.up.money"
 --app_pkg = "com.android.chrome"
 --app_pkg = "com.whatsapp"
---app_pkg = "com.ticktick.task"
+app_pkg = "com.ticktick.task"
 --app_pkg = "com.vivaldi.browser"
 --app_pkg = "com.openai.chatgpt"
-app_pkg = "com.calm.android"
+--app_pkg = "com.calm.android"
 
 -- Globals
 labels = {}
