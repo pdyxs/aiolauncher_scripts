@@ -10,6 +10,7 @@ local fmt = require "fmt"
 local w_bridge = nil
 local lines = {}
 local link_numbers = {}
+local listname = nil
 
 function on_resume()
     if not widgets:bound(prefs.wid) then
@@ -31,6 +32,8 @@ function on_app_widget_updated(bridge)
     lines = combine_lines(all_lines)
 
     table.insert(lines, fmt.secondary("Add task"))
+
+    listname = string.sub(strings[1], 10, #strings[1] - 4)
 
     w_bridge = bridge
     if (ui:folding_flag()) then
@@ -61,7 +64,7 @@ end
 function on_click(idx)
     if (ui:folding_flag()) then
         if idx == 1 then
-            w_bridge:click("text_"..link_numbers[idx])
+            tasker:run_task("TickTick list "..listname)
         elseif idx == 2 then
             if (#lines > 1) then
                 w_bridge:click("text_"..link_numbers[idx])
@@ -73,6 +76,8 @@ function on_click(idx)
         if idx == #lines then
             -- "Plus" button
             w_bridge:click("image_3")
+        elseif idx == 1 then
+            tasker:run_task("TickTick list "..listname)
         else
             -- First task name
             w_bridge:click("text_"..link_numbers[idx])
