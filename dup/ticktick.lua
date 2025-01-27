@@ -31,9 +31,9 @@ function on_app_widget_updated(bridge)
     local all_lines = extract_list_item_lines(tree)
     lines = combine_lines(all_lines)
 
-    table.insert(lines, fmt.secondary("Add task"))
+    table.insert(lines, "%%fa:square-plus%% "..fmt.secondary("Add task"))
 
-    listname = string.sub(strings[1], 10, #strings[1] - 4)
+    listname = string.sub(strings[1], 4, #strings[1] - 4)
 
     w_bridge = bridge
     if (ui:folding_flag()) then

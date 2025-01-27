@@ -10,5 +10,6 @@ for repo in $DUP; do
         file=${script##*/}
         ../platform-tools/adb push $script $SCRIPTS_DIR/${file%.*}2.lua
         ../platform-tools/adb push $script $SCRIPTS_DIR/${file%.*}3.lua
+        ../platform-tools/adb push $script $SCRIPTS_DIR/${file%.*}4.lua
     done
 done
