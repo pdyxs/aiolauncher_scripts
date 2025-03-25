@@ -12,6 +12,10 @@ app_pkg = "com.ticktick.task"
 --app_pkg = "com.openai.chatgpt"
 --app_pkg = "com.calm.android"
 
+-- Widget size (string from "1x1" to "4x4")
+-- In most cases you can use nil
+widget_size = nil
+
 -- Globals
 labels = {}
 providers = {}
@@ -41,7 +45,7 @@ end
 function on_click(idx)
     if w_content == "" then
         wid = widgets:setup(providers[idx])
-        widgets:request_updates(wid)
+        widgets:request_updates(wid, widget_size)
     else
         system:copy_to_clipboard(w_content)
     end

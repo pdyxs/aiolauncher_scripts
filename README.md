@@ -18,6 +18,7 @@ The type of script is determined by the line (meta tag) at the beginning of the 
 
 # Links
 
+* [Step-by-step guide to writing scripts for AIO Launcher](README_INTRO.md)
 * [AIO Scripting Telegram Group](https://t.me/aio_scripting)
 * [AIO Script Store app](https://play.google.com/store/apps/details?id=ru.execbit.aiostore)
 * [Lua Guide](https://www.lua.org/pil/contents.html)
@@ -25,19 +26,28 @@ The type of script is determined by the line (meta tag) at the beginning of the 
 
 # Changelog
 
-### 5.3.5
+### 5.6.1
 
-* Added `ai` module
+* Added `ui:set_expandable()` and `ui:is_expanded()` methods
 
-### 5.3.1
+### 5.6.0
 
-* Added `string:trim()`, `string:starts_with()` and `string:ends_with()` methods
+* Added `ui:set_edit_mode_buttons()` method
+* Added size argument to `widgets:request_updates()` method
 
-### 5.3.0
+### 5.5.4
 
-* Added `prefs:show_dialog` method
-* Added `system:show_notify()` and `system:cancel_notify()` methods
-* Added support for SVG icons to the Rich UI API
+* Added `icon` meta tag
+* Added `private_mode` meta tag
+* Added `calendar:enabled_calendar_ids()` method
+
+### 5.5.1
+
+* Added `calendar:is_holiday()` method
+
+### 5.5.0
+
+* Added `aio:add_todo()` method
 
 [Full changelog](CHANGELOG.md)
 
@@ -128,7 +138,10 @@ _AIO Launcher also offers a way to create more complex UIs: [instructions](READM
 * `ui:set_title()` - changes the title of the widget, should be called before the data display function (empty line - reset to the standard title);
 * `ui:set_folding_flag(boolean)` - sets the flag of the folded mode of the widget, the function should be called before the data display functions;
 * `ui:folding_flag()` - returns folding flag;
-* `ui:set_progress(float)` - sets current widget progress (like in Player and Health widgets).
+* `ui:set_expandable()` - shows expand button on widget update;
+* `ui:is_expanded()` - checks if expanded mode is enabled;
+* `ui:set_progress(float)` - sets current widget progress (like in Player and Health widgets);
+* `ui:set_edit_mode_buttons(table)` - adds icons listed in the table (formatted as `"fa:name"`) to the edit mode. When an icon is clicked, the function `on_edit_mode_button_click(index)` will be called.
 
 The `ui:show_chart()` function takes a string as its third argument to format the x and y values on the screen. For example, the string `x: date y: number` means that the X-axis values should be formatted as dates, and the Y-values should be formatted as a regular number. There are four formats in total:
 
@@ -267,16 +280,36 @@ The function takes a command table of this format as a parameter:
 `traffic` - traffic progress bar;
 `screen` - screen time progress bar;
 `alarm` - next alarm info;
+`clock` - current time;
 `notes [NUM]` - last NUM notes;
 `tasks [NUM]` - last NUM tasks;
 `calendar [NUM]` - last NUM calendar events;
+`calendarw` - weekly calendar;
 `exchage [NUM] [FROM] [TO]` - exchange rate FROM currency TO currency;
 `player` - player controls;
-`health` - health data;
 `weather [NUM]` - weather forecast for NUM days;
 `worldclock [TIME_ZONE]` - time in the given TIME_ZONE;
 `notify [NUM]` - last NUM notifications;
 `dialogs [NUM]` - last NUM dialogs;
+`calculator` - calculator;
+`feed [NUM]` - news feed;
+`control` - control panel;
+`stopwatch` - stopwatch;
+`finance [NUM]` - finance tickers;
+`financechart` - finance chart;
+`contacts [NUM]` - contacts (number of lines);
+`apps [NUM]` - frequent apps (number of lines);
+`appbox [NUM]` - my apps (number of lines);
+`applist [NUM]` - apps list (number of lines);
+`appfolders [NUM]` - app folders;
+`timer` - timers;
+`mailbox [NUM]` - mail widget;
+`dialer` - dialer;
+`recorder` - recorder;
+`telegram` - telegram messages;
+`smartspacer` - SmartSpacer;
+`widgetscontainer` - widgets container;
+`tips` - tips;
 `text [TEXT]` - just shows TEXT;
 `space [NUM]` - NUM of spaces.
 ```
@@ -351,7 +384,8 @@ Intent table format (all fields are optional):
 * `aio:do_action(string)` - performs an AIO action ([more](https://aiolauncher.app/api.html));
 * `aio:actions()` - returns a list of available actions;
 * `aio:settings()` - returns a list of available AIO Settings sections;
-* `aio:open_settings([section])` - open AIO Settings or AIO Settings section.
+* `aio:open_settings([section])` - open AIO Settings or AIO Settings section;
+* `aio:add_todo(icon, text)` - add a TODO item with the specified Fontawesome icon and text.
 
 Format of table elements returned by `aio:available_widgets()`:
 
@@ -467,12 +501,14 @@ If there is a problem with the network, the `on_network_error_$id` callback will
 ## Calendar
 
 * `calendar:events([start_date], [end_date], [cal_table])` - returns table of event tables of all calendars, start\_date - event start date, end\_date - event end date, cal\_table - calendar ID table (function will return the string `permission_error` if the launcher does not have permissions to read the calendar);
-* `calendar:request_permission()` - requests access rights to the calendar;
 * `calendar:calendars()` - returns table of calendars tables;
+* `calendar:request_permission()` - requests access rights to the calendar;
 * `calendar:show_event_dialog(id)` - shows the event dialog;
 * `calendar:open_event(id|event_table)` - opens an event in the system calendar;
 * `calendar:open_new_event([start], [end])` - opens a new event in the calendar, `start` - start date of the event in seconds, `end` - end date of the event;
-* `calendar:add_event(event_table)` - adds event to the system calendar.
+* `calendar:add_event(event_table)` - adds event to the system calendar;
+* `calendar:is_holiday(date)` - returns true if the given date is a holiday or a weekend;
+* `calendar:enabled_calendar_ids()` - returns list of calendar IDs enabled in the builtin Calendar widget settings.
 
 Event table format:
 
@@ -720,9 +756,15 @@ function on_resume()
 end
 ```
 
-The `new_key` will be present in the table even after the AIO Launcher has been restrated.
+The `new_key` will be present in the table even after the AIO Launcher has been restarted.
 
-The `show_dialog()` method automatically creates a window of current settings from fields defined in prefs. The window will display all fields with a text key and a value of one of three types: string, number, or boolean. All other fields of different types will be omittedi. Fields whose names start with an underscore will also be omitted. Script will be reloaded on settings save.
+The `show_dialog()` method automatically creates a window of current settings from fields defined in prefs. The window will display all fields with a text key and a value of one of three types: string, number, or boolean. All other fields of different types will be omitted. Fields whose names start with an underscore will also be omitted. Script will be reloaded on settings save.
+
+Starting from version 5.5.2, you can change the order of fields in the dialog by simply specifying the order in `prefs._dialog_order`. For example:
+
+```
+prefs._dialog_order = "message,start_time,end_time"
+```
 
 ## Animation and real time updates
 
@@ -829,12 +871,12 @@ In order for AIO Launcher to correctly display information about the script in t
 
 ```
 -- name = "Covid info"
+-- icon = "fontawesome_icon_name"
 -- description = "Cases of illness and death from covid"
 -- data_source = "https://covid19api.com"
--- arguments_help = "Specify the country code"
--- arguments_default = "RU"
 -- type = "widget"
--- foldable = "false"
+-- foldable = "true"
+-- private_mode = "false"
 -- author = "Evgeny Zobnin (zobnin@gmail.com)"
 -- version = "1.0"
 ```
