@@ -4,7 +4,7 @@
 -- author = "pdyxs"
 
 local puzzles = {
-    "Sunny with a chance of fog",
+    "Sunny, with a chance of fog",
     "Cityscrapers",
     "This is how the time war works",
     "This is how you live the time war",
@@ -32,7 +32,7 @@ function on_drawer_open()
     drawer:show_list(newPuzzles)
 
     for k, puzzle in pairs(puzzles) do
-        local key = string.lower(puzzle:gsub(" ", ""))
+        local key = string.lower(puzzle:gsub(" ", "")):gsub(",", "%%2C")
         local response = shttp:get("https://api.sudokupad.com/counter/pdyxs-"..key)
 
         if response.code >= 200 and response.code < 300 then
