@@ -26,6 +26,16 @@ The type of script is determined by the line (meta tag) at the beginning of the 
 
 # Changelog
 
+### 5.7.1
+
+* Added `tags` field to the app table
+* Added `system:tz()` method
+
+### 5.7.0
+
+* Added `ui:show_image(uri)` method
+* Many changes in the `notify` module
+
 ### 5.6.1
 
 * Added `ui:set_expandable()` and `ui:is_expanded()` methods
@@ -34,20 +44,6 @@ The type of script is determined by the line (meta tag) at the beginning of the 
 
 * Added `ui:set_edit_mode_buttons()` method
 * Added size argument to `widgets:request_updates()` method
-
-### 5.5.4
-
-* Added `icon` meta tag
-* Added `private_mode` meta tag
-* Added `calendar:enabled_calendar_ids()` method
-
-### 5.5.1
-
-* Added `calendar:is_holiday()` method
-
-### 5.5.0
-
-* Added `aio:add_todo()` method
 
 [Full changelog](CHANGELOG.md)
 
@@ -125,6 +121,7 @@ The list output functions support HTML and Markdown (see User Interface section 
 ## User Interface
 
 _Available only in widget scripts._
+
 _AIO Launcher also offers a way to create more complex UIs: [instructions](README_RICH_UI.md)_
 
 * `ui:show_text(string)` - displays plain text in widget, repeated call will erase previous text;
@@ -133,6 +130,7 @@ _AIO Launcher also offers a way to create more complex UIs: [instructions](READM
 * `ui:show_buttons(names, [colors])` - displays a list of buttons, the first argument is a table of strings, the second is an optional argument, a table of colors in the format #XXXXXX;
 * `ui:show_progress_bar(text, current_value, max_value, [color])` - shows the progress bar;
 * `ui:show_chart(points, [format], [title], [show_grid], [folded_string], [copyright])` - shows the chart, points - table of coordinate tables, format - data format (see below), title - chart name, show\_grid - grid display flag, folded\_string - string for the folded state (otherwise the name will be shown), copyright - string displayed in the lower right corner;
+* `ui:show_image(uri)` - show image by URL;
 * `ui:show_toast(string)` - shows informational message in Android style;
 * `ui:default_title()` - returns the standard widget title (set in the `name` metadata);
 * `ui:set_title()` - changes the title of the widget, should be called before the data display function (empty line - reset to the standard title);
@@ -196,11 +194,11 @@ _Note: AIO only supports icons up to Fontawesome 6.3.0._
 
 _Available only in widget scripts._
 
-* `ui:show_dialog(title, text, [button1_text], [button2_text])` - show dialog, the first argument is the title, the second is the text, button1\_text is the name of the first button, button2\_text is the name of the second button;
-* `ui:show_edit_dialog(title, [text], [default_value])` - show the dialog with the input field: title - title, text - signature, default\_value - standard value of the input field;
-* `ui:show_radio_dialog (title, lines, [index])` - show a dialog with a choice: title - title, lines - table of lines, index - index of the default value;
-* `ui:show_checkbox_dialog(title, lines, [table])` - show dialog with selection of several elements: title - title, lines - table of lines, table - table default values;
-* `ui:show_list_dialog(prefs)` - shows dialog with list of data.
+* `dialogs:show_dialog(title, text, [button1_text], [button2_text])` - show dialog, the first argument is the title, the second is the text, button1\_text is the name of the first button, button2\_text is the name of the second button;
+* `dialogs:show_edit_dialog(title, [text], [default_value])` - show the dialog with the input field: title - title, text - signature, default\_value - standard value of the input field;
+* `dialogs:show_radio_dialog (title, lines, [index])` - show a dialog with a choice: title - title, lines - table of lines, index - index of the default value;
+* `dialogs:show_checkbox_dialog(title, lines, [table])` - show dialog with selection of several elements: title - title, lines - table of lines, table - table default values;
+* `dialogs:show_list_dialog(prefs)` - shows dialog with list of data.
 
 Dialog button clicks should be handled in the `on_dialog_action(number)` callback, where 1 is the first button, 2 is the second button, and -1 is nothing (dialog just closed). `ui:show_radio_dialog()` returns the index of the selected item or -1 in case the cancel button was pressed. `ui:show_checkbox_dialog()` returns the table of indexes or -1. `ui:show_edit_dialog()` returns text or -1.
 
@@ -220,7 +218,7 @@ List dialog accepts table as argument:
 
 _Avaialble from: 4.4.1_
 
-* `ui:show_rich_editor(prefs)` - show complex editor dialog with undo support, lists, time, colors support. It can be used to create notes and tasks style widgets.
+* `dialogs:show_rich_editor(prefs)` - show complex editor dialog with undo support, lists, time, colors support. It can be used to create notes and tasks style widgets.
 
 Dialog accepts table as argument:
 
@@ -302,6 +300,7 @@ The function takes a command table of this format as a parameter:
 `appbox [NUM]` - my apps (number of lines);
 `applist [NUM]` - apps list (number of lines);
 `appfolders [NUM]` - app folders;
+`appcategories [NUM]` - app categries;
 `timer` - timers;
 `mailbox [NUM]` - mail widget;
 `dialer` - dialer;
@@ -329,6 +328,7 @@ The function takes a command table of this format as a parameter:
 * `system:alarm_sound(seconds)` - make alarm sound;
 * `system:share_text(string)` - opens the "Share" system dialog;
 * `system:lang()` - returns the language selected in the system;
+* `system:tz()` - returns TimeZone string (example: Africa/Cairo);
 * `system:tz_offset()` - returns TimeZone offset in seconds;
 * `system:currency()` - returns default currency code based on locale;
 * `system:format_date_localized(format, date)` - returns localized date string (using java formatting);
@@ -452,7 +452,7 @@ end
 * `apps:show_edit_dialog(package)` - shows edit dialog of the application;
 * `apps:categories()` - returns a table of category tables.
 
-The format of the apps table:
+The format of the app table:
 
 ```
 `pkg` - name of the app package (if it is cloned app or Android for Work app package name will also contain user id, like that: `com.example.app:123`);
@@ -461,6 +461,7 @@ The format of the apps table:
 `hidden` - true if the application is hidden;
 `suspended` - true if the application is suspended;
 `category_id` - category ID;
+`tags` - array of tags;
 `badge` - number on the badge;
 `icon` - icon of the application in the form of a link (can be used in the side menu scripts).
 ```
@@ -648,6 +649,7 @@ _Avaialble from: 5.3.6._
 ## AI
 
 _Avaialble from: 5.3.5._
+
 _Requires subscription._
 
 * `ai:complete(text)` - send message to the AI;
@@ -670,17 +672,19 @@ _Keep in mind that the launcher imposes certain limitations on the use of this m
 ## Reading notifications
 
 _Available only in widget scripts._
+
 _Avaialble from: 4.1.3._
 
 _This module is intended for reading notifications from other applications. To send notifications, use the `system` module._
 
-* `notify:request_current()` - requests current notifications from the launcher;
+* `notify:list()` - returns list of current notifications as table of tables;
 * `notify:open(key)` - opens notification with specified key;
 * `notify:close(key)` - removes the notification with the specified key;
-* `notify:do_action(key, action_id)` - sends notification action (_available from: 4.1.5_);
-* `notify:consumed(key)` - mark notification as consumed so built-in Notifications widget will not show it;
+* `notify:do_action(key, action_id)` - sends notification action (_available from: 4.1.5_).
 
-The `notify:request_current()` function asks for all current notifications. The Launcher returns them one by one to the `on_notify_posted(table)` callback, where table is the table representing the notification. The same callback will be called when a new notification appears. When the notification is closed, the `on_notify_removed(table)` colbeck will be called.
+The launcher triggers callback when a notification is received or removed:
+
+* `on_notifications_updated()` – notification list changed;
 
 Notification table format:
 
@@ -701,7 +705,7 @@ Notification table format:
 `actions` - table notifications actions with fields: `id`, `title`, `have_input` (_available from: 4.1.5_);
 ```
 
-Keep in mind that the AIO Launcher also calls `request_current()` every time you return to the launcher, which means that all scripts will also get notification information in the `on_notify_posted()` callback every time you return to the desktop.
+Keep in mind that the AIO Launcher also request current notifications every time you return to the launcher, which means that all scripts will also get the `on_notifications_updated()` callback called.
 
 ## Files
 
@@ -769,6 +773,7 @@ prefs._dialog_order = "message,start_time,end_time"
 ## Animation and real time updates
 
 _Available only in widget scripts._
+
 _Avaialble from: 4.5.2_
 
 The scripts API is designed in a way that every function that changes a widget's UI updates the entire interface. This approach makes the API as simple and convenient as possible for quick scripting, but it also prevents the creation of more complex scripts that change the UI state very often.
@@ -781,7 +786,7 @@ There are two modules to solve this problem: `morph` and `anim`. The first is us
 * `morph:run_with_delay(delay, function)` - populates specified Lua function with delay `delay`;
 * `morph:cancel(idx)` - cancels a previously run change if it is not yet complete (e.g., delay or animation is not over).
 * `anim:blink(idx)` - blinks UI element with index `idx`;
-* `anim:move(x, y, [delay])` - moves element sideways by specified number of DP and returns back after delay;
+* `anim:move(idx, x, y, [delay])` - moves element sideways by specified number of DP and returns back after delay;
 * `anim:heartbeat(idx)` - animation of heartbeat;
 * `anim:shake(idx)` - shake animation;
 * `anim:cancel(idx)` - cancel the running animation.
@@ -801,7 +806,7 @@ _Avaialble from: 4.4.4_
 
 * `tasker:tasks([project])` - returns a list of all the tasks in the Tasker, the second optional argument is the project for which you want to get the tasks (returns nil if Tasker is not installed or enabled);
 * `tasker:projects()` - returns all Tasker projects (returns nil if Tasker is not installed or enabled);
-* `tasker:run_task(name, [args])` - executes the task in the Tasker, the second optional argument is a table of variables passed to the task in the format `{ "name" = "value" }`;
+* `tasker:run_task(name, [args])` - executes the task in the Tasker, the second optional argument is a table of variables passed to the task in the format `{ name = "value" }`;
 * `tasker:run_own_task(commands)` - constructs and performs the task on the fly;
 * `tasker:send_command(command)` - sends [tasker command](https://tasker.joaoapps.com/commandsystem.html).
 

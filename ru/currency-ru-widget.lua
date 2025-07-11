@@ -25,7 +25,7 @@ function on_long_click()
     if history == "" then
         return
     end
-    ui:show_dialog("История курсов ЦБ\n"..nominal.." "..cur.." / "..base_cur,history)
+    dialogs:show_dialog("История курсов ЦБ\n"..nominal.." "..cur.." / "..base_cur,history)
 end
 
 function on_settings()
@@ -38,7 +38,7 @@ function on_settings()
             idx = i
         end
     end
-    ui:show_radio_dialog("Выберите валюту",names,idx)
+    dialogs:show_radio_dialog("Выберите валюту",names,idx)
 end
 
 function on_dialog_action(data)
@@ -64,12 +64,12 @@ function on_network_result_today(result,error)
 		end
 		today = today..v.Nominal:value().." "..v.CharCode:value().." = "..v.Value:value():replace(",",".").." "..base_cur
 	end
-	ui:show_dialog("Курсы валют ЦБ\n"..date_today,today)
+	dialogs:show_dialog("Курсы валют ЦБ\n"..date_today,today)
 end
 
 function on_network_result_history(result,error)
     history = ""
-    local color = ui:get_colors()
+    local color = aio:colors()
     local equals = "<font color=\""..color.secondary_text.."\"> = </font>"
     local xml = require "xml"
     local t = xml:parse(result)
@@ -111,7 +111,7 @@ function get_rates()
 end
 
 function get_formatted_change_text(change)
-	local color = ui:get_colors()
+	local color = aio:colors()
     if change > 0 then
         return "<font color=\""..color.progress_good.."\">&nbsp+"..change.."%</font>"
     elseif change < 0 then

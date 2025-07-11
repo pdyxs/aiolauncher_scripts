@@ -16,11 +16,11 @@ function on_resume()
 end
 
 function redraw()
-    ui:show_text(current_output)
+    ui:show_text("%%txt%%"..current_output)
 end
 
 function on_click(idx)
-    ui:show_edit_dialog("Enter command")
+    dialogs:show_edit_dialog("Enter command")
 end
 
 function on_dialog_action(text)

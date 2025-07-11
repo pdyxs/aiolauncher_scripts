@@ -4,7 +4,7 @@
 -- arguments_help = "Long click button for options, open widget settings for list of buttons"
 --foldable = "true"
 -- author = "Theodor Galanis"
--- version = "2.5"
+-- version = "2.6"
 
 md_colors = require "md_colors"
 
@@ -14,7 +14,7 @@ local names = {"Quick menu", "Quick apps menu", "Applications menu", "Toggle hea
 
 local colors = { md_colors.purple_800,  md_colors.purple_600, md_colors.amber_900, md_colors.orange_900, md_colors.blue_900, md_colors.deep_purple_800, md_colors.grey_600, md_colors.green_900, md_colors.green_900, md_colors.blue_800, md_colors.pink_300, md_colors.pink_A200, md_colors.green_600, md_colors.grey_800, md_colors.teal_700, md_colors.teal_800, md_colors.orange_700, md_colors.red_800, md_colors.red_900, md_colors.deep_purple_700, md_colors.blue_700, md_colors.amber_800, md_colors.blue_grey_700}
 
-  local  actions = { "quick_menu", "quick_apps_menu", "apps_menu", "headers", "settings", "refresh", "restart", "notify", "clear_notifications", "quick_settings", "fold", "unfold", "private_mode", "screen_off", "scroll_down", "scroll_up", "add_note", "start_record", "send_mail", "show_recents",  "voice", "one_handed", "search"}
+local actions = { "quick_menu", "quick_apps_menu", "apps_menu", "headers", "settings", "refresh", "restart", "notify", "clear_notifications", "quick_settings", "fold", "unfold", "private_mode", "screen_off", "scroll_down", "scroll_up", "add_note", "start_record", "send_mail", "show_recents",  "voice", "one_handed", "search"}
 
 local pos = 0
 
@@ -35,7 +35,7 @@ function on_long_click(idx)
   pos = idx
   local tab = settings:get()
   label = get_label(actions[get_checkbox_idx()[idx]])
- if label == nil then 
+ if label == nil then
   label = names[get_checkbox_idx()[idx]]
   end
   ui:show_context_menu({{"angle-left",""},{"ban",""},{"angle-right",""},{icons[get_checkbox_idx()[idx]]:gsub("fa:",""),label}})
@@ -66,13 +66,13 @@ axions = aio:actions()
 lab = {}
 for i = 1, #axions do
 lav = get_label(actions[i])
- if lav == nil then 
+ if lav == nil then
  table.insert(lab,names[i])
- else 
+ else
  table.insert(lab, lav)
   end
   end
- ui:show_checkbox_dialog("Select actions", lab, get_checkbox_idx())
+ dialogs:show_checkbox_dialog("Select actions", lab, get_checkbox_idx())
 end
 
 --utilities--

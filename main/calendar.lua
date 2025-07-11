@@ -32,7 +32,7 @@ end
 
 function on_settings()
 	dialog_id = "settings"
-	ui:show_checkbox_dialog("Check calendars", get_all_cals()[3],cal_id_to_id(settings:get()))
+	dialogs:show_checkbox_dialog("Check calendars", get_all_cals()[3],cal_id_to_id(settings:get()))
 end
 
 function on_click(i)
@@ -51,7 +51,7 @@ function on_click(i)
 			on_resume()
 		elseif i > 1 and i < 8 then
 			dialog_id = "date"
-			ui:show_edit_dialog("Enter month and year", "Format - 12.2020. Empty value - current month", string.format("%02d.%04d", month, year))
+			dialogs:show_edit_dialog("Enter month and year", "Format - 12.2020. Empty value - current month", string.format("%02d.%04d", month, year))
 			return
 		elseif (i-1)%8 ~= 0 and tab[i] ~= " " then
 			day = tab[i]:match(">(%d+)<"):gsub("^0","")
@@ -116,7 +116,7 @@ function on_dialog_action(data)
 end
 
 function get_cal(y,m)
-	local color = ui:colors()
+	local color = aio:colors()
 	local events = get_my_events(y,m,0)
 	local from = os.time{year=y,month=m,day=1}
 	local tab = {
@@ -151,7 +151,7 @@ function get_cal(y,m)
 end
 
 function format_day(y,m,d,events)
-	local color = ui:colors()
+	local color = aio:colors()
 	local from = os.time{year=y,month=m,day=d,hour=0,min=0,sec=0}
 	local to = os.time{year=y,month=m,day=d,hour=23,min=59,sec=59}
 	local yes = false
@@ -261,7 +261,7 @@ function get_day_tab(events)
 end
 
 function get_lines(events)
-	local color = ui:colors()
+	local color = aio:colors()
 	local lines = {}
 	for i,v in ipairs(events) do
 		table.insert(lines,"<font color = \""..v[9].."\">•</font>")
