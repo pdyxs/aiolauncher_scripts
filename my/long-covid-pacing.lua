@@ -9,26 +9,34 @@ local prefs = require "prefs"
 
 -- Initialize preferences
 if not prefs.selected_level then
-    prefs.selected_level = 2  -- Default to YELLOW
+    prefs.selected_level = 0  -- Default to no selection
+end
+
+-- Track what day we last made a selection
+if not prefs.last_selection_date then
+    prefs.last_selection_date = ""
 end
 
 -- Capacity levels
 local levels = {
-    {name = "🔴 RED", color = "#FF4444", key = "red"},
-    {name = "🟡 YELLOW", color = "#FFAA00", key = "yellow"}, 
-    {name = "🟢 GREEN", color = "#44AA44", key = "green"}
+    {name = "Recovering", color = "#FF4444", key = "red", icon = "bed"},
+    {name = "Maintaining", color = "#FFAA00", key = "yellow", icon = "walking"}, 
+    {name = "Engaging", color = "#44AA44", key = "green", icon = "bolt"}
 }
 
--- Using AIO Launcher's files module (sandboxed directory)
--- Files will be stored in /sdcard/Android/data/ru.execbit.aiolauncher/files/scripts/
+-- Using AIO Launcher's files module (sandboxed directory) 
+-- OR receive data directly from Tasker via broadcast intent
+-- Tasker sends plan data directly to avoid file permission issues
 
 -- Cache for parsed data
 local cached_plans = {}
 local cached_criteria = nil
+local data_source = "none"  -- "files" or "tasker" or "none"
 
 function on_resume()
     -- Add error handling for the main entry point
     local success, error_msg = pcall(function()
+        check_daily_reset()
         load_data()
         render_widget()
     end)
@@ -38,15 +46,63 @@ function on_resume()
     end
 end
 
+function check_daily_reset()
+    local today = os.date("%Y-%m-%d")
+    if prefs.last_selection_date ~= today then
+        -- New day - reset to no selection
+        prefs.selected_level = 0
+        prefs.last_selection_date = today
+    end
+end
+
 function on_click(idx)
-    if idx >= 1 and idx <= 3 then
-        -- Only allow same level or downgrade
-        if idx <= prefs.selected_level then
-            prefs.selected_level = idx
-            save_daily_choice(idx)
+    if not my_gui then return end
+    
+    local element = my_gui.ui[idx]
+    if not element then return end
+    
+    local elem_type = element[1]
+    local elem_text = element[2]
+    
+    if elem_type == "button" then
+        if elem_text:find("bed") then
+            -- Capacity level 1 (Recovering)
+            if prefs.selected_level == 0 or 1 <= prefs.selected_level then
+                prefs.selected_level = 1
+                save_daily_choice(1)
+                render_widget()
+            else
+                ui:show_toast("Can only downgrade capacity level")
+            end
+        elseif elem_text:find("walking") then
+            -- Capacity level 2 (Maintaining)
+            if prefs.selected_level == 0 or 2 <= prefs.selected_level then
+                prefs.selected_level = 2
+                save_daily_choice(2)
+                render_widget()
+            else
+                ui:show_toast("Can only downgrade capacity level")
+            end
+        elseif elem_text:find("bolt") then
+            -- Capacity level 3 (Engaging)
+            if prefs.selected_level == 0 or 3 <= prefs.selected_level then
+                prefs.selected_level = 3
+                save_daily_choice(3)
+                render_widget()
+            else
+                ui:show_toast("Can only downgrade capacity level")
+            end
+        elseif elem_text:find("rotate%-right") then
+            -- Reset selection button
+            prefs.selected_level = 0
+            ui:show_toast("Selection reset")
             render_widget()
-        else
-            ui:show_toast("Can only downgrade capacity level")
+        elseif elem_text:find("sync") then
+            -- Sync files button
+            sync_plan_files()
+        elseif elem_text == "Back" then
+            -- Back button from decision criteria
+            render_widget()
         end
     end
 end
@@ -147,37 +203,77 @@ function render_widget()
     
     ui:set_title("Long Covid Pacing - " .. day_display)
     
-    -- Create buttons with current selection highlighted
-    local button_names = {}
-    local button_colors = {}
+    -- Build Rich UI
+    local ui_elements = {}
     
+    -- Add capacity level buttons
     for i, level in ipairs(levels) do
-        table.insert(button_names, level.name)
-        if i == prefs.selected_level then
-            table.insert(button_colors, level.color)
-        else
-            table.insert(button_colors, "#888888")  -- Dimmed for non-selected
-        end
-    end
-    
-    ui:show_buttons(button_names, button_colors)
-    
-    -- Show plan details if expanded
-    if ui:is_expanded() then
-        local success, error_msg = pcall(function()
-            show_plan_details(today)
-        end)
+        local color
+        local button_text
         
-        if not success then
-            ui:show_text("Selected: " .. levels[prefs.selected_level].name .. "\n\nCan't load plan data.\nCheck file paths in Documents folder.")
+        if i == prefs.selected_level then
+            color = level.color  -- Highlight selected
+            button_text = "%%fa:" .. level.icon .. "%% " .. level.name  -- Icon + text for selected
+        elseif prefs.selected_level == 0 then
+            color = level.color  -- All available when none selected
+            button_text = "%%fa:" .. level.icon .. "%% " .. level.name  -- Icon + text when all available
+        else
+            color = "#888888"  -- Dimmed for unavailable
+            button_text = "fa:" .. level.icon  -- Icon only for unavailable
+        end
+        
+        table.insert(ui_elements, {"button", button_text, {color = color}})
+        if i < #levels then
+            table.insert(ui_elements, {"spacer", 1})
         end
     end
+    
+    -- Add reset button (always icon-only)
+    table.insert(ui_elements, {"spacer", 2})
+    table.insert(ui_elements, {"button", "fa:rotate-right", {color = "#666666"}})
+
+    ui:set_expandable(true)
+    
+    -- Add plan details if expanded
+    if ui:is_expanded() then
+        table.insert(ui_elements, {"new_line", 2})
+        
+        if prefs.selected_level == 0 then
+            -- No selection made yet
+            table.insert(ui_elements, {"text", "<b>Select your capacity level:</b>", {size = 18}})
+            table.insert(ui_elements, {"new_line", 1})
+            table.insert(ui_elements, {"text", "%%fa:bed%% <b>Recovering</b> - Low energy, prioritize rest", {color = "#FF4444"}})
+            table.insert(ui_elements, {"new_line", 1})
+            table.insert(ui_elements, {"text", "%%fa:walking%% <b>Maintaining</b> - Moderate energy, standard routine", {color = "#FFAA00"}})
+            table.insert(ui_elements, {"new_line", 1})
+            table.insert(ui_elements, {"text", "%%fa:bolt%% <b>Engaging</b> - High energy, can handle challenges", {color = "#44AA44"}})
+            table.insert(ui_elements, {"new_line", 2})
+            table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50"}})
+        else
+            local success, error_msg = pcall(function()
+                add_plan_details(ui_elements, today)
+            end)
+            
+            if not success then
+                -- Show error and sync button
+                table.insert(ui_elements, {"text", "<b>Selected:</b> " .. levels[prefs.selected_level].name, {size = 18}})
+                table.insert(ui_elements, {"new_line", 1})
+                table.insert(ui_elements, {"text", "%%fa:exclamation-triangle%% <b>Can't load plan data</b>", {color = "#ff6b6b"}})
+                table.insert(ui_elements, {"new_line", 2})
+                table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50"}})
+            end
+        end
+    end
+    
+    -- Render the UI
+    my_gui = gui(ui_elements)
+    my_gui.render()
 end
 
-function show_plan_details(day)
+function add_plan_details(ui_elements, day)
     local plan = cached_plans[day]
     if not plan then
-        ui:show_text("No plan available for " .. day)
+        table.insert(ui_elements, {"text", "No plan available for " .. day, {color = "#ff6b6b"}})
         return
     end
     
@@ -185,29 +281,35 @@ function show_plan_details(day)
     local level_plan = plan[level_key]
     
     if not level_plan then
-        ui:show_text("No plan available for selected level")
+        table.insert(ui_elements, {"text", "No plan available for selected level", {color = "#ff6b6b"}})
         return
     end
     
-    local lines = {}
-    table.insert(lines, "<b>Today's Plan:</b>")
-    table.insert(lines, "")
+    table.insert(ui_elements, {"text", "<b>Today's Plan:</b>", {size = 18}})
+    table.insert(ui_elements, {"new_line", 1})
     
     -- Add each category
     for category, items in pairs(level_plan) do
         if #items > 0 then
-            table.insert(lines, "<b>" .. category .. ":</b>")
+            table.insert(ui_elements, {"text", "<b>" .. category .. ":</b>", {size = 16, color = "#666666"}})
+            table.insert(ui_elements, {"new_line", 1})
             for _, item in ipairs(items) do
-                table.insert(lines, "• " .. item)
+                table.insert(ui_elements, {"text", "• " .. item})
+                table.insert(ui_elements, {"new_line", 1})
             end
-            table.insert(lines, "")
+            table.insert(ui_elements, {"new_line", 1})
         end
     end
     
-    ui:show_lines(lines)
+    -- Add sync button at the end
+    table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50"}})
 end
 
 function save_daily_choice(level_idx)
+    if level_idx == 0 then
+        return  -- Don't save if no selection
+    end
+    
     local today = os.date("%Y-%m-%d")
     local day_name = get_current_day()
     local level_name = levels[level_idx].name
@@ -226,9 +328,75 @@ function save_daily_choice(level_idx)
 end
 
 function on_long_click(idx)
-    if idx >= 1 and idx <= 3 then
-        -- Show decision criteria for selected level
-        show_decision_criteria(idx)
+    if not my_gui then return end
+    
+    local element = my_gui.ui[idx]
+    if not element then return end
+    
+    local elem_type = element[1]
+    local elem_text = element[2]
+    
+    if elem_type == "button" then
+        if elem_text:find("bed") then
+            show_decision_criteria(1)
+        elseif elem_text:find("walking") then
+            show_decision_criteria(2)
+        elseif elem_text:find("bolt") then
+            show_decision_criteria(3)
+        elseif elem_text:find("rotate%-right") then
+            ui:show_toast("Reset button - tap to clear selection")
+        elseif elem_text:find("sync") then
+            ui:show_toast("Syncing plan files with Tasker...")
+            sync_plan_files()
+        end
+    end
+end
+
+function sync_plan_files()
+    -- Call Tasker to send plan data directly to widget
+    if tasker then
+        ui:show_toast("Loading plan data...")
+        tasker:run_task("LongCovid_SendData")
+    else
+        ui:show_toast("Tasker not available")
+    end
+end
+
+function on_tasker_result(success)
+    if success then
+        ui:show_toast("✓ Tasker task completed")
+        -- Data will be received via on_command callback
+    else
+        ui:show_toast("✗ Tasker task failed")
+    end
+end
+
+function on_command(data)
+    -- Receive data from Tasker via broadcast intent
+    -- Data format: "type:filename:content"
+    local parts = data:split(":")
+    if #parts < 3 then
+        return
+    end
+    
+    local data_type = parts[1]
+    local filename = parts[2]
+    local content = table.concat(parts, ":", 3)  -- Rejoin content (may contain colons)
+    
+    if data_type == "plan_data" then
+        -- Store the received data using AIO's files module
+        files:write(filename, content)
+        
+        -- Clear cache to reload data
+        cached_plans = {}
+        cached_criteria = nil
+        data_source = "files"
+        
+        -- Reload widget
+        load_data()
+        render_widget()
+        
+        ui:show_toast("✓ Plan data updated")
     end
 end
 
@@ -241,13 +409,18 @@ function show_decision_criteria(level_idx)
         return
     end
     
-    local lines = {}
-    table.insert(lines, "<b>" .. levels[level_idx].name .. " - Decision Criteria:</b>")
-    table.insert(lines, "")
+    local ui_elements = {}
+    table.insert(ui_elements, {"text", "<b>" .. levels[level_idx].name .. " - Decision Criteria:</b>", {size = 18, color = levels[level_idx].color}})
+    table.insert(ui_elements, {"new_line", 2})
     
     for _, criterion in ipairs(criteria) do
-        table.insert(lines, "• " .. criterion)
+        table.insert(ui_elements, {"text", "• " .. criterion})
+        table.insert(ui_elements, {"new_line", 1})
     end
     
-    ui:show_lines(lines)
+    table.insert(ui_elements, {"new_line", 1})
+    table.insert(ui_elements, {"button", "Back", {color = "#666666"}})
+    
+    my_gui = gui(ui_elements)
+    my_gui.render()
 end
