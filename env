@@ -1,4 +1,3 @@
-REPOS="dev my dup"
-DUP="dup"
+REPOS="dev my"
 SCRIPTS_DIR="/sdcard/Android/data/ru.execbit.aiolauncher/files/"
 

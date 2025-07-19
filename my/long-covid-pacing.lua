@@ -92,7 +92,7 @@ function on_click(idx)
             else
                 ui:show_toast("Can only downgrade capacity level")
             end
-        elseif elem_text:find("rotate%-right") then
+        elseif elem_text:find("rotate%-right") or elem_text:find("Reset") then
             -- Reset selection button
             prefs.selected_level = 0
             ui:show_toast("Selection reset")
@@ -206,10 +206,11 @@ function render_widget()
     -- Build Rich UI
     local ui_elements = {}
     
-    -- Add capacity level buttons
+    -- Add capacity level buttons (centered)
     for i, level in ipairs(levels) do
         local color
         local button_text
+        local gravity = nil
         
         if i == prefs.selected_level then
             color = level.color  -- Highlight selected
@@ -222,15 +223,23 @@ function render_widget()
             button_text = "fa:" .. level.icon  -- Icon only for unavailable
         end
         
-        table.insert(ui_elements, {"button", button_text, {color = color}})
+        -- Center the first button, anchor others to it
+        if i == 1 then
+            gravity = "center_h"
+        else
+            gravity = "anchor_prev"
+        end
+        
+        local button_props = {color = color}
+        if gravity then
+            button_props.gravity = gravity
+        end
+        
+        table.insert(ui_elements, {"button", button_text, button_props})
         if i < #levels then
             table.insert(ui_elements, {"spacer", 1})
         end
     end
-    
-    -- Add reset button (always icon-only)
-    table.insert(ui_elements, {"spacer", 2})
-    table.insert(ui_elements, {"button", "fa:rotate-right", {color = "#666666"}})
 
     ui:set_expandable(true)
     
@@ -248,7 +257,9 @@ function render_widget()
             table.insert(ui_elements, {"new_line", 1})
             table.insert(ui_elements, {"text", "%%fa:bolt%% <b>Engaging</b> - High energy, can handle challenges", {color = "#44AA44"}})
             table.insert(ui_elements, {"new_line", 2})
-            table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50"}})
+            table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}})
+            table.insert(ui_elements, {"spacer", 2})
+            table.insert(ui_elements, {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}})
         else
             local success, error_msg = pcall(function()
                 add_plan_details(ui_elements, today)
@@ -260,7 +271,9 @@ function render_widget()
                 table.insert(ui_elements, {"new_line", 1})
                 table.insert(ui_elements, {"text", "%%fa:exclamation-triangle%% <b>Can't load plan data</b>", {color = "#ff6b6b"}})
                 table.insert(ui_elements, {"new_line", 2})
-                table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50"}})
+                table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}})
+                table.insert(ui_elements, {"spacer", 2})
+                table.insert(ui_elements, {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}})
             end
         end
     end
@@ -301,8 +314,10 @@ function add_plan_details(ui_elements, day)
         end
     end
     
-    -- Add sync button at the end
-    table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50"}})
+    -- Add sync button and reset at the end
+    table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}})
+    table.insert(ui_elements, {"spacer", 2})
+    table.insert(ui_elements, {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}})
 end
 
 function save_daily_choice(level_idx)
@@ -343,7 +358,7 @@ function on_long_click(idx)
             show_decision_criteria(2)
         elseif elem_text:find("bolt") then
             show_decision_criteria(3)
-        elseif elem_text:find("rotate%-right") then
+        elseif elem_text:find("rotate%-right") or elem_text:find("Reset") then
             ui:show_toast("Reset button - tap to clear selection")
         elseif elem_text:find("sync") then
             ui:show_toast("Syncing plan files with Tasker...")
