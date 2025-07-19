@@ -338,8 +338,11 @@ function save_daily_choice(level_idx)
     -- Append new entry
     local new_content = existing_content .. entry
     
-    -- Save updated content
+    -- Save updated content locally
     files:write("tracking.md", new_content)
+    
+    -- Send tracking data back to filesystem via Tasker
+    sync_tracking_data(new_content)
 end
 
 function on_long_click(idx)
@@ -374,6 +377,16 @@ function sync_plan_files()
         tasker:run_task("LongCovid_SendData")
     else
         ui:show_toast("Tasker not available")
+    end
+end
+
+function sync_tracking_data(tracking_content)
+    -- Send tracking data to Tasker for writing to filesystem
+    if tasker then
+        -- Use tasker:run_task with tracking data as parameter
+        tasker:run_task("LongCovid_WriteTracking", {
+            tracking_content = tracking_content
+        })
     end
 end
 

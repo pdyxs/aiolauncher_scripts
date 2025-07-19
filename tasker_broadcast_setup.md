@@ -120,13 +120,41 @@ Instead of copying files (which requires root), this approach has Tasker read th
 1. Tap "✓" to save the task
 2. Go back to main Tasker screen
 
+## Required Tasker Task: "LongCovid_WriteTracking"
+
+### Step 1: Create New Task for Writing Tracking Data
+1. Open Tasker
+2. Go to Tasks tab
+3. Tap "+" to create new task
+4. Name it: `LongCovid_WriteTracking`
+
+### Step 2: Add Write File Action
+**Action 1: Write Tracking File**
+1. Tap "+" to add action
+2. Choose "File" → "Write File"
+3. **File:** `/sdcard/Documents/pdyxs/Long Covid/plans/tracking.md`
+4. **Text:** `%tracking_content` (this variable is passed from the widget)
+5. **Append:** `Off` (overwrite file)
+
+### Step 3: Save Task
+1. Tap "✓" to save the task
+2. Go back to main Tasker screen
+
 ## Data Flow Summary
 
+### Plan Data Sync (Documents → Widget)
 1. **Widget triggers sync** → Calls `tasker:run_task("LongCovid_SendData")`
 2. **Tasker reads files** → Reads all 7 plan files from Documents folder
 3. **Tasker sends data** → Broadcasts each file's content to AIO widget
 4. **Widget receives data** → Stores data using `files:write()` in AIO directory
 5. **Widget reloads** → Parses received data and updates display
+
+### Tracking Data Sync (Widget → Documents)
+1. **User makes choice** → Widget calls `save_daily_choice()`
+2. **Widget saves locally** → Updates tracking data in AIO directory
+3. **Widget calls Tasker** → Runs `LongCovid_WriteTracking` task with tracking data
+4. **Tasker receives data** → Gets `%tracking_content` variable from widget
+5. **Tasker writes file** → Updates tracking.md in Documents folder
 
 ## Testing the Setup
 
@@ -141,6 +169,12 @@ Instead of copying files (which requires root), this approach has Tasker read th
 1. The widget should show today's plan based on your selected capacity level
 2. Long-press capacity buttons to see decision criteria
 3. Your daily selections should be tracked in the widget
+
+### Test Tracking Data Sync
+1. Select a capacity level in the widget
+2. Check `/sdcard/Documents/pdyxs/Long Covid/plans/tracking.md`
+3. Your selection should appear in the tracking file
+4. Each new selection should be appended to the file
 
 ## Troubleshooting
 
@@ -159,6 +193,12 @@ Instead of copying files (which requires root), this approach has Tasker read th
 - Verify the broadcast intent format is correct
 - Check that the script name in the Extra field matches exactly: `long-covid-pacing.lua`
 - Ensure the data format is: `cmd:script:long-covid-pacing.lua:plan_data:filename:content`
+
+### Tracking data not syncing
+- Check that the `LongCovid_WriteTracking` task exists and is enabled
+- Verify the task name matches exactly: `LongCovid_WriteTracking`
+- Test the task manually in Tasker with a test variable
+- Check storage permissions for Tasker to write to Documents folder
 
 ## Optional: Auto-Sync Profile
 
