@@ -6,7 +6,11 @@ Scripts are in Lua. Documentation for creating a script can be found in `README.
 
 My scripts are all in the `my` folder.
 
-### Long Covid data
+### Long Covid widget
+
+The long covid widget can be found under my/long-covid-pacing.lua
+
+#### Long Covid data
 
 Long covid planning can be found in the filesystem, under 'Long Covid/plans'. 
 

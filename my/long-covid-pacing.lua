@@ -314,7 +314,9 @@ function add_plan_details(ui_elements, day)
         table.insert(ui_elements, {"text", "<b>Today's Overview:</b>", {size = 18}})
         table.insert(ui_elements, {"new_line", 1})
         for _, overview_line in ipairs(level_plan.overview) do
-            table.insert(ui_elements, {"text", overview_line, {size = 16}})
+            -- Convert markdown bold to HTML bold
+            local formatted_line = overview_line:gsub("%*%*([^%*]+)%*%*", "<b>%1</b>")
+            table.insert(ui_elements, {"text", formatted_line, {size = 16}})
             table.insert(ui_elements, {"new_line", 1})
         end
         table.insert(ui_elements, {"new_line", 1})
