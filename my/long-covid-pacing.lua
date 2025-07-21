@@ -175,14 +175,25 @@ function parse_day_file(day)
         if line:match("^## RED") then
             current_level = "red"
             current_category = nil
+            template[current_level].overview = {}
         elseif line:match("^## YELLOW") then
             current_level = "yellow"
             current_category = nil
+            template[current_level].overview = {}
         elseif line:match("^## GREEN") then
             current_level = "green"
             current_category = nil
+            template[current_level].overview = {}
+        elseif line:match("^%*%*") and current_level and not current_category then
+            -- Parse quick summary lines like "**Work:** WFH normal, hourly breaks"
+            table.insert(template[current_level].overview, line)
         elseif line:match("^### ") and current_level then
             current_category = line:match("^### (.+)")
+            if current_category then
+                template[current_level][current_category] = {}
+            end
+        elseif line:match("^#### ") and current_level then
+            current_category = line:match("^#### (.+)")
             if current_category then
                 template[current_level][current_category] = {}
             end
@@ -298,13 +309,21 @@ function add_plan_details(ui_elements, day)
         return
     end
     
-    table.insert(ui_elements, {"text", "<b>Today's Plan:</b>", {size = 18}})
-    table.insert(ui_elements, {"new_line", 1})
+    -- Add quick overview if available
+    if level_plan.overview and #level_plan.overview > 0 then
+        table.insert(ui_elements, {"text", "<b>Today's Overview:</b>", {size = 18}})
+        table.insert(ui_elements, {"new_line", 1})
+        for _, overview_line in ipairs(level_plan.overview) do
+            table.insert(ui_elements, {"text", overview_line, {size = 16}})
+            table.insert(ui_elements, {"new_line", 1})
+        end
+        table.insert(ui_elements, {"new_line", 1})
+    end
     
-    -- Add each category
+    -- Add each category (excluding overview)
     for category, items in pairs(level_plan) do
-        if #items > 0 then
-            table.insert(ui_elements, {"text", "<b>" .. category .. ":</b>", {size = 16, color = "#666666"}})
+        if category ~= "overview" and #items > 0 then
+            table.insert(ui_elements, {"text", "<b>" .. category .. ":</b>", {size = 16}})
             table.insert(ui_elements, {"new_line", 1})
             for _, item in ipairs(items) do
                 table.insert(ui_elements, {"text", "• " .. item})
