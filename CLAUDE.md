@@ -17,8 +17,10 @@ Long covid planning can be found in the filesystem, under 'Long Covid/plans'.
 Please read and follow the instructions in the 'project_instructions.md' file in that folder before making changes to those plans.
 
 The Long Covid planning widget is an AIO script which aims to:
-1. Surface data from the plan on an android device (where the equivalent planning folder can be found at "Documents/pdyxs/Long Covid/plans") - allowing me to choose a level of capacity for the day, and displaying the appropriate plan
+1. Surface data from the plan on an android device (where the equivalent planning folder can be found at "Documents/pdyxs/Long Covid/plans") - allowing me to choose a level of capacity for the day, and displaying the appropriate plan for all 7 days of the week
 2. Allow me to make choices in the widget, which are saved to a markdown file to help track my progress
+
+**Plan Structure**: The system uses separate daily plans for all 7 days (monday.md through sunday.md), replacing the previous combined weekend.md file with separate saturday.md and sunday.md files.
 
 **Project Plan**: See `long_covid_widget_plan.md` for the detailed implementation plan, including data restructuring and widget development phases.
 

@@ -124,11 +124,6 @@ function get_current_day()
     local day_names = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"}
     local today = day_names[tonumber(os.date("%w")) + 1]
     
-    -- Map weekend to combined weekend file
-    if today == "saturday" or today == "sunday" then
-        return "weekend"
-    end
-    
     return today
 end
 
