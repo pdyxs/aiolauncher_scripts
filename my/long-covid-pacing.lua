@@ -112,6 +112,9 @@ function on_click(idx)
         elseif elem_text:find("sync") then
             -- Sync files button
             sync_plan_files()
+        elseif elem_text:find("notes%-medical") then
+            -- Symptom logging button
+            show_symptom_dialog()
         elseif elem_text == "Back" then
             -- Back button from decision criteria
             render_widget()
@@ -258,6 +261,9 @@ function render_widget()
             table.insert(ui_elements, {"spacer", 1})
         end
     end
+    
+    -- Add symptom logging button on the right side
+    table.insert(ui_elements, {"button", "fa:notes-medical", {color = "#6c757d", gravity = "right"}})
 
     ui:set_expandable(true)
     
@@ -478,4 +484,73 @@ function show_decision_criteria(level_idx)
     
     my_gui = gui(ui_elements)
     my_gui.render()
+end
+
+-- Common symptoms for long covid tracking
+local common_symptoms = {
+    "Fatigue",
+    "Brain fog",
+    "Headache", 
+    "Shortness of breath",
+    "Joint pain",
+    "Muscle aches",
+    "Sleep issues",
+    "Chest pain",
+    "Heart palpitations",
+    "Dizziness",
+    "Nausea",
+    "Loss of taste/smell",
+    "Anxiety",
+    "Depression",
+    "Other..."
+}
+
+function show_symptom_dialog()
+    dialogs:show_list_dialog({
+        title = "Log Symptom",
+        lines = common_symptoms,
+        search = true,
+        zebra = true
+    })
+end
+
+function log_symptom(symptom_name)
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    
+    -- Send to AutoSheets via Tasker
+    if tasker then
+        tasker:run_task("LongCovid_LogEvent", {
+            timestamp = timestamp,
+            event_type = "Symptom",
+            value = symptom_name
+        })
+        ui:show_toast("✓ Symptom logged: " .. symptom_name)
+    else
+        ui:show_toast("Tasker not available")
+    end
+end
+
+function on_dialog_action(result)
+    if result == -1 then
+        -- Dialog was cancelled
+        return
+    end
+    
+    if type(result) == "number" then
+        -- List dialog result - symptom selection
+        local selected_symptom = common_symptoms[result]
+        
+        if selected_symptom == "Other..." then
+            -- Show edit dialog for custom symptom
+            dialogs:show_edit_dialog("Custom Symptom", "Enter symptom name:", "")
+        else
+            -- Log the selected symptom
+            log_symptom(selected_symptom)
+        end
+    elseif type(result) == "string" then
+        -- Edit dialog result - custom symptom text
+        if result ~= "" then
+            log_symptom(result)
+        end
+    end
 end
