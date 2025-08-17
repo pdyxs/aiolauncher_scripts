@@ -32,6 +32,8 @@ local levels = {
 local cached_plans = {}
 local cached_criteria = nil
 local cached_symptoms = nil
+local cached_activities = nil
+local current_dialog_type = nil  -- Track which dialog is open: "symptom" or "activity"
 local data_source = "none"  -- "files" or "tasker" or "none"
 
 function on_resume()
@@ -116,6 +118,9 @@ function on_click(idx)
         elseif elem_text:find("notes%-medical") then
             -- Symptom logging button
             show_symptom_dialog()
+        elseif elem_text:find("running") then
+            -- Activity logging button
+            show_activity_dialog()
         elseif elem_text == "Back" then
             -- Back button from decision criteria
             render_widget()
@@ -264,6 +269,50 @@ function parse_symptoms_file()
     return symptoms
 end
 
+function parse_activities_file()
+    -- Return cached activities if available
+    if cached_activities then
+        return cached_activities
+    end
+    
+    local content = files:read("activities.md")
+    if not content then
+        -- Fallback to default activities if file not available
+        cached_activities = {
+            "Light walk",
+            "Desk work",
+            "Cooking",
+            "Reading",
+            "Social visit",
+            "Rest/nap",
+            "Other..."
+        }
+        return cached_activities
+    end
+    
+    local activities = {}
+    local current_category = nil
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^## ") then
+            current_category = line:match("^## (.+)")
+        elseif line:match("^%- ") then
+            local activity = line:match("^%- (.+)")
+            if activity then
+                table.insert(activities, activity)
+            end
+        end
+    end
+    
+    -- Always add "Other..." as the last option
+    table.insert(activities, "Other...")
+    
+    -- Cache the parsed activities
+    cached_activities = activities
+    
+    return activities
+end
+
 function render_widget()
     local today = get_current_day()
     local day_display = today:gsub("^%l", string.upper)  -- Capitalize first letter
@@ -272,6 +321,9 @@ function render_widget()
     
     -- Build Rich UI
     local ui_elements = {}
+    
+    -- Add activity logging button on the left side
+    table.insert(ui_elements, {"button", "fa:running", {color = "#28a745", gravity = "left"}})
     
     -- Add capacity level buttons (centered)
     for i, level in ipairs(levels) do
@@ -498,6 +550,7 @@ function on_command(data)
         cached_plans = {}
         cached_criteria = nil
         cached_symptoms = nil
+        cached_activities = nil
         data_source = "files"
         
         -- Reload widget
@@ -535,6 +588,7 @@ end
 
 
 function show_symptom_dialog()
+    current_dialog_type = "symptom"
     local symptoms = parse_symptoms_file()
     dialogs:show_list_dialog({
         title = "Log Symptom",
@@ -560,28 +614,96 @@ function log_symptom(symptom_name)
     end
 end
 
+function show_activity_dialog()
+    current_dialog_type = "activity"
+    local activities = parse_activities_file()
+    dialogs:show_list_dialog({
+        title = "Log Activity",
+        lines = activities,
+        search = true,
+        zebra = true
+    })
+end
+
+function log_activity(activity_name)
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    
+    -- Send to AutoSheets via Tasker
+    if tasker then
+        tasker:run_task("LongCovid_LogEvent", {
+            timestamp = timestamp,
+            event_type = "Activity",
+            value = activity_name
+        })
+        ui:show_toast("✓ Activity logged: " .. activity_name)
+    else
+        ui:show_toast("Tasker not available")
+    end
+end
+
 function on_dialog_action(result)
     if result == -1 then
         -- Dialog was cancelled
-        return
+        if current_dialog_type == "symptom" or current_dialog_type == "activity" then
+            -- Main list dialog was cancelled, clear completely
+            current_dialog_type = nil
+        end
+        -- If we're in edit mode (symptom_edit/activity_edit), keep the state
+        -- because the list dialog closing doesn't mean the edit dialog was cancelled
+        return true  -- Close dialog on cancel
     end
     
     if type(result) == "number" then
-        -- List dialog result - symptom selection
-        local symptoms = parse_symptoms_file()
-        local selected_symptom = symptoms[result]
-        
-        if selected_symptom == "Other..." then
-            -- Show edit dialog for custom symptom
-            dialogs:show_edit_dialog("Custom Symptom", "Enter symptom name:", "")
-        else
-            -- Log the selected symptom
-            log_symptom(selected_symptom)
+        -- List dialog result
+        if current_dialog_type == "symptom" then
+            local symptoms = parse_symptoms_file()
+            local selected_item = symptoms[result]
+            
+            if selected_item == "Other..." then
+                -- Show edit dialog for custom symptom
+                current_dialog_type = "symptom_edit"  -- Change to indicate edit mode
+                dialogs:show_edit_dialog("Custom Symptom", "Enter symptom name:", "")
+                return true  -- Close list dialog
+            else
+                -- Log the selected symptom
+                log_symptom(selected_item)
+                -- Keep current_dialog_type so "Other..." still works
+                return true  -- Close dialog
+            end
+        elseif current_dialog_type == "activity" then
+            local activities = parse_activities_file()
+            local selected_item = activities[result]
+            
+            if selected_item == "Other..." then
+                -- Show edit dialog for custom activity
+                current_dialog_type = "activity_edit"  -- Change to indicate edit mode
+                dialogs:show_edit_dialog("Custom Activity", "Enter activity name:", "")
+                return true  -- Close list dialog
+            else
+                -- Log the selected activity
+                log_activity(selected_item)
+                -- Keep current_dialog_type so "Other..." still works
+                return true  -- Close dialog
+            end
         end
     elseif type(result) == "string" then
-        -- Edit dialog result - custom symptom text
+        -- Edit dialog result - custom text
         if result ~= "" then
-            log_symptom(result)
+            if current_dialog_type == "symptom_edit" then
+                log_symptom(result)
+                current_dialog_type = "symptom"  -- Go back to main symptom dialog state
+            elseif current_dialog_type == "activity_edit" then
+                log_activity(result)
+                current_dialog_type = "activity"  -- Go back to main activity dialog state
+            end
+        else
+            -- Empty result, go back to main dialog state
+            if current_dialog_type == "symptom_edit" then
+                current_dialog_type = "symptom"
+            elseif current_dialog_type == "activity_edit" then
+                current_dialog_type = "activity"
+            end
         end
+        return true  -- Close edit dialog
     end
 end
