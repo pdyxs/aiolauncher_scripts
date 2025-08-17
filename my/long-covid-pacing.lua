@@ -33,7 +33,8 @@ local cached_plans = {}
 local cached_criteria = nil
 local cached_symptoms = nil
 local cached_activities = nil
-local current_dialog_type = nil  -- Track which dialog is open: "symptom" or "activity"
+local cached_interventions = nil
+local current_dialog_type = nil  -- Track which dialog is open: "symptom", "activity", or "intervention"
 local data_source = "none"  -- "files" or "tasker" or "none"
 
 function on_resume()
@@ -121,6 +122,9 @@ function on_click(idx)
         elseif elem_text:find("running") then
             -- Activity logging button
             show_activity_dialog()
+        elseif elem_text:find("pills") then
+            -- Intervention logging button
+            show_intervention_dialog()
         elseif elem_text == "Back" then
             -- Back button from decision criteria
             render_widget()
@@ -313,6 +317,50 @@ function parse_activities_file()
     return activities
 end
 
+function parse_interventions_file()
+    -- Return cached interventions if available
+    if cached_interventions then
+        return cached_interventions
+    end
+    
+    local content = files:read("interventions.md")
+    if not content then
+        -- Fallback to default interventions if file not available
+        cached_interventions = {
+            "Vitamin D",
+            "Vitamin B12",
+            "Magnesium",
+            "Extra rest",
+            "Breathing exercises",
+            "Meditation",
+            "Other..."
+        }
+        return cached_interventions
+    end
+    
+    local interventions = {}
+    local current_category = nil
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^## ") then
+            current_category = line:match("^## (.+)")
+        elseif line:match("^%- ") then
+            local intervention = line:match("^%- (.+)")
+            if intervention then
+                table.insert(interventions, intervention)
+            end
+        end
+    end
+    
+    -- Always add "Other..." as the last option
+    table.insert(interventions, "Other...")
+    
+    -- Cache the parsed interventions
+    cached_interventions = interventions
+    
+    return interventions
+end
+
 function render_widget()
     local today = get_current_day()
     local day_display = today:gsub("^%l", string.upper)  -- Capitalize first letter
@@ -373,6 +421,8 @@ function render_widget()
         table.insert(ui_elements, {"button", "fa:running", {color = "#28a745", gravity = "right"}})
         -- Add symptom logging button next to activity button
         table.insert(ui_elements, {"button", "fa:notes-medical", {color = "#6c757d", gravity = "anchor_prev"}})
+        -- Add intervention logging button next to symptom button
+        table.insert(ui_elements, {"button", "fa:pills", {color = "#007bff", gravity = "anchor_prev"}})
     end
 
     ui:set_expandable(true)
@@ -563,6 +613,7 @@ function on_command(data)
         cached_criteria = nil
         cached_symptoms = nil
         cached_activities = nil
+        cached_interventions = nil
         data_source = "files"
         
         -- Reload widget
@@ -653,14 +704,41 @@ function log_activity(activity_name)
     end
 end
 
+function show_intervention_dialog()
+    current_dialog_type = "intervention"
+    local interventions = parse_interventions_file()
+    dialogs:show_list_dialog({
+        title = "Log Intervention",
+        lines = interventions,
+        search = true,
+        zebra = true
+    })
+end
+
+function log_intervention(intervention_name)
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    
+    -- Send to AutoSheets via Tasker
+    if tasker then
+        tasker:run_task("LongCovid_LogEvent", {
+            timestamp = timestamp,
+            event_type = "Intervention",
+            value = intervention_name
+        })
+        ui:show_toast("✓ Intervention logged: " .. intervention_name)
+    else
+        ui:show_toast("Tasker not available")
+    end
+end
+
 function on_dialog_action(result)
     if result == -1 then
         -- Dialog was cancelled
-        if current_dialog_type == "symptom" or current_dialog_type == "activity" then
+        if current_dialog_type == "symptom" or current_dialog_type == "activity" or current_dialog_type == "intervention" then
             -- Main list dialog was cancelled, clear completely
             current_dialog_type = nil
         end
-        -- If we're in edit mode (symptom_edit/activity_edit), keep the state
+        -- If we're in edit mode (symptom_edit/activity_edit/intervention_edit), keep the state
         -- because the list dialog closing doesn't mean the edit dialog was cancelled
         return true  -- Close dialog on cancel
     end
@@ -697,6 +775,21 @@ function on_dialog_action(result)
                 -- Keep current_dialog_type so "Other..." still works
                 return true  -- Close dialog
             end
+        elseif current_dialog_type == "intervention" then
+            local interventions = parse_interventions_file()
+            local selected_item = interventions[result]
+            
+            if selected_item == "Other..." then
+                -- Show edit dialog for custom intervention
+                current_dialog_type = "intervention_edit"  -- Change to indicate edit mode
+                dialogs:show_edit_dialog("Custom Intervention", "Enter intervention name:", "")
+                return true  -- Close list dialog
+            else
+                -- Log the selected intervention
+                log_intervention(selected_item)
+                -- Keep current_dialog_type so "Other..." still works
+                return true  -- Close dialog
+            end
         end
     elseif type(result) == "string" then
         -- Edit dialog result - custom text
@@ -707,6 +800,9 @@ function on_dialog_action(result)
             elseif current_dialog_type == "activity_edit" then
                 log_activity(result)
                 current_dialog_type = "activity"  -- Go back to main activity dialog state
+            elseif current_dialog_type == "intervention_edit" then
+                log_intervention(result)
+                current_dialog_type = "intervention"  -- Go back to main intervention dialog state
             end
         else
             -- Empty result, go back to main dialog state
@@ -714,6 +810,8 @@ function on_dialog_action(result)
                 current_dialog_type = "symptom"
             elseif current_dialog_type == "activity_edit" then
                 current_dialog_type = "activity"
+            elseif current_dialog_type == "intervention_edit" then
+                current_dialog_type = "intervention"
             end
         end
         return true  -- Close edit dialog

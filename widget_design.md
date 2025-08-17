@@ -14,13 +14,13 @@ Long Covid Pacing - Monday
 ### After Capacity Selection
 ```
 Long Covid Pacing - Monday
-🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging                    🏃📋
+🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging                  🏃📋💊
 ```
 
 ### Expanded State with Plan
 ```
 Long Covid Pacing - Monday
-🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging                    🏃📋
+🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging                  🏃📋💊
 
 Today's Overview:
 Work: WFH normal, hourly breaks
@@ -52,12 +52,13 @@ Evening:
 - **Persistence**: Choice saved locally and logged to Google Sheets
 - **Restrictions**: Can only downgrade capacity during the day
 
-### 2. Activity & Symptom Logging
+### 2. Activity, Symptom & Intervention Logging
 - **Activity button**: 🏃 Running icon (right-aligned)
 - **Symptom button**: 📋 Medical notes icon (next to activity button)
+- **Intervention button**: 💊 Pills icon (next to symptom button)
 - **Visibility**: Only shown after capacity selection
 - **Functionality**: Opens searchable list dialogs with custom "Other..." option
-- **Data sources**: Markdown files (activities.md, symptoms.md)
+- **Data sources**: Markdown files (activities.md, symptoms.md, interventions.md)
 - **Logging**: All entries sent to Google Spreadsheet via AutoSheets
 
 ### 3. Daily Plan Display  
@@ -91,6 +92,9 @@ Evening:
 - `/Long Covid/plans/decision_criteria.md` - Decision criteria
 - `/Long Covid/plans/days/{day}.md` - Day-specific templates
 - `/Long Covid/plans/tracking.md` - Daily selections log
+- `activities.md` - Available activities for logging
+- `symptoms.md` - Available symptoms for logging
+- `interventions.md` - Available interventions for logging
 
 ### Tracking File Format
 ```markdown
@@ -186,14 +190,32 @@ end
 - **Feedback**: Visual confirmation of selections
 - **Error prevention**: Logical capacity transitions
 
+## Intervention Tracking
+
+The intervention logging feature allows tracking of medications, supplements, treatments, and lifestyle changes to help determine their effectiveness for long covid management.
+
+### Intervention Categories
+- **Medications**: Prescribed and over-the-counter medications
+- **Supplements**: Vitamins, minerals, and other supplements
+- **Treatments**: Physical therapies, breathing exercises, meditation
+- **Lifestyle**: Rest adjustments, hydration, stress management
+
+### Usage Pattern
+1. Select daily capacity level first
+2. Log interventions throughout the day as they are taken/performed
+3. Track patterns over time to identify what helps with specific symptoms or capacity levels
+4. Use "Other..." option for unlisted interventions that get added to custom tracking
+
 ## Future Enhancements
 
 ### Phase 2 Features
 - **Quick metrics input**: HRV, sleep quality, energy level
 - **Smart suggestions**: Based on recent patterns
 - **Weekly review**: Summary of capacity trends
+- **Intervention effectiveness**: Analytics on intervention timing vs. symptom patterns
 
 ### Phase 3 Features
 - **Notification reminders**: Morning decision prompt
 - **Integration**: With health apps/smartwatch
-- **Analytics**: Capacity level trends and insights
+- **Analytics**: Capacity level trends and intervention effectiveness insights
+- **Dosage tracking**: Amount/frequency for medications and supplements
