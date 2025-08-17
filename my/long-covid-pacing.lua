@@ -52,6 +52,11 @@ function check_daily_reset()
         -- New day - reset to no selection
         prefs.selected_level = 0
         prefs.last_selection_date = today
+    else
+        -- Same day - check if we have a stored selection
+        if prefs.daily_capacity_log and prefs.daily_capacity_log[today] then
+            prefs.selected_level = prefs.daily_capacity_log[today].capacity
+        end
     end
 end
 
@@ -95,6 +100,13 @@ function on_click(idx)
         elseif elem_text:find("rotate%-right") or elem_text:find("Reset") then
             -- Reset selection button
             prefs.selected_level = 0
+            
+            -- Also clear the stored daily capacity log for today
+            local today = os.date("%Y-%m-%d")
+            if prefs.daily_capacity_log and prefs.daily_capacity_log[today] then
+                prefs.daily_capacity_log[today] = nil
+            end
+            
             ui:show_toast("Selection reset")
             render_widget()
         elseif elem_text:find("sync") then
@@ -342,23 +354,31 @@ function save_daily_choice(level_idx)
     end
     
     local today = os.date("%Y-%m-%d")
-    local day_name = get_current_day()
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
     local level_name = levels[level_idx].name
     
-    local entry = string.format("## %s (%s)\n- Capacity: %s\n- Time: %s\n\n", 
-        today, day_name:gsub("^%l", string.upper), level_name, os.date("%H:%M"))
+    -- Store locally for offline access and daily reset functionality
+    if not prefs.daily_capacity_log then
+        prefs.daily_capacity_log = {}
+    end
     
-    -- Read existing tracking file
-    local existing_content = files:read("tracking.md") or "# Long Covid Daily Tracking\n\n"
+    prefs.daily_capacity_log[today] = {
+        capacity = level_idx,
+        capacity_name = level_name,
+        timestamp = os.date("%H:%M")
+    }
     
-    -- Append new entry
-    local new_content = existing_content .. entry
-    
-    -- Save updated content locally
-    files:write("tracking.md", new_content)
-    
-    -- Send tracking data back to filesystem via Tasker
-    sync_tracking_data(new_content)
+    -- Send to AutoSheets via Tasker (simplified 3-column format)
+    if tasker then
+        tasker:run_task("LongCovid_LogEvent", {
+            timestamp = timestamp,
+            event_type = "Capacity",
+            value = level_name
+        })
+        ui:show_toast("✓ Logged to spreadsheet")
+    else
+        ui:show_toast("Tasker not available")
+    end
 end
 
 function on_long_click(idx)
@@ -396,15 +416,6 @@ function sync_plan_files()
     end
 end
 
-function sync_tracking_data(tracking_content)
-    -- Send tracking data to Tasker for writing to filesystem
-    if tasker then
-        -- Use tasker:run_task with tracking data as parameter
-        tasker:run_task("LongCovid_WriteTracking", {
-            tracking_content = tracking_content
-        })
-    end
-end
 
 function on_tasker_result(success)
     if success then
