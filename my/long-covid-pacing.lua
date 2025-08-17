@@ -31,6 +31,7 @@ local levels = {
 -- Cache for parsed data
 local cached_plans = {}
 local cached_criteria = nil
+local cached_symptoms = nil
 local data_source = "none"  -- "files" or "tasker" or "none"
 
 function on_resume()
@@ -216,6 +217,51 @@ function parse_day_file(day)
     end
     
     return template
+end
+
+function parse_symptoms_file()
+    -- Return cached symptoms if available
+    if cached_symptoms then
+        return cached_symptoms
+    end
+    
+    local content = files:read("symptoms.md")
+    if not content then
+        -- Fallback to default symptoms if file not available
+        cached_symptoms = {
+            "Fatigue",
+            "Brain fog", 
+            "Headache",
+            "Shortness of breath",
+            "Joint pain",
+            "Muscle aches",
+            "Sleep issues",
+            "Other..."
+        }
+        return cached_symptoms
+    end
+    
+    local symptoms = {}
+    local current_category = nil
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^## ") then
+            current_category = line:match("^## (.+)")
+        elseif line:match("^%- ") then
+            local symptom = line:match("^%- (.+)")
+            if symptom then
+                table.insert(symptoms, symptom)
+            end
+        end
+    end
+    
+    -- Always add "Other..." as the last option
+    table.insert(symptoms, "Other...")
+    
+    -- Cache the parsed symptoms
+    cached_symptoms = symptoms
+    
+    return symptoms
 end
 
 function render_widget()
@@ -451,6 +497,7 @@ function on_command(data)
         -- Clear cache to reload data
         cached_plans = {}
         cached_criteria = nil
+        cached_symptoms = nil
         data_source = "files"
         
         -- Reload widget
@@ -486,29 +533,12 @@ function show_decision_criteria(level_idx)
     my_gui.render()
 end
 
--- Common symptoms for long covid tracking
-local common_symptoms = {
-    "Fatigue",
-    "Brain fog",
-    "Headache", 
-    "Shortness of breath",
-    "Joint pain",
-    "Muscle aches",
-    "Sleep issues",
-    "Chest pain",
-    "Heart palpitations",
-    "Dizziness",
-    "Nausea",
-    "Loss of taste/smell",
-    "Anxiety",
-    "Depression",
-    "Other..."
-}
 
 function show_symptom_dialog()
+    local symptoms = parse_symptoms_file()
     dialogs:show_list_dialog({
         title = "Log Symptom",
-        lines = common_symptoms,
+        lines = symptoms,
         search = true,
         zebra = true
     })
@@ -538,7 +568,8 @@ function on_dialog_action(result)
     
     if type(result) == "number" then
         -- List dialog result - symptom selection
-        local selected_symptom = common_symptoms[result]
+        local symptoms = parse_symptoms_file()
+        local selected_symptom = symptoms[result]
         
         if selected_symptom == "Other..." then
             -- Show edit dialog for custom symptom
