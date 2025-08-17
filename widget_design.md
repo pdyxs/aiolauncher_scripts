@@ -1,24 +1,34 @@
 # Long Covid Widget Interface Design
 
 ## Widget Overview
-The Long Covid planning widget provides a simple interface for daily capacity level selection and displays the appropriate plan for the current day.
+The Long Covid planning widget provides a comprehensive interface for daily capacity level selection, activity logging, symptom tracking, and displays the appropriate plan for the current day. All data is automatically logged to a Google Spreadsheet for analysis.
 
 ## Widget Layout
 
-### Folded State
-```
-Long Covid Pacing
-🔴 RED | 🟡 YELLOW | 🟢 GREEN
-```
-
-### Expanded State
+### Before Capacity Selection
 ```
 Long Covid Pacing - Monday
-🔴 RED | 🟡 YELLOW | 🟢 GREEN
+     🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging
+```
 
-Today's Plan:
+### After Capacity Selection
+```
+Long Covid Pacing - Monday
+🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging                    🏃📋
+```
+
+### Expanded State with Plan
+```
+Long Covid Pacing - Monday
+🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging                    🏃📋
+
+Today's Overview:
+Work: WFH normal, hourly breaks
+Physical: Light physio (10 min)
+Evening: Quiet evening with partner
+
 Work:
-• WFH - normal workload
+• WFH - normal workload  
 • Standard tasks
 • Hourly breaks
 
@@ -29,23 +39,37 @@ Physical:
 Evening:
 • Quiet evening with partner
 • Early bedtime (9:00 PM)
+
+[Sync Files] [Reset]
 ```
 
 ## User Interface Elements
 
 ### 1. Capacity Level Selection
-- **Three buttons**: 🔴 RED, 🟡 YELLOW, 🟢 GREEN
-- **Visual feedback**: Selected level highlighted
-- **Persistence**: Choice saved to tracking file
+- **Three buttons**: 🛏️ Recovering, 🚶 Maintaining, ⚡ Engaging
+- **Visual feedback**: Selected level highlighted, others dimmed
+- **Alignment**: Centered when no selection, left-aligned after selection
+- **Persistence**: Choice saved locally and logged to Google Sheets
+- **Restrictions**: Can only downgrade capacity during the day
 
-### 2. Daily Plan Display
-- **Dynamic content**: Shows plan for current day
+### 2. Activity & Symptom Logging
+- **Activity button**: 🏃 Running icon (right-aligned)
+- **Symptom button**: 📋 Medical notes icon (next to activity button)
+- **Visibility**: Only shown after capacity selection
+- **Functionality**: Opens searchable list dialogs with custom "Other..." option
+- **Data sources**: Markdown files (activities.md, symptoms.md)
+- **Logging**: All entries sent to Google Spreadsheet via AutoSheets
+
+### 3. Daily Plan Display  
+- **Dynamic content**: Shows plan for current day and selected capacity
+- **Overview section**: Bold summary lines for quick scanning
 - **Categorized sections**: Work, Physical, Evening, etc.
 - **Bullet points**: Simple, scannable format
+- **Error handling**: Sync button when plan data unavailable
 
-### 3. Widget Title
-- **Static**: "Long Covid Pacing"
-- **Dynamic**: Adds current day when expanded
+### 4. Widget Title
+- **Format**: "Long Covid Pacing - [Day]"
+- **Dynamic**: Shows current day of week
 
 ## Interaction Flow
 
