@@ -5,22 +5,18 @@ The Long Covid planning widget provides a comprehensive interface for daily capa
 
 ## Widget Layout
 
-### Before Capacity Selection
+### Widget Layout
 ```
 Long Covid Pacing - Monday
      🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging
-```
-
-### After Capacity Selection
-```
-Long Covid Pacing - Monday
-🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging                  🏃📋💊
+           🏃 📋 💊
 ```
 
 ### Expanded State with Plan
 ```
 Long Covid Pacing - Monday
-🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging                  🏃📋💊
+     🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging
+           🏃 📋 💊
 
 Today's Overview:
 Work: WFH normal, hourly breaks
@@ -48,15 +44,16 @@ Evening:
 ### 1. Capacity Level Selection
 - **Three buttons**: 🛏️ Recovering, 🚶 Maintaining, ⚡ Engaging
 - **Visual feedback**: Selected level highlighted, others dimmed
-- **Alignment**: Centered when no selection, left-aligned after selection
+- **Alignment**: Always centered on first line
 - **Persistence**: Choice saved locally and logged to Google Sheets
 - **Restrictions**: Can only downgrade capacity during the day
 
 ### 2. Activity, Symptom & Intervention Logging
-- **Activity button**: 🏃 Running icon (right-aligned)
+- **Activity button**: 🏃 Running icon (centered on second line)
 - **Symptom button**: 📋 Medical notes icon (next to activity button)
 - **Intervention button**: 💊 Pills icon (next to symptom button)
-- **Visibility**: Only shown after capacity selection
+- **Visibility**: Always visible
+- **Layout**: Centered as a group on second line below capacity buttons
 - **Functionality**: Opens searchable list dialogs with custom "Other..." option
 - **Data sources**: Markdown files (activities.md, symptoms.md, interventions.md)
 - **Logging**: All entries sent to Google Spreadsheet via AutoSheets

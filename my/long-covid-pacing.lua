@@ -370,7 +370,7 @@ function render_widget()
     -- Build Rich UI
     local ui_elements = {}
     
-    -- Add capacity level buttons (centered when no selection, left-aligned when selected)
+    -- Add capacity level buttons (always centered)
     for i, level in ipairs(levels) do
         local color
         local button_text
@@ -387,21 +387,11 @@ function render_widget()
             button_text = "fa:" .. level.icon  -- Icon only for unavailable
         end
         
-        -- Alignment based on selection state
-        if prefs.selected_level == 0 then
-            -- No selection made yet - center the buttons
-            if i == 1 then
-                gravity = "center_h"
-            else
-                gravity = "anchor_prev"
-            end
+        -- Always center the capacity buttons
+        if i == 1 then
+            gravity = "center_h"
         else
-            -- Selection made - left align the buttons
-            if i == 1 then
-                gravity = "left"
-            else
-                gravity = "anchor_prev"
-            end
+            gravity = "anchor_prev"
         end
         
         local button_props = {color = color}
@@ -415,15 +405,15 @@ function render_widget()
         end
     end
     
-    -- Only show activity and symptom buttons if capacity has been selected
-    if prefs.selected_level > 0 then
-        -- Add activity logging button on the right side
-        table.insert(ui_elements, {"button", "fa:running", {color = "#28a745", gravity = "right"}})
-        -- Add symptom logging button next to activity button
-        table.insert(ui_elements, {"button", "fa:notes-medical", {color = "#6c757d", gravity = "anchor_prev"}})
-        -- Add intervention logging button next to symptom button
-        table.insert(ui_elements, {"button", "fa:pills", {color = "#007bff", gravity = "anchor_prev"}})
-    end
+    -- Add new line for second row of buttons
+    table.insert(ui_elements, {"new_line", 1})
+    
+    -- Add activity logging button (centered)
+    table.insert(ui_elements, {"button", "fa:running", {color = "#28a745", gravity = "center_h"}})
+    -- Add symptom logging button next to activity button
+    table.insert(ui_elements, {"button", "fa:notes-medical", {color = "#6c757d", gravity = "anchor_prev"}})
+    -- Add intervention logging button next to symptom button
+    table.insert(ui_elements, {"button", "fa:pills", {color = "#007bff", gravity = "anchor_prev"}})
 
     ui:set_expandable(true)
     
