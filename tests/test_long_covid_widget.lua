@@ -56,6 +56,325 @@ local function string_find(str, pattern, init, plain)
     return string.find(str, pattern, init, plain)
 end
 
+-- Helper function to check if array contains value
+local function assert_contains(array, value, message)
+    for _, item in ipairs(array) do
+        if item == value then
+            return -- Found it
+        end
+    end
+    error((message or "Array should contain value") .. " (expected: " .. tostring(value) .. ")")
+end
+
+-- Helper function to check if array does NOT contain value
+local function assert_not_contains(array, value, message)
+    for _, item in ipairs(array) do
+        if item == value then
+            error((message or "Array should not contain value") .. " (found: " .. tostring(value) .. ")")
+        end
+    end
+end
+
+-- Global variables for widget state (from the main widget)
+local cached_plans = {}
+local cached_criteria = nil
+local cached_symptoms = nil
+local cached_activities = nil
+local cached_interventions = nil
+local cached_required_activities = nil
+local cached_required_interventions = nil
+local selected_level = 0
+local last_selection_date = ""
+local daily_capacity_log = {}
+local daily_logs = {}
+
+-- Mock functions for new functionality that will be implemented
+local cached_activity_options = nil
+local cached_intervention_options = nil
+
+-- Test setup function
+function setup_test()
+    -- Reset all test state
+    test_prefs = {}
+    test_ui_calls = {}
+    test_files = {}
+    test_toasts = {}
+    test_daily_logs = {}
+    
+    -- Reset widget state
+    cached_plans = {}
+    cached_criteria = nil
+    cached_symptoms = nil
+    cached_activities = nil
+    cached_interventions = nil
+    cached_required_activities = nil
+    cached_required_interventions = nil
+    cached_activity_options = nil
+    cached_intervention_options = nil
+    selected_level = 0
+    last_selection_date = ""
+    daily_capacity_log = {}
+    daily_logs = {}
+    
+    -- Set up global mocks for widget functions
+    _G.prefs = mock_prefs
+    _G.ui = mock_ui
+    _G.files = mock_files
+    _G.gui = mock_gui
+end
+
+-- Widget functions needed for tests
+function parse_activities_file()
+    if cached_activities then
+        return cached_activities
+    end
+    
+    local content = test_files["activities.md"]
+    if not content then
+        cached_activities = {"Light walk", "Desk work", "Cooking", "Other..."}
+        return cached_activities
+    end
+    
+    local activities = {}
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^%- ") then
+            local activity = line:match("^%- (.+)")
+            if activity then
+                -- Clean up activity name by removing {Required} and {Options} markers
+                local clean_activity = activity:match("^(.-)%s*%{") or activity
+                table.insert(activities, clean_activity)
+            end
+        end
+    end
+    
+    -- Always add "Other..." as the last option
+    table.insert(activities, "Other...")
+    
+    cached_activities = activities
+    return activities
+end
+
+function parse_interventions_file()
+    if cached_interventions then
+        return cached_interventions
+    end
+    
+    local content = test_files["interventions.md"]
+    if not content then
+        cached_interventions = {"Vitamin D", "Magnesium", "Other..."}
+        return cached_interventions
+    end
+    
+    local interventions = {}
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^%- ") then
+            local intervention = line:match("^%- (.+)")
+            if intervention then
+                -- Clean up intervention name by removing {Required} and {Options} markers
+                local clean_intervention = intervention:match("^(.-)%s*%{") or intervention
+                table.insert(interventions, clean_intervention)
+            end
+        end
+    end
+    
+    -- Always add "Other..." as the last option
+    table.insert(interventions, "Other...")
+    
+    cached_interventions = interventions
+    return interventions
+end
+
+function parse_required_activities()
+    if cached_required_activities then
+        return cached_required_activities
+    end
+    
+    local content = test_files["activities.md"]
+    if not content then
+        cached_required_activities = {}
+        return cached_required_activities
+    end
+    
+    local required_activities = {}
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^%- ") then
+            local activity_line = line:match("^%- (.+)")
+            if activity_line and activity_line:match("%{Required") then
+                -- Extract activity name (everything before {Required)
+                local activity_name = activity_line:match("^(.-)%s*%{Required") or activity_line:match("^(.-)%s*%{")
+                if activity_name then
+                    local required_info = {
+                        name = activity_name,
+                        days = nil -- nil means all days
+                    }
+                    
+                    -- Check for specific days: {Required: Mon,Wed,Fri}
+                    local days_match = activity_line:match("%{Required:%s*([^%}]+)%}")
+                    if days_match then
+                        required_info.days = {}
+                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
+                            table.insert(required_info.days, day_abbrev:lower())
+                        end
+                    end
+                    
+                    table.insert(required_activities, required_info)
+                end
+            end
+        end
+    end
+    
+    cached_required_activities = required_activities
+    return required_activities
+end
+
+function get_daily_logs(date)
+    if not daily_logs then
+        daily_logs = {}
+    end
+    
+    if not daily_logs[date] then
+        daily_logs[date] = {
+            symptoms = {},
+            activities = {},
+            interventions = {},
+            energy_levels = {}
+        }
+    else
+        -- Ensure existing logs have energy_levels field (backward compatibility)
+        if not daily_logs[date].energy_levels then
+            daily_logs[date].energy_levels = {}
+        end
+    end
+    
+    return daily_logs[date]
+end
+
+function save_prefs_data()
+    -- Save global variables back to prefs
+    _G.prefs.selected_level = selected_level
+    _G.prefs.last_selection_date = last_selection_date
+    _G.prefs.daily_capacity_log = daily_capacity_log
+    _G.prefs.daily_logs = daily_logs
+end
+
+function format_list_items(items, item_type)
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    local category
+    if item_type == "symptom" then
+        category = logs.symptoms
+    elseif item_type == "activity" then
+        category = logs.activities
+    elseif item_type == "intervention" then
+        category = logs.interventions
+    else
+        return items  -- Return unchanged for unknown types
+    end
+    
+    local formatted = {}
+    for _, item in ipairs(items) do
+        local logged_data = category[item]
+        
+        if logged_data and (type(logged_data) == "number" and logged_data > 0) or (type(logged_data) == "table" and #logged_data > 0) then
+            -- Item has been logged - show with checkmark and count
+            local count = type(logged_data) == "number" and logged_data or #logged_data
+            table.insert(formatted, "✓ " .. item .. " (" .. count .. ")")
+        else
+            -- Item not logged - show with spacing
+            table.insert(formatted, "   " .. item)
+        end
+    end
+    
+    return formatted
+end
+
+function extract_options(line)
+    local options = {}
+    local options_match = line:match("{Options:%s*([^}]+)}")
+    if options_match then
+        for option in options_match:gmatch("([^,]+)") do
+            table.insert(options, option:match("^%s*(.-)%s*$")) -- trim whitespace
+        end
+    end
+    return options
+end
+
+function get_activity_options(activity_name)
+    if not cached_activity_options then
+        cached_activity_options = {}
+        local content = test_files["activities.md"]
+        if content then
+            for line in content:gmatch("[^\r\n]+") do
+                if line:match("^%- ") then
+                    local activity_line = line:match("^%- (.+)")
+                    if activity_line then
+                        local clean_name = activity_line:match("^(.-)%s*{") or activity_line
+                        local options = extract_options(activity_line)
+                        cached_activity_options[clean_name] = options
+                    end
+                end
+            end
+        end
+    end
+    return cached_activity_options[activity_name] or {}
+end
+
+function get_intervention_options(intervention_name)
+    if not cached_intervention_options then
+        cached_intervention_options = {}
+        local content = test_files["interventions.md"]
+        if content then
+            for line in content:gmatch("[^\r\n]+") do
+                if line:match("^%- ") then
+                    local intervention_line = line:match("^%- (.+)")
+                    if intervention_line then
+                        local clean_name = intervention_line:match("^(.-)%s*{") or intervention_line
+                        local options = extract_options(intervention_line)
+                        cached_intervention_options[clean_name] = options
+                    end
+                end
+            end
+        end
+    end
+    return cached_intervention_options[intervention_name] or {}
+end
+
+function log_activity_with_option(activity_name, option)
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    if not logs.activities[activity_name] then
+        logs.activities[activity_name] = {}
+    end
+    
+    table.insert(logs.activities[activity_name], {
+        option = option,
+        timestamp = os.time()
+    })
+    
+    save_prefs_data()
+end
+
+function log_symptom_with_severity(symptom_name, severity)
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    if not logs.symptoms[symptom_name] then
+        logs.symptoms[symptom_name] = {}
+    end
+    
+    table.insert(logs.symptoms[symptom_name], {
+        severity = severity,
+        timestamp = os.time()
+    })
+    
+    save_prefs_data()
+end
+
 -- Test data
 local test_criteria_content = [[## RED
 - Feeling extremely fatigued
@@ -1316,6 +1635,205 @@ add_test("Daily logs purging functionality", function()
     assert_true(_G.prefs.daily_logs[yesterday] == nil, "Yesterday's data should be purged")
     assert_true(_G.prefs.daily_logs[two_days_ago] == nil, "Two days ago data should be purged")
 end)
+
+-- Tests for Options and Required syntax parsing
+table.insert(tests, {name = "Extract options from activity line", func = function()
+    -- Test basic options syntax
+    local line1 = "Desk work {Options: Short session,Full session,Extended}"
+    local options1 = extract_options(line1)
+    assert_equals(3, #options1, "Should extract 3 options")
+    assert_equals("Short session", options1[1], "First option should match")
+    assert_equals("Full session", options1[2], "Second option should match")
+    assert_equals("Extended", options1[3], "Third option should match")
+    
+    -- Test options with spaces around commas
+    local line2 = "Cooking {Options: Simple meal, Complex meal, Batch cooking}"
+    local options2 = extract_options(line2)
+    assert_equals(3, #options2, "Should extract 3 options with spaces")
+    assert_equals("Simple meal", options2[1], "Should trim spaces from options")
+    assert_equals("Complex meal", options2[2], "Should trim spaces from options")
+    assert_equals("Batch cooking", options2[3], "Should trim spaces from options")
+    
+    -- Test no options
+    local line3 = "Light walk"
+    local options3 = extract_options(line3)
+    assert_equals(0, #options3, "Should return empty table for no options")
+end})
+
+table.insert(tests, {name = "Parse activities with options", func = function()
+    -- Mock activities.md file with options
+    test_files["activities.md"] = [[
+## Physical Activities
+- Light walk
+- Desk work {Options: Short session,Full session,Extended}
+- Cooking {Options: Simple meal,Complex meal}
+
+## Exercise
+- Physiotherapy {Required: Mon,Wed,Fri} {Options: Exercises only,Full session}
+- Swimming {Options: 15 min,30 min,45 min}
+]]
+    
+    local activities = parse_activities_file()
+    
+    -- Should contain all activities (clean names without options)
+    assert_contains(activities, "Light walk", "Should contain simple activity")
+    assert_contains(activities, "Desk work", "Should contain activity with options")
+    assert_contains(activities, "Cooking", "Should contain activity with options")
+    assert_contains(activities, "Physiotherapy", "Should contain required activity with options")
+    assert_contains(activities, "Swimming", "Should contain activity with options")
+    
+    -- Test that options are properly extracted
+    local desk_options = get_activity_options("Desk work")
+    assert_equals(3, #desk_options, "Desk work should have 3 options")
+    assert_equals("Short session", desk_options[1], "First option should match")
+    assert_equals("Full session", desk_options[2], "Second option should match")
+    assert_equals("Extended", desk_options[3], "Third option should match")
+    
+    local physio_options = get_activity_options("Physiotherapy")
+    assert_equals(2, #physio_options, "Physiotherapy should have 2 options")
+    assert_equals("Exercises only", physio_options[1], "First physio option should match")
+    assert_equals("Full session", physio_options[2], "Second physio option should match")
+end})
+
+table.insert(tests, {name = "Parse interventions with options", func = function()
+    -- Mock interventions.md file with options
+    test_files["interventions.md"] = [[
+## Supplements
+- Vitamin D {Required}
+- Magnesium {Options: 200mg,400mg,600mg}
+- B Complex {Required: Mon,Wed,Fri} {Options: Low dose,High dose}
+
+## Therapies
+- Meditation {Options: 5 min,10 min,20 min}
+- Breathing exercises
+]]
+    
+    local interventions = parse_interventions_file()
+    
+    -- Should contain all interventions (clean names without options)
+    assert_contains(interventions, "Vitamin D", "Should contain required intervention")
+    assert_contains(interventions, "Magnesium", "Should contain intervention with options")
+    assert_contains(interventions, "B Complex", "Should contain required intervention with options")
+    assert_contains(interventions, "Meditation", "Should contain intervention with options")
+    assert_contains(interventions, "Breathing exercises", "Should contain simple intervention")
+    
+    -- Test that options are properly extracted
+    local mag_options = get_intervention_options("Magnesium")
+    assert_equals(3, #mag_options, "Magnesium should have 3 options")
+    assert_equals("200mg", mag_options[1], "First option should match")
+    assert_equals("400mg", mag_options[2], "Second option should match")
+    assert_equals("600mg", mag_options[3], "Third option should match")
+    
+    local b_complex_options = get_intervention_options("B Complex")
+    assert_equals(2, #b_complex_options, "B Complex should have 2 options")
+    assert_equals("Low dose", b_complex_options[1], "First B Complex option should match")
+    assert_equals("High dose", b_complex_options[2], "Second B Complex option should match")
+end})
+
+table.insert(tests, {name = "Activity options and required status combination", func = function()
+    -- Mock file with combination of required and options
+    test_files["activities.md"] = [[
+## Exercise
+- Walking {Required}
+- Physiotherapy {Required: Mon,Wed,Fri} {Options: Exercises only,Full session,Assessment}
+- Swimming {Options: Lane swimming,Water walking}
+- Stretching {Required} {Options: Morning routine,Evening routine}
+]]
+    
+    -- Clear caches
+    cached_activities = nil
+    cached_required_activities = nil
+    cached_activity_options = nil
+    
+    local activities = parse_activities_file()
+    local required_activities = parse_required_activities()
+    
+    -- Test activities parsing
+    assert_contains(activities, "Walking", "Should contain walking")
+    assert_contains(activities, "Physiotherapy", "Should contain physiotherapy")
+    assert_contains(activities, "Swimming", "Should contain swimming")
+    assert_contains(activities, "Stretching", "Should contain stretching")
+    
+    -- Test required activities parsing
+    local required_names = {}
+    for _, req in ipairs(required_activities) do
+        table.insert(required_names, req.name)
+    end
+    assert_contains(required_names, "Walking", "Walking should be required")
+    assert_contains(required_names, "Physiotherapy", "Physiotherapy should be required")
+    assert_contains(required_names, "Stretching", "Stretching should be required")
+    assert_not_contains(required_names, "Swimming", "Swimming should not be required")
+    
+    -- Test options parsing
+    local physio_options = get_activity_options("Physiotherapy")
+    assert_equals(3, #physio_options, "Physiotherapy should have 3 options")
+    assert_contains(physio_options, "Exercises only", "Should contain exercises option")
+    assert_contains(physio_options, "Full session", "Should contain full session option")
+    assert_contains(physio_options, "Assessment", "Should contain assessment option")
+    
+    local swimming_options = get_activity_options("Swimming")
+    assert_equals(2, #swimming_options, "Swimming should have 2 options")
+    
+    local stretching_options = get_activity_options("Stretching")
+    assert_equals(2, #stretching_options, "Stretching should have 2 options")
+    
+    local walking_options = get_activity_options("Walking")
+    assert_equals(0, #walking_options, "Walking should have no options")
+end})
+
+table.insert(tests, {name = "Log activity with option", func = function()
+    setup_test()
+    
+    local today = os.date("%Y-%m-%d")
+    
+    -- Test logging activity with option
+    log_activity_with_option("Desk work", "Full session")
+    
+    local logs = get_daily_logs(today)
+    
+    -- Should track the activity with its option
+    assert_true(logs.activities["Desk work"] ~= nil, "Should create activity entry")
+    assert_equals(1, #logs.activities["Desk work"], "Should have 1 log entry")
+    assert_equals("Full session", logs.activities["Desk work"][1].option, "Should store the selected option")
+    assert_true(logs.activities["Desk work"][1].timestamp ~= nil, "Should store timestamp")
+end})
+
+table.insert(tests, {name = "Log symptom with severity", func = function()
+    setup_test()
+    
+    local today = os.date("%Y-%m-%d")
+    
+    -- Test logging symptom with severity
+    log_symptom_with_severity("Fatigue", 7)
+    
+    local logs = get_daily_logs(today)
+    
+    -- Should track the symptom with its severity
+    assert_true(logs.symptoms["Fatigue"] ~= nil, "Should create symptom entry")
+    assert_equals(1, #logs.symptoms["Fatigue"], "Should have 1 log entry")
+    assert_equals(7, logs.symptoms["Fatigue"][1].severity, "Should store the selected severity")
+    assert_true(logs.symptoms["Fatigue"][1].timestamp ~= nil, "Should store timestamp")
+end})
+
+table.insert(tests, {name = "Format list items with options", func = function()
+    setup_test()
+    
+    local today = os.date("%Y-%m-%d")
+    
+    -- Log some activities with options
+    log_activity_with_option("Desk work", "Full session")
+    log_activity_with_option("Desk work", "Short session")
+    log_activity_with_option("Swimming", "30 min")
+    
+    -- Test formatting
+    local activities = {"Desk work", "Swimming", "Walking"}
+    local formatted = format_list_items(activities, "activity")
+    
+    -- Should show count and option info
+    assert_contains(formatted, "✓ Desk work (2)", "Should show count for logged activity with options")
+    assert_contains(formatted, "✓ Swimming (1)", "Should show count for logged activity with options")
+    assert_contains(formatted, "   Walking", "Should show unlogged activity normally")
+end})
 
 -- Run tests
 local function run_tests()

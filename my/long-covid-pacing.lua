@@ -41,7 +41,11 @@ local cached_activities = nil
 local cached_interventions = nil
 local cached_required_activities = nil
 local cached_required_interventions = nil
-local current_dialog_type = nil  -- Track which dialog is open: "symptom", "activity", or "intervention"
+local cached_activity_options = nil
+local cached_intervention_options = nil
+local current_dialog_type = nil  -- Track which dialog is open: "symptom", "activity", "intervention", "symptom_severity", "activity_option", "intervention_option"
+local pending_log_item = nil  -- Store selected item for severity/option dialogs: {type = "symptom", name = "Fatigue"}
+local ignore_next_cancel = false  -- Flag to ignore next cancel event when chaining dialogs
 local data_source = "none"  -- "files" or "tasker" or "none"
 
 -- Global variables to store prefs data
@@ -176,6 +180,57 @@ function log_item(item_type, item_name)
     save_prefs_data()
 end
 
+function log_symptom_with_severity(symptom_name, severity)
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    if not logs.symptoms[symptom_name] then
+        logs.symptoms[symptom_name] = {}
+    end
+    
+    table.insert(logs.symptoms[symptom_name], {
+        severity = severity,
+        timestamp = os.time()
+    })
+    
+    -- Save changes back to prefs immediately
+    save_prefs_data()
+end
+
+function log_activity_with_option(activity_name, option)
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    if not logs.activities[activity_name] then
+        logs.activities[activity_name] = {}
+    end
+    
+    table.insert(logs.activities[activity_name], {
+        option = option,
+        timestamp = os.time()
+    })
+    
+    -- Save changes back to prefs immediately
+    save_prefs_data()
+end
+
+function log_intervention_with_option(intervention_name, option)
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    if not logs.interventions[intervention_name] then
+        logs.interventions[intervention_name] = {}
+    end
+    
+    table.insert(logs.interventions[intervention_name], {
+        option = option,
+        timestamp = os.time()
+    })
+    
+    -- Save changes back to prefs immediately
+    save_prefs_data()
+end
+
 function format_list_items(items, item_type)
     local today = os.date("%Y-%m-%d")
     local logs = get_daily_logs(today)
@@ -210,10 +265,20 @@ function format_list_items(items, item_type)
     
     local formatted = {}
     for _, item in ipairs(items) do
-        local count = category[item]
+        local logged_data = category[item]
         local is_required = required_set[item]
         
-        if count and count > 0 then
+        -- Handle both old (number) and new (table with severity/option) data structures
+        local count = 0
+        if logged_data then
+            if type(logged_data) == "number" then
+                count = logged_data
+            elseif type(logged_data) == "table" then
+                count = #logged_data
+            end
+        end
+        
+        if count > 0 then
             -- Logged items get checkmark
             if is_required then
                 -- Required and completed: Green checkmark
@@ -592,6 +657,89 @@ function parse_required_activities()
     return required_activities
 end
 
+function extract_options(line)
+    local options = {}
+    local options_match = line:match("{Options:%s*([^}]+)}")
+    if options_match then
+        for option in options_match:gmatch("([^,]+)") do
+            table.insert(options, option:match("^%s*(.-)%s*$")) -- trim whitespace
+        end
+    end
+    return options
+end
+
+function parse_activity_options()
+    -- Return cached activity options if available
+    if cached_activity_options then
+        return cached_activity_options
+    end
+    
+    local content = files:read("activities.md")
+    if not content then
+        cached_activity_options = {}
+        return cached_activity_options
+    end
+    
+    local activity_options = {}
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^%- ") then
+            local activity_line = line:match("^%- (.+)")
+            if activity_line then
+                local clean_name = activity_line:match("^(.-)%s*{") or activity_line
+                local options = extract_options(activity_line)
+                if #options > 0 then
+                    activity_options[clean_name] = options
+                end
+            end
+        end
+    end
+    
+    cached_activity_options = activity_options
+    return activity_options
+end
+
+function parse_intervention_options()
+    -- Return cached intervention options if available
+    if cached_intervention_options then
+        return cached_intervention_options
+    end
+    
+    local content = files:read("interventions.md")
+    if not content then
+        cached_intervention_options = {}
+        return cached_intervention_options
+    end
+    
+    local intervention_options = {}
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^%- ") then
+            local intervention_line = line:match("^%- (.+)")
+            if intervention_line then
+                local clean_name = intervention_line:match("^(.-)%s*{") or intervention_line
+                local options = extract_options(intervention_line)
+                if #options > 0 then
+                    intervention_options[clean_name] = options
+                end
+            end
+        end
+    end
+    
+    cached_intervention_options = intervention_options
+    return intervention_options
+end
+
+function get_activity_options(activity_name)
+    local activity_options = parse_activity_options()
+    return activity_options[activity_name] or {}
+end
+
+function get_intervention_options(intervention_name)
+    local intervention_options = parse_intervention_options()
+    return intervention_options[intervention_name] or {}
+end
+
 function parse_required_interventions()
     -- Return cached required interventions if available
     if cached_required_interventions then
@@ -696,7 +844,17 @@ function are_all_required_activities_completed()
     local logs = get_daily_logs(today)
     
     for _, required_activity in ipairs(required_activities) do
-        if not logs.activities[required_activity] or logs.activities[required_activity] == 0 then
+        local logged_data = logs.activities[required_activity]
+        local count = 0
+        if logged_data then
+            if type(logged_data) == "number" then
+                count = logged_data
+            elseif type(logged_data) == "table" then
+                count = #logged_data
+            end
+        end
+        
+        if count == 0 then
             return false -- This required activity hasn't been logged
         end
     end
@@ -714,7 +872,17 @@ function are_all_required_interventions_completed()
     local logs = get_daily_logs(today)
     
     for _, required_intervention in ipairs(required_interventions) do
-        if not logs.interventions[required_intervention] or logs.interventions[required_intervention] == 0 then
+        local logged_data = logs.interventions[required_intervention]
+        local count = 0
+        if logged_data then
+            if type(logged_data) == "number" then
+                count = logged_data
+            elseif type(logged_data) == "table" then
+                count = #logged_data
+            end
+        end
+        
+        if count == 0 then
             return false -- This required intervention hasn't been logged
         end
     end
@@ -1010,6 +1178,8 @@ function on_command(data)
         cached_interventions = nil
         cached_required_activities = nil
         cached_required_interventions = nil
+        cached_activity_options = nil
+        cached_intervention_options = nil
         data_source = "files"
         
         -- Reload widget
@@ -1138,6 +1308,22 @@ function show_energy_dialog()
     dialogs:show_radio_dialog("Log Energy Level", energy_levels, 0)
 end
 
+function show_severity_dialog_for_symptom(symptom_name)
+    -- Store the symptom name and set dialog type
+    pending_log_item = {type = "symptom", name = symptom_name}
+    current_dialog_type = "symptom_severity"
+    
+    local severity_levels = {}
+    for i = 1, 10 do
+        table.insert(severity_levels, tostring(i) .. " - " .. (i <= 3 and "Mild" or i <= 6 and "Moderate" or "Severe"))
+    end
+    ui:show_toast("DEBUG: show_severity_dialog_for_symptom calling radio dialog")
+    dialogs:show_radio_dialog("Symptom Severity (1-10)", severity_levels, 0)
+end
+
+-- Use a global variable to trigger delayed dialog
+local pending_severity_symptom = nil
+
 function log_intervention(intervention_name)
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
     
@@ -1211,11 +1397,46 @@ function extract_item_name(formatted_item)
 end
 
 function on_dialog_action(result)
+    ui:show_toast("DEBUG: on_dialog_action called, result=" .. tostring(result) .. ", type=" .. tostring(current_dialog_type))
     if result == -1 then
         -- Dialog was cancelled
+        ui:show_toast("DEBUG: Dialog cancelled, current_dialog_type=" .. tostring(current_dialog_type) .. ", ignore_next_cancel=" .. tostring(ignore_next_cancel))
+        
+        -- Check if we should ignore this cancel (dialog chaining)
+        if ignore_next_cancel then
+            ui:show_toast("DEBUG: Ignoring cancel event (chaining dialogs)")
+            ignore_next_cancel = false
+            
+            -- Check if we need to show a delayed severity dialog
+            if pending_severity_symptom then
+                ui:show_toast("DEBUG: Showing delayed severity dialog for " .. pending_severity_symptom)
+                local symptom_name = pending_severity_symptom
+                pending_severity_symptom = nil
+                show_severity_dialog_for_symptom(symptom_name)
+            end
+            
+            return true  -- Just close the dialog, don't reset state
+        end
+        
+        -- Handle actual cancellations
         if current_dialog_type == "symptom" or current_dialog_type == "activity" or current_dialog_type == "intervention" or current_dialog_type == "energy" then
             -- Main list dialog was cancelled, clear completely
             current_dialog_type = nil
+            pending_log_item = nil
+        elseif current_dialog_type == "symptom_severity" or current_dialog_type == "activity_option" or current_dialog_type == "intervention_option" then
+            -- Radio dialog was cancelled, go back to main dialog
+            ui:show_toast("DEBUG: Radio dialog cancelled, going back to main dialog")
+            pending_log_item = nil
+            if current_dialog_type == "symptom_severity" then
+                current_dialog_type = "symptom"
+                show_symptom_dialog()
+            elseif current_dialog_type == "activity_option" then
+                current_dialog_type = "activity"
+                show_activity_dialog()
+            elseif current_dialog_type == "intervention_option" then
+                current_dialog_type = "intervention"
+                show_intervention_dialog()
+            end
         end
         -- If we're in edit mode (symptom_edit/activity_edit/intervention_edit), keep the state
         -- because the list dialog closing doesn't mean the edit dialog was cancelled
@@ -1236,10 +1457,11 @@ function on_dialog_action(result)
                 dialogs:show_edit_dialog("Custom Symptom", "Enter symptom name:", "")
                 return true  -- Close list dialog
             else
-                -- Log the selected symptom
-                log_symptom(selected_item)
-                -- Keep current_dialog_type so "Other..." still works
-                return true  -- Close dialog
+                -- Store selected item for delayed severity dialog
+                pending_severity_symptom = selected_item
+                ignore_next_cancel = true  -- Ignore the cancel from this dialog closing
+                ui:show_toast("DEBUG: Setting pending_severity_symptom to " .. selected_item)
+                return true  -- Close list dialog
             end
         elseif current_dialog_type == "activity" then
             local activities = parse_activities_file()
@@ -1253,10 +1475,20 @@ function on_dialog_action(result)
                 dialogs:show_edit_dialog("Custom Activity", "Enter activity name:", "")
                 return true  -- Close list dialog
             else
-                -- Log the selected activity
-                log_activity(selected_item)
-                -- Keep current_dialog_type so "Other..." still works
-                return true  -- Close dialog
+                -- Check if activity has options
+                local options = get_activity_options(selected_item)
+                if #options > 0 then
+                    -- Store selected item and show options dialog
+                    pending_log_item = {type = "activity", name = selected_item}
+                    current_dialog_type = "activity_option"
+                    ignore_next_cancel = true  -- Ignore the cancel from this dialog closing
+                    dialogs:show_radio_dialog("Select Option", options, 0)
+                    return true  -- Close list dialog
+                else
+                    -- No options - log directly using old method for backward compatibility
+                    log_activity(selected_item)
+                    return true  -- Close dialog
+                end
             end
         elseif current_dialog_type == "intervention" then
             local interventions = parse_interventions_file()
@@ -1270,10 +1502,20 @@ function on_dialog_action(result)
                 dialogs:show_edit_dialog("Custom Intervention", "Enter intervention name:", "")
                 return true  -- Close list dialog
             else
-                -- Log the selected intervention
-                log_intervention(selected_item)
-                -- Keep current_dialog_type so "Other..." still works
-                return true  -- Close dialog
+                -- Check if intervention has options
+                local options = get_intervention_options(selected_item)
+                if #options > 0 then
+                    -- Store selected item and show options dialog
+                    pending_log_item = {type = "intervention", name = selected_item}
+                    current_dialog_type = "intervention_option"
+                    ignore_next_cancel = true  -- Ignore the cancel from this dialog closing
+                    dialogs:show_radio_dialog("Select Option", options, 0)
+                    return true  -- Close list dialog
+                else
+                    -- No options - log directly using old method for backward compatibility
+                    log_intervention(selected_item)
+                    return true  -- Close dialog
+                end
             end
         elseif current_dialog_type == "energy" then
             -- Energy level logging - extract the number from "1 - Completely drained"
@@ -1288,13 +1530,113 @@ function on_dialog_action(result)
                 end
             end
             return true  -- Close dialog
+        elseif current_dialog_type == "symptom_severity" then
+            -- Symptom severity selection
+            ui:show_toast("DEBUG: symptom_severity dialog, result=" .. tostring(result))
+            if pending_log_item and pending_log_item.type == "symptom" then
+                ui:show_toast("DEBUG: pending_log_item found: " .. pending_log_item.name)
+                local severity = result  -- result is the index (1-10)
+                ui:show_toast("DEBUG: severity=" .. tostring(severity))
+                log_symptom_with_severity(pending_log_item.name, severity)
+                
+                -- Send to AutoSheets via Tasker with 4-column format
+                if tasker then
+                    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+                    tasker:run_task("LongCovid_LogEvent", {
+                        timestamp = timestamp,
+                        event_type = "Symptom",
+                        value = pending_log_item.name,
+                        severity = tostring(severity)
+                    })
+                    ui:show_toast("✓ " .. pending_log_item.name .. " (severity " .. severity .. ") logged")
+                else
+                    ui:show_toast("✓ " .. pending_log_item.name .. " (severity " .. severity .. ") logged")
+                end
+                
+                -- Reset states and re-open symptom dialog
+                pending_log_item = nil
+                current_dialog_type = "symptom"
+                show_symptom_dialog()
+            end
+            return true  -- Close dialog
+        elseif current_dialog_type == "activity_option" then
+            -- Activity option selection
+            if pending_log_item and pending_log_item.type == "activity" then
+                local options = get_activity_options(pending_log_item.name)
+                local selected_option = options[result]
+                if selected_option then
+                    log_activity_with_option(pending_log_item.name, selected_option)
+                    
+                    -- Send to AutoSheets via Tasker with 4-column format
+                    if tasker then
+                        local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+                        tasker:run_task("LongCovid_LogEvent", {
+                            timestamp = timestamp,
+                            event_type = "Activity",
+                            value = pending_log_item.name,
+                            option = selected_option
+                        })
+                        ui:show_toast("✓ " .. pending_log_item.name .. " (" .. selected_option .. ") logged")
+                    else
+                        ui:show_toast("✓ " .. pending_log_item.name .. " (" .. selected_option .. ") logged")
+                    end
+                    
+                    -- Reset states and re-open activity dialog
+                    pending_log_item = nil
+                    current_dialog_type = "activity"
+                    show_activity_dialog()
+                end
+            end
+            return true  -- Close dialog
+        elseif current_dialog_type == "intervention_option" then
+            -- Intervention option selection
+            ui:show_toast("DEBUG: intervention_option dialog, result=" .. tostring(result))
+            if pending_log_item and pending_log_item.type == "intervention" then
+                ui:show_toast("DEBUG: pending_log_item found: " .. pending_log_item.name)
+                local options = get_intervention_options(pending_log_item.name)
+                ui:show_toast("DEBUG: options count=" .. #options)
+                local selected_option = options[result]
+                ui:show_toast("DEBUG: selected_option=" .. tostring(selected_option))
+                if selected_option then
+                    log_intervention_with_option(pending_log_item.name, selected_option)
+                    
+                    -- Send to AutoSheets via Tasker with 4-column format
+                    if tasker then
+                        local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+                        tasker:run_task("LongCovid_LogEvent", {
+                            timestamp = timestamp,
+                            event_type = "Intervention",
+                            value = pending_log_item.name,
+                            option = selected_option
+                        })
+                        ui:show_toast("✓ " .. pending_log_item.name .. " (" .. selected_option .. ") logged")
+                    else
+                        ui:show_toast("✓ " .. pending_log_item.name .. " (" .. selected_option .. ") logged")
+                    end
+                    
+                    -- Reset states and re-open intervention dialog
+                    pending_log_item = nil
+                    current_dialog_type = "intervention"
+                    show_intervention_dialog()
+                end
+            end
+            return true  -- Close dialog
         end
     elseif type(result) == "string" then
         -- Edit dialog result - custom text
         if result ~= "" then
             if current_dialog_type == "symptom_edit" then
-                current_dialog_type = "symptom"  -- Set to main state before logging
-                log_symptom(result)  -- This will re-open the dialog
+                -- Store custom symptom and show severity dialog
+                pending_log_item = {type = "symptom", name = result}
+                current_dialog_type = "symptom_severity"
+                ignore_next_cancel = true  -- Ignore the cancel from edit dialog closing
+                
+                local severity_levels = {}
+                for i = 1, 10 do
+                    table.insert(severity_levels, tostring(i) .. " - " .. (i <= 3 and "Mild" or i <= 6 and "Moderate" or "Severe"))
+                end
+                dialogs:show_radio_dialog("Symptom Severity (1-10)", severity_levels, 0)
+                return true  -- Keep dialog open for severity selection
             elseif current_dialog_type == "activity_edit" then
                 current_dialog_type = "activity"  -- Set to main state before logging
                 log_activity(result)  -- This will re-open the dialog
