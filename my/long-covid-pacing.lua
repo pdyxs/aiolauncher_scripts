@@ -63,7 +63,8 @@ function load_prefs_data()
         daily_logs[today] = {
             symptoms = {},
             activities = {},
-            interventions = {}
+            interventions = {},
+            energy_levels = {}
         }
     end
 end
@@ -120,8 +121,14 @@ function get_daily_logs(date)
         daily_logs[date] = {
             symptoms = {},
             activities = {},
-            interventions = {}
+            interventions = {},
+            energy_levels = {}
         }
+    else
+        -- Ensure existing logs have energy_levels field (backward compatibility)
+        if not daily_logs[date].energy_levels then
+            daily_logs[date].energy_levels = {}
+        end
     end
     
     return daily_logs[date]
@@ -275,6 +282,9 @@ function on_click(idx)
         elseif elem_text:find("heart%-pulse") then
             -- Symptom logging button
             show_symptom_dialog()
+        elseif elem_text:find("bolt%-lightning") then
+            -- Energy level logging button
+            show_energy_dialog()
         elseif elem_text:find("running") then
             -- Activity logging button
             show_activity_dialog()
@@ -698,6 +708,40 @@ function are_all_required_interventions_completed()
     return true
 end
 
+function get_energy_button_color()
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    if not logs.energy_levels or #logs.energy_levels == 0 then
+        -- Never logged today - red
+        return "#dc3545"
+    end
+    
+    -- Find the most recent energy log
+    local most_recent_time = 0
+    for _, entry in ipairs(logs.energy_levels) do
+        if entry.timestamp and entry.timestamp > most_recent_time then
+            most_recent_time = entry.timestamp
+        end
+    end
+    
+    if most_recent_time == 0 then
+        -- No valid timestamps - red
+        return "#dc3545"
+    end
+    
+    local current_time = os.time()
+    local hours_since_last = (current_time - most_recent_time) / 3600
+    
+    if hours_since_last >= 4 then
+        -- 4+ hours since last log - yellow
+        return "#ffc107"
+    else
+        -- Logged within 4 hours - green
+        return "#28a745"
+    end
+end
+
 function render_widget()
     local today = get_current_day()
     local day_display = today:gsub("^%l", string.upper)  -- Capitalize first letter
@@ -745,12 +789,14 @@ function render_widget()
     -- Add new line for second row of buttons
     table.insert(ui_elements, {"new_line", 1})
     
-    -- Determine button colors based on required items completion
+    -- Determine button colors based on completion and timing
     local activity_color = are_all_required_activities_completed() and "#28a745" or "#dc3545" -- Green or Red
     local intervention_color = are_all_required_interventions_completed() and "#007bff" or "#dc3545" -- Blue or Red
+    local energy_color = get_energy_button_color() -- Red/Yellow/Green based on timing
     
-    -- First group: Symptom logging (left side, centered)
+    -- First group: Health tracking (left side, centered)
     table.insert(ui_elements, {"button", "fa:heart-pulse", {color = "#6c757d", gravity = "center_h"}})
+    table.insert(ui_elements, {"button", "fa:bolt-lightning", {color = energy_color, gravity = "anchor_prev"}})
     
     -- Add spacing between groups
     table.insert(ui_elements, {"spacer", 3})
@@ -1070,6 +1116,18 @@ function show_intervention_dialog()
     })
 end
 
+function show_energy_dialog()
+    current_dialog_type = "energy"
+    local energy_levels = {"1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
+                           "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
+                           "9 - Excellent", "10 - Peak energy"}
+    dialogs:show_radio_dialog({
+        title = "Log Energy Level",
+        lines = energy_levels,
+        selected = -1  -- No initial selection
+    })
+end
+
 function log_intervention(intervention_name)
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
     
@@ -1094,6 +1152,39 @@ function log_intervention(intervention_name)
     end
 end
 
+function log_energy(energy_level)
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    -- Store energy level with timestamp
+    local energy_entry = {
+        level = energy_level,
+        timestamp = os.time(),
+        time_display = os.date("%H:%M")
+    }
+    
+    table.insert(logs.energy_levels, energy_entry)
+    
+    -- Save changes back to prefs immediately
+    save_prefs_data()
+    
+    -- Send to AutoSheets via Tasker
+    if tasker then
+        tasker:run_task("LongCovid_LogEvent", {
+            timestamp = timestamp,
+            event_type = "Energy",
+            value = tostring(energy_level)
+        })
+        ui:show_toast("✓ Energy level " .. energy_level .. " logged")
+    else
+        ui:show_toast("✓ Energy level " .. energy_level .. " logged")
+    end
+    
+    -- Re-render widget to update button color
+    render_widget()
+end
+
 function extract_item_name(formatted_item)
     -- Extract original item name from formatted string
     -- Handle: "✓ Fatigue (2)" -> "Fatigue" or "   Headache" -> "Headache"
@@ -1112,7 +1203,7 @@ end
 function on_dialog_action(result)
     if result == -1 then
         -- Dialog was cancelled
-        if current_dialog_type == "symptom" or current_dialog_type == "activity" or current_dialog_type == "intervention" then
+        if current_dialog_type == "symptom" or current_dialog_type == "activity" or current_dialog_type == "intervention" or current_dialog_type == "energy" then
             -- Main list dialog was cancelled, clear completely
             current_dialog_type = nil
         end
@@ -1174,6 +1265,19 @@ function on_dialog_action(result)
                 -- Keep current_dialog_type so "Other..." still works
                 return true  -- Close dialog
             end
+        elseif current_dialog_type == "energy" then
+            -- Energy level logging - extract the number from "1 - Completely drained"
+            local energy_levels = {"1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
+                                   "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
+                                   "9 - Excellent", "10 - Peak energy"}
+            local selected_text = energy_levels[result]
+            if selected_text then
+                local energy_level = tonumber(selected_text:match("^(%d+)"))
+                if energy_level then
+                    log_energy(energy_level)
+                end
+            end
+            return true  -- Close dialog
         end
     elseif type(result) == "string" then
         -- Edit dialog result - custom text

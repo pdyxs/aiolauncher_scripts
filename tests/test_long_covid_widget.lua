@@ -241,7 +241,8 @@ local function test_get_daily_logs(date)
         _G.prefs.daily_logs[date] = {
             symptoms = {},
             activities = {},
-            interventions = {}
+            interventions = {},
+            energy_levels = {}
         }
     end
     
@@ -581,6 +582,48 @@ local function test_format_list_items(items, item_type)
     end
     
     return formatted
+end
+
+local function test_log_energy(energy_level)
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    local energy_entry = {
+        level = energy_level,
+        timestamp = os.time(),
+        time_display = os.date("%H:%M")
+    }
+    
+    table.insert(logs.energy_levels, energy_entry)
+end
+
+local function test_get_energy_button_color()
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    if not logs.energy_levels or #logs.energy_levels == 0 then
+        return "#dc3545" -- Red
+    end
+    
+    local most_recent_time = 0
+    for _, entry in ipairs(logs.energy_levels) do
+        if entry.timestamp and entry.timestamp > most_recent_time then
+            most_recent_time = entry.timestamp
+        end
+    end
+    
+    if most_recent_time == 0 then
+        return "#dc3545" -- Red
+    end
+    
+    local current_time = os.time()
+    local hours_since_last = (current_time - most_recent_time) / 3600
+    
+    if hours_since_last >= 4 then
+        return "#ffc107" -- Yellow
+    else
+        return "#28a745" -- Green
+    end
 end
 
 -- Test framework
@@ -991,6 +1034,7 @@ add_test("Widget initialization creates daily logs", function()
     assert_true(logs.symptoms ~= nil, "Should create symptoms table")
     assert_true(logs.activities ~= nil, "Should create activities table") 
     assert_true(logs.interventions ~= nil, "Should create interventions table")
+    assert_true(logs.energy_levels ~= nil, "Should create energy_levels table")
 end)
 
 -- Required Activities Tests
@@ -1135,6 +1179,70 @@ add_test("Format list items with required markers", function()
     formatted = test_format_list_items(activities, "activity")
     
     assert_contains(formatted, "✓ Light walk (1)", "Optional logged should have regular checkmark")
+end)
+
+-- Energy Logging Tests
+add_test("Energy logging functionality", function()
+    setup_widget_env()
+    
+    -- Initially no energy logged
+    local color = test_get_energy_button_color()
+    assert_equals("#dc3545", color, "Should be red when no energy logged")
+    
+    -- Log an energy level
+    test_log_energy(7)
+    
+    -- Should now be green (just logged)
+    color = test_get_energy_button_color()
+    assert_equals("#28a745", color, "Should be green after logging energy")
+    
+    -- Verify energy was stored
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    assert_equals(1, #logs.energy_levels, "Should have 1 energy entry")
+    assert_equals(7, logs.energy_levels[1].level, "Should store correct energy level")
+    assert_true(logs.energy_levels[1].timestamp ~= nil, "Should have timestamp")
+    assert_true(logs.energy_levels[1].time_display ~= nil, "Should have time display")
+end)
+
+add_test("Energy button color timing logic", function()
+    setup_widget_env()
+    
+    -- Log energy 5 hours ago (should be yellow)
+    local five_hours_ago = os.time() - (5 * 3600)
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    table.insert(logs.energy_levels, {
+        level = 5,
+        timestamp = five_hours_ago,
+        time_display = os.date("%H:%M", five_hours_ago)
+    })
+    
+    local color = test_get_energy_button_color()
+    assert_equals("#ffc107", color, "Should be yellow when logged 4+ hours ago")
+    
+    -- Add recent log (should be green)
+    test_log_energy(6)
+    color = test_get_energy_button_color()
+    assert_equals("#28a745", color, "Should be green with recent log")
+end)
+
+add_test("Multiple energy entries", function()
+    setup_widget_env()
+    
+    -- Log multiple energy levels
+    test_log_energy(3)
+    test_log_energy(5)
+    test_log_energy(7)
+    
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    assert_equals(3, #logs.energy_levels, "Should store multiple energy entries")
+    assert_equals(3, logs.energy_levels[1].level, "First entry should be 3")
+    assert_equals(5, logs.energy_levels[2].level, "Second entry should be 5") 
+    assert_equals(7, logs.energy_levels[3].level, "Third entry should be 7")
 end)
 
 -- Run tests

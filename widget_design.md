@@ -9,14 +9,14 @@ The Long Covid planning widget provides a comprehensive interface for daily capa
 ```
 Long Covid Pacing - Monday
      🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging
-         💗     🏃 💊
+        💗 ⚡     🏃 💊
 ```
 
 ### Expanded State with Plan
 ```
 Long Covid Pacing - Monday
      🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging
-         💗     🏃 💊
+        💗 ⚡     🏃 💊
 
 Today's Overview:
 Work: WFH normal, hourly breaks
@@ -48,15 +48,18 @@ Evening:
 - **Persistence**: Choice saved locally and logged to Google Sheets
 - **Restrictions**: Can only downgrade capacity during the day
 
-### 2. Activity, Symptom & Intervention Logging
+### 2. Health & Activity Logging
 - **Symptom button**: 💗 Heart-pulse icon (left group, centered on second line)
   - **Color**: Always grey (#6c757d) - symptoms are not "required"
+- **Energy button**: ⚡ Lightning icon (left group, next to symptom button)
+  - **Color**: Red (#dc3545) when never logged, Yellow (#ffc107) when 4+ hours since last log, Green (#28a745) when logged within 4 hours
+  - **Dialog**: Radio button selection for single-choice energy level
 - **Activity button**: 🏃 Running icon (right group, after spacing)
   - **Color**: Red (#dc3545) when required activities incomplete, Green (#28a745) when complete
 - **Intervention button**: 💊 Pills icon (right group, next to activity button)
   - **Color**: Red (#dc3545) when required interventions incomplete, Blue (#007bff) when complete
 - **Visibility**: Always visible
-- **Layout**: Two groups on second line - symptoms (left), activities/interventions (right) with spacing between
+- **Layout**: Two groups on second line - health tracking (left), activities/interventions (right) with spacing between
 - **Functionality**: Opens searchable list dialogs with custom "Other..." option
 - **Data sources**: Markdown files (activities.md, symptoms.md, interventions.md)
 - **Required items**: Specified in source files using `{Required}` or `{Required: Mon,Wed,Fri}` syntax
@@ -321,6 +324,34 @@ Log Activity
 - **Instant feedback**: Dialog refreshes automatically after logging to show updated counts
 - **Button colors**: Activity/intervention buttons are red until all required items completed
 
+## Energy Level Tracking
+
+The energy level logging feature provides continuous monitoring of energy throughout the day on a 1-10 scale, with time-based visual feedback to encourage regular logging.
+
+### Energy Levels Scale
+1. **Completely drained** - No energy left
+2. **Very low** - Struggling to function
+3. **Low** - Below normal, limited activity
+4. **Below average** - Functioning but tired
+5. **Average** - Normal baseline energy
+6. **Above average** - Good energy levels
+7. **Good** - Feeling strong and capable
+8. **Very good** - High energy, productive
+9. **Excellent** - Peak performance
+10. **Peak energy** - Maximum energy and vitality
+
+### Button Color Logic
+- **Red (#dc3545)**: Never logged today - encourages first log
+- **Yellow (#ffc107)**: Last logged 4+ hours ago - reminder to update
+- **Green (#28a745)**: Logged within last 4 hours - up to date
+
+### Data Storage
+Energy levels are stored with timestamps, allowing for:
+- Time-series analysis of daily energy patterns
+- Correlation with activities, symptoms, and interventions
+- Identification of energy peaks and crashes
+- Long-term trend analysis
+
 ## Intervention Tracking
 
 The intervention logging feature allows tracking of medications, supplements, treatments, and lifestyle changes to help determine their effectiveness for long covid management.
@@ -355,7 +386,7 @@ The intervention logging feature allows tracking of medications, supplements, tr
 
 The widget includes comprehensive test coverage ensuring reliability:
 
-### Test Categories (26 total tests)
+### Test Categories (29 total tests)
 - **Core functionality**: Preferences, daily reset, capacity selection
 - **Data parsing**: Decision criteria, day files, current day calculation
 - **UI interaction**: Button clicks, widget rendering, level restrictions
@@ -365,6 +396,7 @@ The widget includes comprehensive test coverage ensuring reliability:
 - **Required activities**: Parsing required specifications, day-specific requirements
 - **Completion status**: Button color logic, required vs optional tracking
 - **Visual markers**: Warning icons for incomplete required items
+- **Energy logging**: Time-based color logic, multiple entries, timing validation
 - **Edge cases**: Items with existing brackets, complex naming scenarios
 
 ### Test File Location
