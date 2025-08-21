@@ -26,7 +26,7 @@ end
 local levels = {
     {name = "Recovering", color = "#FF4444", key = "red", icon = "bed"},
     {name = "Maintaining", color = "#FFAA00", key = "yellow", icon = "walking"}, 
-    {name = "Engaging", color = "#44AA44", key = "green", icon = "bolt"}
+    {name = "Engaging", color = "#44AA44", key = "green", icon = "rocket-launch"}
 }
 
 -- Using AIO Launcher's files module (sandboxed directory) 
@@ -267,7 +267,7 @@ function on_click(idx)
             else
                 ui:show_toast("Can only downgrade capacity level")
             end
-        elseif elem_text:find("bolt") then
+        elseif elem_text:find("rocket%-launch") then
             -- Capacity level 3 (Engaging)
             if selected_level == 0 or 3 <= selected_level then
                 selected_level = 3
@@ -833,7 +833,7 @@ function render_widget()
             table.insert(ui_elements, {"new_line", 1})
             table.insert(ui_elements, {"text", "%%fa:walking%% <b>Maintaining</b> - Moderate energy, standard routine", {color = "#FFAA00"}})
             table.insert(ui_elements, {"new_line", 1})
-            table.insert(ui_elements, {"text", "%%fa:bolt%% <b>Engaging</b> - High energy, can handle challenges", {color = "#44AA44"}})
+            table.insert(ui_elements, {"text", "%%fa:rocket-launch%% <b>Engaging</b> - High energy, can handle challenges", {color = "#44AA44"}})
             table.insert(ui_elements, {"new_line", 2})
             table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}})
             table.insert(ui_elements, {"spacer", 2})
@@ -955,7 +955,7 @@ function on_long_click(idx)
             show_decision_criteria(1)
         elseif elem_text:find("walking") then
             show_decision_criteria(2)
-        elseif elem_text:find("bolt") then
+        elseif elem_text:find("rocket%-launch") then
             show_decision_criteria(3)
         elseif elem_text:find("rotate%-right") or elem_text:find("Reset") then
             ui:show_toast("Reset button - tap to clear selection")
@@ -1135,11 +1135,7 @@ function show_energy_dialog()
     local energy_levels = {"1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
                            "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
                            "9 - Excellent", "10 - Peak energy"}
-    dialogs:show_radio_dialog({
-        title = "Log Energy Level",
-        lines = energy_levels,
-        selected = -1  -- No initial selection
-    })
+    dialogs:show_radio_dialog("Log Energy Level", energy_levels, 0)
 end
 
 function log_intervention(intervention_name)
