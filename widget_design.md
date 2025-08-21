@@ -9,14 +9,14 @@ The Long Covid planning widget provides a comprehensive interface for daily capa
 ```
 Long Covid Pacing - Monday
      🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging
-           🏃 📋 💊
+         💗     🏃 💊
 ```
 
 ### Expanded State with Plan
 ```
 Long Covid Pacing - Monday
      🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging
-           🏃 📋 💊
+         💗     🏃 💊
 
 Today's Overview:
 Work: WFH normal, hourly breaks
@@ -49,14 +49,14 @@ Evening:
 - **Restrictions**: Can only downgrade capacity during the day
 
 ### 2. Activity, Symptom & Intervention Logging
-- **Activity button**: 🏃 Running icon (centered on second line)
-  - **Color**: Red (#dc3545) when required activities incomplete, Green (#28a745) when complete
-- **Symptom button**: 📋 Medical notes icon (next to activity button)
+- **Symptom button**: 💗 Heart-pulse icon (left group, centered on second line)
   - **Color**: Always grey (#6c757d) - symptoms are not "required"
-- **Intervention button**: 💊 Pills icon (next to symptom button)
+- **Activity button**: 🏃 Running icon (right group, after spacing)
+  - **Color**: Red (#dc3545) when required activities incomplete, Green (#28a745) when complete
+- **Intervention button**: 💊 Pills icon (right group, next to activity button)
   - **Color**: Red (#dc3545) when required interventions incomplete, Blue (#007bff) when complete
 - **Visibility**: Always visible
-- **Layout**: Centered as a group on second line below capacity buttons
+- **Layout**: Two groups on second line - symptoms (left), activities/interventions (right) with spacing between
 - **Functionality**: Opens searchable list dialogs with custom "Other..." option
 - **Data sources**: Markdown files (activities.md, symptoms.md, interventions.md)
 - **Required items**: Specified in source files using `{Required}` or `{Required: Mon,Wed,Fri}` syntax

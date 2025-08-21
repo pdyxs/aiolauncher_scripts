@@ -272,7 +272,7 @@ function on_click(idx)
         elseif elem_text:find("sync") then
             -- Sync files button
             sync_plan_files()
-        elseif elem_text:find("notes%-medical") then
+        elseif elem_text:find("heart%-pulse") then
             -- Symptom logging button
             show_symptom_dialog()
         elseif elem_text:find("running") then
@@ -749,11 +749,14 @@ function render_widget()
     local activity_color = are_all_required_activities_completed() and "#28a745" or "#dc3545" -- Green or Red
     local intervention_color = are_all_required_interventions_completed() and "#007bff" or "#dc3545" -- Blue or Red
     
-    -- Add activity logging button (centered)
-    table.insert(ui_elements, {"button", "fa:running", {color = activity_color, gravity = "center_h"}})
-    -- Add symptom logging button next to activity button (always grey - symptoms aren't required)
-    table.insert(ui_elements, {"button", "fa:notes-medical", {color = "#6c757d", gravity = "anchor_prev"}})
-    -- Add intervention logging button next to symptom button
+    -- First group: Symptom logging (left side, centered)
+    table.insert(ui_elements, {"button", "fa:heart-pulse", {color = "#6c757d", gravity = "center_h"}})
+    
+    -- Add spacing between groups
+    table.insert(ui_elements, {"spacer", 3})
+    
+    -- Second group: Activity and intervention logging (right side)
+    table.insert(ui_elements, {"button", "fa:running", {color = activity_color, gravity = "anchor_prev"}})
     table.insert(ui_elements, {"button", "fa:pills", {color = intervention_color, gravity = "anchor_prev"}})
 
     ui:set_expandable(true)
