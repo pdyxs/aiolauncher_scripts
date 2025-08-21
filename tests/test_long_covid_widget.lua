@@ -380,6 +380,209 @@ local function test_on_click(idx)
     end
 end
 
+-- Required activities test functions
+local function test_parse_required_activities()
+    local content = mock_files.read("activities.md")
+    if not content then
+        return {}
+    end
+    
+    local required_activities = {}
+    local lines = split_lines(content)
+    
+    for _, line in ipairs(lines) do
+        if line:match("^%- ") then
+            local activity_line = line:match("^%- (.+)")
+            if activity_line and activity_line:match("%{Required") then
+                local activity_name = activity_line:match("^(.-)%s*%{Required")
+                if activity_name then
+                    local required_info = {
+                        name = activity_name,
+                        days = nil
+                    }
+                    
+                    local days_match = activity_line:match("%{Required:%s*([^%}]+)%}")
+                    if days_match then
+                        required_info.days = {}
+                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
+                            table.insert(required_info.days, day_abbrev:lower())
+                        end
+                    end
+                    
+                    table.insert(required_activities, required_info)
+                end
+            end
+        end
+    end
+    
+    return required_activities
+end
+
+local function test_parse_required_interventions()
+    local content = mock_files.read("interventions.md")
+    if not content then
+        return {}
+    end
+    
+    local required_interventions = {}
+    local lines = split_lines(content)
+    
+    for _, line in ipairs(lines) do
+        if line:match("^%- ") then
+            local intervention_line = line:match("^%- (.+)")
+            if intervention_line and intervention_line:match("%{Required") then
+                local intervention_name = intervention_line:match("^(.-)%s*%{Required")
+                if intervention_name then
+                    local required_info = {
+                        name = intervention_name,
+                        days = nil
+                    }
+                    
+                    local days_match = intervention_line:match("%{Required:%s*([^%}]+)%}")
+                    if days_match then
+                        required_info.days = {}
+                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
+                            table.insert(required_info.days, day_abbrev:lower())
+                        end
+                    end
+                    
+                    table.insert(required_interventions, required_info)
+                end
+            end
+        end
+    end
+    
+    return required_interventions
+end
+
+local function test_get_current_day_abbrev()
+    local day_abbrevs = {"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
+    return day_abbrevs[tonumber(os.date("%w")) + 1]
+end
+
+local function test_is_required_today(required_info)
+    if not required_info.days then
+        return true
+    end
+    
+    local today_abbrev = test_get_current_day_abbrev()
+    for _, day in ipairs(required_info.days) do
+        if day == today_abbrev then
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function test_get_required_activities_for_today()
+    local required_activities = test_parse_required_activities()
+    local today_required = {}
+    
+    for _, required_info in ipairs(required_activities) do
+        if test_is_required_today(required_info) then
+            table.insert(today_required, required_info.name)
+        end
+    end
+    
+    return today_required
+end
+
+local function test_get_required_interventions_for_today()
+    local required_interventions = test_parse_required_interventions()
+    local today_required = {}
+    
+    for _, required_info in ipairs(required_interventions) do
+        if test_is_required_today(required_info) then
+            table.insert(today_required, required_info.name)
+        end
+    end
+    
+    return today_required
+end
+
+local function test_are_all_required_activities_completed()
+    local required_activities = test_get_required_activities_for_today()
+    if #required_activities == 0 then
+        return true
+    end
+    
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    for _, required_activity in ipairs(required_activities) do
+        if not logs.activities[required_activity] or logs.activities[required_activity] == 0 then
+            return false
+        end
+    end
+    
+    return true
+end
+
+local function test_are_all_required_interventions_completed()
+    local required_interventions = test_get_required_interventions_for_today()
+    if #required_interventions == 0 then
+        return true
+    end
+    
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    for _, required_intervention in ipairs(required_interventions) do
+        if not logs.interventions[required_intervention] or logs.interventions[required_intervention] == 0 then
+            return false
+        end
+    end
+    
+    return true
+end
+
+local function test_format_list_items(items, item_type)
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    local category
+    local required_items = {}
+    if item_type == "symptom" then
+        category = logs.symptoms
+    elseif item_type == "activity" then
+        category = logs.activities
+        required_items = test_get_required_activities_for_today()
+    elseif item_type == "intervention" then
+        category = logs.interventions
+        required_items = test_get_required_interventions_for_today()
+    else
+        return items
+    end
+    
+    local required_set = {}
+    for _, req_item in ipairs(required_items) do
+        required_set[req_item] = true
+    end
+    
+    local formatted = {}
+    for _, item in ipairs(items) do
+        local count = category[item]
+        local is_required = required_set[item]
+        
+        if count and count > 0 then
+            if is_required then
+                table.insert(formatted, "✅ " .. item .. " (" .. count .. ")")
+            else
+                table.insert(formatted, "✓ " .. item .. " (" .. count .. ")")
+            end
+        else
+            if is_required then
+                table.insert(formatted, "⚠️ " .. item)
+            else
+                table.insert(formatted, "   " .. item)
+            end
+        end
+    end
+    
+    return formatted
+end
+
 -- Test framework
 local tests = {}
 
@@ -788,6 +991,150 @@ add_test("Widget initialization creates daily logs", function()
     assert_true(logs.symptoms ~= nil, "Should create symptoms table")
     assert_true(logs.activities ~= nil, "Should create activities table") 
     assert_true(logs.interventions ~= nil, "Should create interventions table")
+end)
+
+-- Required Activities Tests
+add_test("Parse required activities", function()
+    setup_widget_env()
+    test_files["activities.md"] = [[
+# Long Covid Activities
+
+## Physical
+- Light walk
+- Physio (full) {Required: Mon,Wed,Fri}
+- Yin Yoga {Required}
+
+## Work
+- Work from home
+]]
+    
+    local required = test_parse_required_activities()
+    
+    assert_equals(2, #required, "Should find 2 required activities")
+    assert_equals("Physio (full)", required[1].name, "Should parse activity name correctly")
+    assert_equals("Yin Yoga", required[2].name, "Should parse daily required activity")
+    
+    assert_true(required[1].days ~= nil, "Should parse specific days")
+    assert_equals(3, #required[1].days, "Should find 3 days for physio")
+    assert_true(required[2].days == nil, "Daily required should have no specific days")
+end)
+
+add_test("Parse required interventions", function()
+    setup_widget_env()
+    test_files["interventions.md"] = [[
+## Medications
+- LDN (4mg) {Required}
+- Claratyne
+
+## Supplements
+- Salvital {Required: Mon,Wed,Fri}
+]]
+    
+    local required = test_parse_required_interventions()
+    
+    assert_equals(2, #required, "Should find 2 required interventions")
+    assert_equals("LDN (4mg)", required[1].name, "Should parse intervention name correctly")
+    assert_equals("Salvital", required[2].name, "Should parse day-specific intervention")
+end)
+
+add_test("Current day abbreviation", function()
+    setup_widget_env()
+    
+    local day_abbrev = test_get_current_day_abbrev()
+    local valid_abbrevs = {"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
+    
+    local found = false
+    for _, valid in ipairs(valid_abbrevs) do
+        if day_abbrev == valid then
+            found = true
+            break
+        end
+    end
+    
+    assert_true(found, "Should return valid day abbreviation: " .. tostring(day_abbrev))
+end)
+
+add_test("Required items for today logic", function()
+    setup_widget_env()
+    test_files["activities.md"] = [[
+## Physical
+- Physio (full) {Required: Mon,Wed,Fri}
+- Yin Yoga {Required}
+]]
+    
+    -- Mock current day abbreviation for consistent testing
+    local orig_get_current_day_abbrev = test_get_current_day_abbrev
+    test_get_current_day_abbrev = function() return "mon" end
+    
+    local today_required = test_get_required_activities_for_today()
+    
+    assert_equals(2, #today_required, "Should find 2 required activities for Monday")
+    assert_contains(today_required, "Physio (full)", "Should include physio on Monday")
+    assert_contains(today_required, "Yin Yoga", "Should include daily required activity")
+    
+    -- Test a day when physio isn't required
+    test_get_current_day_abbrev = function() return "tue" end
+    today_required = test_get_required_activities_for_today()
+    
+    assert_equals(1, #today_required, "Should find 1 required activity for Tuesday")
+    assert_contains(today_required, "Yin Yoga", "Should only include daily required activity")
+    
+    -- Restore original function
+    test_get_current_day_abbrev = orig_get_current_day_abbrev
+end)
+
+add_test("Required activities completion status", function()
+    setup_widget_env()
+    test_files["activities.md"] = [[
+## Physical
+- Physio (full) {Required}
+- Light walk
+]]
+    
+    -- Initially no activities logged - should be incomplete
+    assert_true(not test_are_all_required_activities_completed(), "Should be incomplete when nothing logged")
+    
+    -- Log the required activity
+    test_log_item("activity", "Physio (full)")
+    
+    -- Should now be complete
+    assert_true(test_are_all_required_activities_completed(), "Should be complete after logging required activity")
+    
+    -- Log optional activity - should remain complete
+    test_log_item("activity", "Light walk")
+    assert_true(test_are_all_required_activities_completed(), "Should remain complete after logging optional activity")
+end)
+
+add_test("Format list items with required markers", function()
+    setup_widget_env()
+    test_files["activities.md"] = [[
+## Physical
+- Physio (full) {Required}
+- Light walk
+- Yin Yoga {Required}
+]]
+    
+    local activities = {"Physio (full)", "Light walk", "Yin Yoga"}
+    local formatted = test_format_list_items(activities, "activity")
+    
+    -- Initially all unlogged - required items should have warning icons
+    assert_contains(formatted, "⚠️ Physio (full)", "Required unlogged should have warning icon")
+    assert_contains(formatted, "   Light walk", "Optional unlogged should have spacing")
+    assert_contains(formatted, "⚠️ Yin Yoga", "Required unlogged should have warning icon")
+    
+    -- Log one required activity
+    test_log_item("activity", "Physio (full)")
+    formatted = test_format_list_items(activities, "activity")
+    
+    assert_contains(formatted, "✅ Physio (full) (1)", "Required logged should have green checkmark")
+    assert_contains(formatted, "   Light walk", "Optional unlogged should have spacing")
+    assert_contains(formatted, "⚠️ Yin Yoga", "Required unlogged should have warning icon")
+    
+    -- Log optional activity
+    test_log_item("activity", "Light walk")
+    formatted = test_format_list_items(activities, "activity")
+    
+    assert_contains(formatted, "✓ Light walk (1)", "Optional logged should have regular checkmark")
 end)
 
 -- Run tests

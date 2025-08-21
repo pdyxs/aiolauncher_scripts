@@ -50,15 +50,19 @@ Evening:
 
 ### 2. Activity, Symptom & Intervention Logging
 - **Activity button**: 🏃 Running icon (centered on second line)
+  - **Color**: Red (#dc3545) when required activities incomplete, Green (#28a745) when complete
 - **Symptom button**: 📋 Medical notes icon (next to activity button)
+  - **Color**: Always grey (#6c757d) - symptoms are not "required"
 - **Intervention button**: 💊 Pills icon (next to symptom button)
+  - **Color**: Red (#dc3545) when required interventions incomplete, Blue (#007bff) when complete
 - **Visibility**: Always visible
 - **Layout**: Centered as a group on second line below capacity buttons
 - **Functionality**: Opens searchable list dialogs with custom "Other..." option
 - **Data sources**: Markdown files (activities.md, symptoms.md, interventions.md)
+- **Required items**: Specified in source files using `{Required}` or `{Required: Mon,Wed,Fri}` syntax
 - **Logging**: All entries sent to Google Spreadsheet via AutoSheets
 - **Daily tracking**: Items logged during the day are tracked with counts
-- **Visual differentiation**: Logged items show checkmarks and counts in dialogs
+- **Visual differentiation**: Required vs optional items marked differently in dialogs
 - **Auto-reset**: Daily tracking clears automatically when a new day starts
 
 ### 3. Daily Plan Display  
@@ -70,14 +74,17 @@ Evening:
 
 ### 4. Daily Tracking & Visual Differentiation
 - **Real-time counts**: Tracks how many times each item is logged per day
-- **Visual indicators**: Logged items display with checkmarks (✓) and count numbers
+- **Visual indicators**: Items marked differently based on required status and completion
 - **Dialog formatting**: 
-  - Logged items: `"✓ Fatigue (2)"` - checkmark with count
-  - Unlogged items: `"   Headache"` - indented for alignment
+  - Required completed: `"✅ Physio (full) (1)"` - green checkmark with count
+  - Optional completed: `"✓ Light walk (2)"` - regular checkmark with count
+  - Required incomplete: `"⚠️ Physio (full)"` - warning icon
+  - Optional incomplete: `"   Headache"` - indented for alignment
 - **Smart extraction**: Handles items with existing brackets (e.g., "Physio (full)")
 - **Persistence**: Daily logs stored in preferences, cleared automatically on new day
 - **Count accumulation**: Multiple selections of same item increment the count
 - **Bracket preservation**: Items like "Exercise (15 min)" maintain original brackets when logged
+- **Required item tracking**: Button colors change from red to green/blue when all required items completed
 
 ### 5. Widget Title
 - **Format**: "Long Covid Pacing - [Day]"
@@ -110,9 +117,38 @@ Evening:
 - `/Long Covid/plans/decision_criteria.md` - Decision criteria
 - `/Long Covid/plans/days/{day}.md` - Day-specific templates
 - `/Long Covid/plans/tracking.md` - Daily selections log
-- `activities.md` - Available activities for logging
+- `activities.md` - Available activities for logging with required specifications
 - `symptoms.md` - Available symptoms for logging
-- `interventions.md` - Available interventions for logging
+- `interventions.md` - Available interventions for logging with required specifications
+
+### Required Items Specification Format
+Activities and interventions can be marked as required using special syntax:
+
+**activities.md example:**
+```markdown
+## Physical
+- Light walk
+- Physio (full) {Required: Mon,Wed,Fri}
+- Yin Yoga {Required}
+
+## Work
+- Work from home
+```
+
+**interventions.md example:**
+```markdown
+## Medications
+- LDN (4mg) {Required}
+- Claratyne
+
+## Supplements
+- Salvital {Required: Mon,Wed,Fri}
+```
+
+**Syntax:**
+- `{Required}` - Required every day
+- `{Required: Mon,Wed,Fri}` - Required only on specific days (case insensitive)
+- Day abbreviations: `sun`, `mon`, `tue`, `wed`, `thu`, `fri`, `sat`
 
 ### Internal Storage (AIO Preferences)
 - `daily_logs[date]` - Daily tracking counts for symptoms/activities/interventions
@@ -265,23 +301,25 @@ When opening activity/symptom/intervention dialogs, items are visually different
 ```
 Log Activity
 ┌─────────────────────────────────┐
-│ ✓ Light walk (2)               │  ← Logged twice today
-│ ✓ Cooking (1)                  │  ← Logged once today  
-│    Desk work                   │  ← Not logged yet
-│    Reading                     │  ← Not logged yet
-│ ✓ Physio (full) (3)            │  ← Handles existing brackets
-│    Social visit                │  ← Not logged yet
+│ ✅ Physio (full) (1)           │  ← Required & completed (green checkmark)
+│ ✓ Light walk (2)               │  ← Optional & logged (regular checkmark)
+│ ⚠️ Yin Yoga                    │  ← Required & not completed (warning)
+│    Desk work                   │  ← Optional & not logged (spacing)
+│    Reading                     │  ← Optional & not logged (spacing)
 │    Other...                    │  ← Custom option
 └─────────────────────────────────┘
 ```
 
 **Key Features:**
-- **Checkmarks (✓)**: Indicate items logged today
+- **Green checkmarks (✅)**: Required items that have been completed
+- **Regular checkmarks (✓)**: Optional items that have been logged
+- **Warning icons (⚠️)**: Required items that haven't been completed yet
 - **Count numbers**: Show frequency `(1)`, `(2)`, `(3)`, etc.
-- **Indentation**: Unlogged items indented for visual alignment
+- **Indentation**: Unlogged optional items indented for visual alignment
 - **Bracket handling**: Items like "Physio (full)" preserve original brackets
 - **Real-time updates**: Counts increment immediately when items are selected
 - **Instant feedback**: Dialog refreshes automatically after logging to show updated counts
+- **Button colors**: Activity/intervention buttons are red until all required items completed
 
 ## Intervention Tracking
 
@@ -317,13 +355,16 @@ The intervention logging feature allows tracking of medications, supplements, tr
 
 The widget includes comprehensive test coverage ensuring reliability:
 
-### Test Categories (20 total tests)
+### Test Categories (26 total tests)
 - **Core functionality**: Preferences, daily reset, capacity selection
 - **Data parsing**: Decision criteria, day files, current day calculation
 - **UI interaction**: Button clicks, widget rendering, level restrictions
 - **Daily tracking**: Log storage, count tracking, formatting with counts
 - **Visual differentiation**: Checkmark display, bracket preservation
 - **Dialog refresh**: Automatic dialog updates after logging
+- **Required activities**: Parsing required specifications, day-specific requirements
+- **Completion status**: Button color logic, required vs optional tracking
+- **Visual markers**: Warning icons for incomplete required items
 - **Edge cases**: Items with existing brackets, complex naming scenarios
 
 ### Test File Location

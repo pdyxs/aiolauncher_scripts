@@ -39,6 +39,8 @@ local cached_criteria = nil
 local cached_symptoms = nil
 local cached_activities = nil
 local cached_interventions = nil
+local cached_required_activities = nil
+local cached_required_interventions = nil
 local current_dialog_type = nil  -- Track which dialog is open: "symptom", "activity", or "intervention"
 local data_source = "none"  -- "files" or "tasker" or "none"
 
@@ -164,27 +166,50 @@ function format_list_items(items, item_type)
     end
     
     local category
+    local required_items = {}
     if item_type == "symptom" then
         category = logs.symptoms
+        -- Symptoms don't have required items
     elseif item_type == "activity" then
         category = logs.activities
+        required_items = get_required_activities_for_today()
     elseif item_type == "intervention" then
         category = logs.interventions
+        required_items = get_required_interventions_for_today()
     else
         ui:show_toast("ERROR: Invalid item_type for formatting: " .. tostring(item_type))
         return items
     end
     
+    -- Create a set for faster lookup
+    local required_set = {}
+    for _, req_item in ipairs(required_items) do
+        required_set[req_item] = true
+    end
     
     local formatted = {}
     for _, item in ipairs(items) do
         local count = category[item]
+        local is_required = required_set[item]
+        
         if count and count > 0 then
-            -- Add checkmark and count for logged items
-            table.insert(formatted, "✓ " .. item .. " (" .. count .. ")")
+            -- Logged items get checkmark
+            if is_required then
+                -- Required and completed: Green checkmark
+                table.insert(formatted, "✅ " .. item .. " (" .. count .. ")")
+            else
+                -- Optional and completed: Regular checkmark
+                table.insert(formatted, "✓ " .. item .. " (" .. count .. ")")
+            end
         else
-            -- Add spacing to align with logged items
-            table.insert(formatted, "   " .. item)
+            -- Unlogged items
+            if is_required then
+                -- Required but not completed: Warning icon
+                table.insert(formatted, "⚠️ " .. item)
+            else
+                -- Optional and not completed: Regular spacing
+                table.insert(formatted, "   " .. item)
+            end
         end
     end
     
@@ -434,7 +459,9 @@ function parse_activities_file()
         elseif line:match("^%- ") then
             local activity = line:match("^%- (.+)")
             if activity then
-                table.insert(activities, activity)
+                -- Clean up activity name by removing {Required} markers
+                local clean_activity = activity:match("^(.-)%s*%{Required") or activity
+                table.insert(activities, clean_activity)
             end
         end
     end
@@ -478,7 +505,9 @@ function parse_interventions_file()
         elseif line:match("^%- ") then
             local intervention = line:match("^%- (.+)")
             if intervention then
-                table.insert(interventions, intervention)
+                -- Clean up intervention name by removing {Required} markers
+                local clean_intervention = intervention:match("^(.-)%s*%{Required") or intervention
+                table.insert(interventions, clean_intervention)
             end
         end
     end
@@ -490,6 +519,183 @@ function parse_interventions_file()
     cached_interventions = interventions
     
     return interventions
+end
+
+function parse_required_activities()
+    -- Return cached required activities if available
+    if cached_required_activities then
+        return cached_required_activities
+    end
+    
+    local content = files:read("activities.md")
+    if not content then
+        cached_required_activities = {}
+        return cached_required_activities
+    end
+    
+    local required_activities = {}
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^%- ") then
+            local activity_line = line:match("^%- (.+)")
+            if activity_line and activity_line:match("%{Required") then
+                -- Extract activity name (everything before {Required)
+                local activity_name = activity_line:match("^(.-)%s*%{Required")
+                if activity_name then
+                    local required_info = {
+                        name = activity_name,
+                        days = nil -- nil means all days
+                    }
+                    
+                    -- Check for specific days: {Required: Mon,Wed,Fri}
+                    local days_match = activity_line:match("%{Required:%s*([^%}]+)%}")
+                    if days_match then
+                        required_info.days = {}
+                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
+                            table.insert(required_info.days, day_abbrev:lower())
+                        end
+                    end
+                    
+                    table.insert(required_activities, required_info)
+                end
+            end
+        end
+    end
+    
+    -- Cache the parsed required activities
+    cached_required_activities = required_activities
+    
+    return required_activities
+end
+
+function parse_required_interventions()
+    -- Return cached required interventions if available
+    if cached_required_interventions then
+        return cached_required_interventions
+    end
+    
+    local content = files:read("interventions.md")
+    if not content then
+        cached_required_interventions = {}
+        return cached_required_interventions
+    end
+    
+    local required_interventions = {}
+    
+    for line in content:gmatch("[^\r\n]+") do
+        if line:match("^%- ") then
+            local intervention_line = line:match("^%- (.+)")
+            if intervention_line and intervention_line:match("%{Required") then
+                -- Extract intervention name (everything before {Required)
+                local intervention_name = intervention_line:match("^(.-)%s*%{Required")
+                if intervention_name then
+                    local required_info = {
+                        name = intervention_name,
+                        days = nil -- nil means all days
+                    }
+                    
+                    -- Check for specific days: {Required: Mon,Wed,Fri}
+                    local days_match = intervention_line:match("%{Required:%s*([^%}]+)%}")
+                    if days_match then
+                        required_info.days = {}
+                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
+                            table.insert(required_info.days, day_abbrev:lower())
+                        end
+                    end
+                    
+                    table.insert(required_interventions, required_info)
+                end
+            end
+        end
+    end
+    
+    -- Cache the parsed required interventions
+    cached_required_interventions = required_interventions
+    
+    return required_interventions
+end
+
+function get_current_day_abbrev()
+    local day_abbrevs = {"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
+    return day_abbrevs[tonumber(os.date("%w")) + 1]
+end
+
+function is_required_today(required_info)
+    -- If no specific days, it's required every day
+    if not required_info.days then
+        return true
+    end
+    
+    local today_abbrev = get_current_day_abbrev()
+    for _, day in ipairs(required_info.days) do
+        if day == today_abbrev then
+            return true
+        end
+    end
+    
+    return false
+end
+
+function get_required_activities_for_today()
+    local required_activities = parse_required_activities()
+    local today_required = {}
+    
+    for _, required_info in ipairs(required_activities) do
+        if is_required_today(required_info) then
+            table.insert(today_required, required_info.name)
+        end
+    end
+    
+    return today_required
+end
+
+function get_required_interventions_for_today()
+    local required_interventions = parse_required_interventions()
+    local today_required = {}
+    
+    for _, required_info in ipairs(required_interventions) do
+        if is_required_today(required_info) then
+            table.insert(today_required, required_info.name)
+        end
+    end
+    
+    return today_required
+end
+
+function are_all_required_activities_completed()
+    local required_activities = get_required_activities_for_today()
+    if #required_activities == 0 then
+        return true -- No required activities, so all are "completed"
+    end
+    
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    for _, required_activity in ipairs(required_activities) do
+        if not logs.activities[required_activity] or logs.activities[required_activity] == 0 then
+            return false -- This required activity hasn't been logged
+        end
+    end
+    
+    return true
+end
+
+function are_all_required_interventions_completed()
+    local required_interventions = get_required_interventions_for_today()
+    if #required_interventions == 0 then
+        return true -- No required interventions, so all are "completed"
+    end
+    
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    for _, required_intervention in ipairs(required_interventions) do
+        if not logs.interventions[required_intervention] or logs.interventions[required_intervention] == 0 then
+            return false -- This required intervention hasn't been logged
+        end
+    end
+    
+    return true
 end
 
 function render_widget()
@@ -539,12 +745,16 @@ function render_widget()
     -- Add new line for second row of buttons
     table.insert(ui_elements, {"new_line", 1})
     
+    -- Determine button colors based on required items completion
+    local activity_color = are_all_required_activities_completed() and "#28a745" or "#dc3545" -- Green or Red
+    local intervention_color = are_all_required_interventions_completed() and "#007bff" or "#dc3545" -- Blue or Red
+    
     -- Add activity logging button (centered)
-    table.insert(ui_elements, {"button", "fa:running", {color = "#28a745", gravity = "center_h"}})
-    -- Add symptom logging button next to activity button
+    table.insert(ui_elements, {"button", "fa:running", {color = activity_color, gravity = "center_h"}})
+    -- Add symptom logging button next to activity button (always grey - symptoms aren't required)
     table.insert(ui_elements, {"button", "fa:notes-medical", {color = "#6c757d", gravity = "anchor_prev"}})
     -- Add intervention logging button next to symptom button
-    table.insert(ui_elements, {"button", "fa:pills", {color = "#007bff", gravity = "anchor_prev"}})
+    table.insert(ui_elements, {"button", "fa:pills", {color = intervention_color, gravity = "anchor_prev"}})
 
     ui:set_expandable(true)
     
@@ -735,6 +945,8 @@ function on_command(data)
         cached_symptoms = nil
         cached_activities = nil
         cached_interventions = nil
+        cached_required_activities = nil
+        cached_required_interventions = nil
         data_source = "files"
         
         -- Reload widget
