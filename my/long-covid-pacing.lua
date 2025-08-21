@@ -180,9 +180,11 @@ function format_list_items(items, item_type)
     for _, item in ipairs(items) do
         local count = category[item]
         if count and count > 0 then
-            table.insert(formatted, item .. " (" .. count .. ")")
+            -- Add checkmark and count for logged items
+            table.insert(formatted, "✓ " .. item .. " (" .. count .. ")")
         else
-            table.insert(formatted, item)
+            -- Add spacing to align with logged items
+            table.insert(formatted, "   " .. item)
         end
     end
     
@@ -863,9 +865,18 @@ function log_intervention(intervention_name)
 end
 
 function extract_item_name(formatted_item)
-    -- Extract original item name from formatted string like "Fatigue (2)" -> "Fatigue"
-    local item_name = formatted_item:match("^(.+)%s%(%d+%)$")
-    return item_name or formatted_item -- Return original if no count found
+    -- Extract original item name from formatted string
+    -- Handle: "✓ Fatigue (2)" -> "Fatigue" or "   Headache" -> "Headache"
+    
+    -- First, remove checkmark and leading spaces
+    local cleaned = formatted_item:gsub("^[✓%s]*", "")
+    
+    -- Then extract name before count if present
+    -- This regex matches only the LAST (number) pattern, preserving existing brackets:
+    -- "Fatigue (2)" -> "Fatigue"
+    -- "Physio (full) (2)" -> "Physio (full)"
+    local item_name = cleaned:match("^(.+)%s%(%d+%)$")
+    return item_name or cleaned -- Return cleaned version if no count found
 end
 
 function on_dialog_action(result)

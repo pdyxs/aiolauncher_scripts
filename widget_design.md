@@ -57,6 +57,9 @@ Evening:
 - **Functionality**: Opens searchable list dialogs with custom "Other..." option
 - **Data sources**: Markdown files (activities.md, symptoms.md, interventions.md)
 - **Logging**: All entries sent to Google Spreadsheet via AutoSheets
+- **Daily tracking**: Items logged during the day are tracked with counts
+- **Visual differentiation**: Logged items show checkmarks and counts in dialogs
+- **Auto-reset**: Daily tracking clears automatically when a new day starts
 
 ### 3. Daily Plan Display  
 - **Dynamic content**: Shows plan for current day and selected capacity
@@ -65,7 +68,18 @@ Evening:
 - **Bullet points**: Simple, scannable format
 - **Error handling**: Sync button when plan data unavailable
 
-### 4. Widget Title
+### 4. Daily Tracking & Visual Differentiation
+- **Real-time counts**: Tracks how many times each item is logged per day
+- **Visual indicators**: Logged items display with checkmarks (✓) and count numbers
+- **Dialog formatting**: 
+  - Logged items: `"✓ Fatigue (2)"` - checkmark with count
+  - Unlogged items: `"   Headache"` - indented for alignment
+- **Smart extraction**: Handles items with existing brackets (e.g., "Physio (full)")
+- **Persistence**: Daily logs stored in preferences, cleared automatically on new day
+- **Count accumulation**: Multiple selections of same item increment the count
+- **Bracket preservation**: Items like "Exercise (15 min)" maintain original brackets when logged
+
+### 5. Widget Title
 - **Format**: "Long Covid Pacing - [Day]"
 - **Dynamic**: Shows current day of week
 
@@ -82,6 +96,12 @@ Evening:
 1. User can re-open widget to review plan
 2. Can change capacity level if needed (downgrade only)
 3. Plan updates automatically
+4. **Activity/Symptom/Intervention logging**:
+   - Click activity/symptom/intervention buttons to open dialogs
+   - Previously logged items show with checkmarks and counts
+   - Select items to log (counts increment for repeated selections)
+   - Custom items available via "Other..." option
+5. **Visual feedback**: Toast confirmations show successful logging
 
 ## File Structure Integration
 
@@ -92,6 +112,18 @@ Evening:
 - `activities.md` - Available activities for logging
 - `symptoms.md` - Available symptoms for logging
 - `interventions.md` - Available interventions for logging
+
+### Internal Storage (AIO Preferences)
+- `daily_logs[date]` - Daily tracking counts for symptoms/activities/interventions
+  ```lua
+  daily_logs = {
+    ["2025-01-21"] = {
+      symptoms = {["Fatigue"] = 2, ["Brain fog"] = 1},
+      activities = {["Light walk"] = 1, ["Physio (full)"] = 2},
+      interventions = {["Vitamin D"] = 1, ["Rest"] = 3}
+    }
+  }
+  ```
 
 ### Tracking File Format
 ```markdown
@@ -115,15 +147,42 @@ Evening:
 ```lua
 -- Core functions
 function on_resume()
-    load_today_plan()
-    load_tracking_data()
+    load_prefs_data()        -- Load prefs into global variables
+    check_daily_reset()      -- Clear tracking on new day
+    load_data()             -- Load plan files
     render_widget()
 end
 
 function on_click(idx)
     if idx <= 3 then
         select_capacity_level(idx)
+    elseif element_is_activity_button() then
+        show_activity_dialog()
+    elseif element_is_symptom_button() then
+        show_symptom_dialog()
+    elseif element_is_intervention_button() then
+        show_intervention_dialog()
     end
+end
+
+-- Daily tracking functions
+function get_daily_logs(date)
+    -- Initialize and return daily logs structure for given date
+end
+
+function log_item(item_type, item_name)
+    -- Increment count for symptoms/activities/interventions
+    -- Save changes to preferences immediately
+end
+
+function format_list_items(items, item_type)
+    -- Add checkmarks and counts to logged items
+    -- Format: "✓ Fatigue (2)" or "   Headache"
+end
+
+function extract_item_name(formatted_item)
+    -- Extract original name from formatted display text
+    -- Handles existing brackets: "✓ Physio (full) (2)" -> "Physio (full)"
 end
 
 -- Data parsing
@@ -133,8 +192,8 @@ function parse_day_file(day)
 end
 
 function save_daily_choice(level)
-    -- Append to tracking.md
-    -- Update widget display
+    -- Save to daily_capacity_log and preferences
+    -- Send to Google Sheets via Tasker
 end
 ```
 
@@ -171,9 +230,12 @@ end
 - **Adaptive**: Plan shows relevant info for chosen level
 
 ### Tracking
-- **Automatic logging**: Saves daily choices
+- **Automatic logging**: Saves daily choices and activity/symptom/intervention logs
+- **Visual feedback**: Clear indication of what's been logged during the day
+- **Count tracking**: Shows frequency of repeated activities/symptoms/interventions
 - **Historical view**: Can review past decisions
 - **Reflection support**: Evening notes capability
+- **Smart reset**: Daily logs clear automatically on new day
 
 ## Accessibility Features
 
@@ -186,6 +248,32 @@ end
 - **Touch targets**: Buttons sized for easy tapping
 - **Feedback**: Visual confirmation of selections
 - **Error prevention**: Logical capacity transitions
+
+## Daily Tracking Examples
+
+### Dialog Visual Differentiation
+When opening activity/symptom/intervention dialogs, items are visually differentiated based on daily usage:
+
+**Example Activity Dialog:**
+```
+Log Activity
+┌─────────────────────────────────┐
+│ ✓ Light walk (2)               │  ← Logged twice today
+│ ✓ Cooking (1)                  │  ← Logged once today  
+│    Desk work                   │  ← Not logged yet
+│    Reading                     │  ← Not logged yet
+│ ✓ Physio (full) (3)            │  ← Handles existing brackets
+│    Social visit                │  ← Not logged yet
+│    Other...                    │  ← Custom option
+└─────────────────────────────────┘
+```
+
+**Key Features:**
+- **Checkmarks (✓)**: Indicate items logged today
+- **Count numbers**: Show frequency `(1)`, `(2)`, `(3)`, etc.
+- **Indentation**: Unlogged items indented for visual alignment
+- **Bracket handling**: Items like "Physio (full)" preserve original brackets
+- **Real-time updates**: Counts increment immediately when items are selected
 
 ## Intervention Tracking
 
@@ -216,3 +304,20 @@ The intervention logging feature allows tracking of medications, supplements, tr
 - **Integration**: With health apps/smartwatch
 - **Analytics**: Capacity level trends and intervention effectiveness insights
 - **Dosage tracking**: Amount/frequency for medications and supplements
+
+## Testing Coverage
+
+The widget includes comprehensive test coverage ensuring reliability:
+
+### Test Categories (19 total tests)
+- **Core functionality**: Preferences, daily reset, capacity selection
+- **Data parsing**: Decision criteria, day files, current day calculation
+- **UI interaction**: Button clicks, widget rendering, level restrictions
+- **Daily tracking**: Log storage, count tracking, formatting with counts
+- **Visual differentiation**: Checkmark display, bracket preservation
+- **Edge cases**: Items with existing brackets, complex naming scenarios
+
+### Test File Location
+- `tests/test_long_covid_widget.lua` - Complete test suite
+- Run with: `lua test_long_covid_widget.lua`
+- All tests passing ensures widget stability and feature completeness

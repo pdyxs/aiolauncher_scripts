@@ -285,9 +285,11 @@ local function test_format_list_items(items, item_type)
     for _, item in ipairs(items) do
         local count = category[item]
         if count and count > 0 then
-            table.insert(formatted, item .. " (" .. count .. ")")
+            -- Add checkmark and count for logged items
+            table.insert(formatted, "✓ " .. item .. " (" .. count .. ")")
         else
-            table.insert(formatted, item)
+            -- Add spacing to align with logged items
+            table.insert(formatted, "   " .. item)
         end
     end
     
@@ -660,9 +662,9 @@ add_test("Format list items with counts", function()
     local symptoms = {"Fatigue", "Brain fog", "Headache"}
     local formatted = test_format_list_items(symptoms, "symptom")
     
-    assert_contains(formatted[1], "Fatigue (2)", "Should show count for multiple logs")
-    assert_contains(formatted[2], "Brain fog (1)", "Should show count for single log")
-    assert_equals("Headache", formatted[3], "Should show plain text for unlogged items")
+    assert_contains(formatted[1], "✓ Fatigue (2)", "Should show checkmark and count for multiple logs")
+    assert_contains(formatted[2], "✓ Brain fog (1)", "Should show checkmark and count for single log")
+    assert_contains(formatted[3], "   Headache", "Should show spaced text for unlogged items")
 end)
 
 add_test("Daily reset clears tracking logs", function()
@@ -694,14 +696,55 @@ add_test("Extract item name from formatted string", function()
     
     -- Test the extract_item_name function that needs to be implemented in main widget
     local function test_extract_item_name(formatted_item)
-        local item_name = formatted_item:match("^(.+)%s%(%d+%)$")
-        return item_name or formatted_item
+        -- First, remove checkmark and leading spaces
+        local cleaned = formatted_item:gsub("^[✓%s]*", "")
+        
+        -- Then extract name before count if present: "Fatigue (2)" -> "Fatigue"
+        -- This will only match the LAST (number) pattern, preserving existing brackets
+        local item_name = cleaned:match("^(.+)%s%(%d+%)$")
+        return item_name or cleaned -- Return cleaned version if no count found
     end
     
-    assert_equals("Fatigue", test_extract_item_name("Fatigue (2)"), "Should extract name from counted item")
-    assert_equals("Brain fog", test_extract_item_name("Brain fog (1)"), "Should extract name from single count")
-    assert_equals("Headache", test_extract_item_name("Headache"), "Should return original for uncounted item")
-    assert_equals("Other...", test_extract_item_name("Other..."), "Should handle special items")
+    assert_equals("Fatigue", test_extract_item_name("✓ Fatigue (2)"), "Should extract name from checked counted item")
+    assert_equals("Brain fog", test_extract_item_name("✓ Brain fog (1)"), "Should extract name from checked single count")
+    assert_equals("Headache", test_extract_item_name("   Headache"), "Should extract name from spaced uncounted item")
+    assert_equals("Other...", test_extract_item_name("   Other..."), "Should handle special items with spacing")
+    
+    -- Test items with existing brackets
+    assert_equals("Physio (full)", test_extract_item_name("   Physio (full)"), "Should preserve existing brackets in unlogged items")
+    assert_equals("Physio (full)", test_extract_item_name("✓ Physio (full) (2)"), "Should extract name with brackets from logged items")
+    assert_equals("Medication (morning dose)", test_extract_item_name("✓ Medication (morning dose) (1)"), "Should handle complex bracket scenarios")
+    assert_equals("Exercise (15 min)", test_extract_item_name("   Exercise (15 min)"), "Should preserve brackets with numbers inside")
+end)
+
+add_test("Bracket handling in item names", function()
+    setup_widget_env()
+    
+    local today = os.date("%Y-%m-%d")
+    
+    -- Test logging items with brackets in their names
+    test_log_item("activity", "Physio (full)")
+    test_log_item("activity", "Physio (full)")  -- Log twice
+    test_log_item("activity", "Exercise (15 min)")
+    test_log_item("intervention", "Medication (morning dose)")
+    
+    -- Test formatting items with brackets
+    local activities = {"Physio (full)", "Exercise (15 min)", "Walking"}
+    local formatted = test_format_list_items(activities, "activity")
+    
+    assert_contains(formatted[1], "✓ Physio (full) (2)", "Should show bracket item with count")
+    assert_contains(formatted[2], "✓ Exercise (15 min) (1)", "Should show bracket item with single count")
+    assert_contains(formatted[3], "   Walking", "Should show normal spacing for unlogged items")
+    
+    -- Test extraction from formatted strings
+    local function test_extract_item_name(formatted_item)
+        local cleaned = formatted_item:gsub("^[✓%s]*", "")
+        local item_name = cleaned:match("^(.+)%s%(%d+%)$")
+        return item_name or cleaned
+    end
+    
+    assert_equals("Physio (full)", test_extract_item_name("✓ Physio (full) (2)"), "Should extract original name with brackets")
+    assert_equals("Exercise (15 min)", test_extract_item_name("✓ Exercise (15 min) (1)"), "Should handle numbers inside brackets")
 end)
 
 add_test("Widget initialization creates daily logs", function()
