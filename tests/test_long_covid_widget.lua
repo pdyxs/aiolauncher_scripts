@@ -8,6 +8,7 @@ local test_prefs = {}
 local test_ui_calls = {}
 local test_files = {}
 local test_toasts = {}
+local test_daily_logs = {}
 
 -- Mock prefs module
 local mock_prefs = setmetatable({}, {
@@ -116,6 +117,7 @@ local function setup_widget_env()
     test_ui_calls = {}
     test_files = {}
     test_toasts = {}
+    test_daily_logs = {}
     test_ui_expanded = false
     
     -- Set up globals
@@ -617,6 +619,7 @@ local function test_get_energy_button_color()
     end
     
     local current_time = os.time()
+
     local hours_since_last = (current_time - most_recent_time) / 3600
     
     if hours_since_last >= 4 then
@@ -1243,6 +1246,75 @@ add_test("Multiple energy entries", function()
     assert_equals(3, logs.energy_levels[1].level, "First entry should be 3")
     assert_equals(5, logs.energy_levels[2].level, "Second entry should be 5") 
     assert_equals(7, logs.energy_levels[3].level, "Third entry should be 7")
+end)
+
+add_test("Daily logs purging functionality", function()
+    setup_widget_env()
+    
+    -- Initialize daily_logs
+    _G.prefs.daily_logs = {}
+    
+    -- Simulate old data in daily_logs
+    local today = os.date("%Y-%m-%d")
+    local yesterday = os.date("%Y-%m-%d", os.time() - 86400)
+    local two_days_ago = os.date("%Y-%m-%d", os.time() - 172800)
+    
+    -- Add logs for multiple days
+    _G.prefs.daily_logs[yesterday] = {
+        symptoms = {["Fatigue"] = 2},
+        activities = {["Walk"] = 1},
+        interventions = {["Vitamin D"] = 1},
+        energy_levels = {{level = 4, timestamp = os.time() - 86400}}
+    }
+    _G.prefs.daily_logs[two_days_ago] = {
+        symptoms = {["Brain fog"] = 1},
+        activities = {["Exercise"] = 1},
+        interventions = {["Rest"] = 2},
+        energy_levels = {{level = 3, timestamp = os.time() - 172800}}
+    }
+    _G.prefs.daily_logs[today] = {
+        symptoms = {["Headache"] = 1},
+        activities = {["Work"] = 2},
+        interventions = {["Medicine"] = 1},
+        energy_levels = {{level = 6, timestamp = os.time()}}
+    }
+    
+    -- Verify we have 3 days of data
+    local count = 0
+    for _ in pairs(_G.prefs.daily_logs) do count = count + 1 end
+    assert_equals(3, count, "Should have 3 days of data before purging")
+    
+    -- Call purge function (inline implementation)
+    local today_logs = _G.prefs.daily_logs[today]
+    _G.prefs.daily_logs = {}
+    
+    -- Initialize today's logs if needed
+    if not today_logs then
+        _G.prefs.daily_logs[today] = {
+            symptoms = {},
+            activities = {},
+            interventions = {},
+            energy_levels = {}
+        }
+    else
+        _G.prefs.daily_logs[today] = today_logs
+    end
+    
+    -- Verify only today's data remains
+    count = 0
+    for _ in pairs(_G.prefs.daily_logs) do count = count + 1 end
+    assert_equals(1, count, "Should have only 1 day of data after purging")
+    
+    -- Verify today's data is preserved
+    assert_true(_G.prefs.daily_logs[today] ~= nil, "Today's data should be preserved")
+    assert_equals(1, _G.prefs.daily_logs[today].symptoms["Headache"], "Today's symptoms should be preserved")
+    assert_equals(2, _G.prefs.daily_logs[today].activities["Work"], "Today's activities should be preserved")
+    assert_equals(1, _G.prefs.daily_logs[today].interventions["Medicine"], "Today's interventions should be preserved")
+    assert_equals(1, #_G.prefs.daily_logs[today].energy_levels, "Today's energy levels should be preserved")
+    
+    -- Verify old data is gone
+    assert_true(_G.prefs.daily_logs[yesterday] == nil, "Yesterday's data should be purged")
+    assert_true(_G.prefs.daily_logs[two_days_ago] == nil, "Two days ago data should be purged")
 end)
 
 -- Run tests

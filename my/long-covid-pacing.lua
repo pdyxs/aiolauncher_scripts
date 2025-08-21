@@ -57,16 +57,9 @@ function load_prefs_data()
     daily_capacity_log = prefs.daily_capacity_log or {}
     daily_logs = prefs.daily_logs or {}
     
-    -- Initialize today's logs if needed
+    -- Purge old daily logs on every load for performance
     local today = os.date("%Y-%m-%d")
-    if not daily_logs[today] then
-        daily_logs[today] = {
-            symptoms = {},
-            activities = {},
-            interventions = {},
-            energy_levels = {}
-        }
-    end
+    purge_old_daily_logs(today)
 end
 
 function save_prefs_data()
@@ -97,10 +90,8 @@ function check_daily_reset()
         -- New day - reset to no selection
         selected_level = 0
         last_selection_date = today
-        -- Clear today's tracking logs on new day
-        if daily_logs then
-            daily_logs[today] = nil
-        end
+        -- Purge all old daily logs - only keep today's data for performance
+        purge_old_daily_logs(today)
         -- Save changes back to prefs
         save_prefs_data()
     else
@@ -108,6 +99,29 @@ function check_daily_reset()
         if daily_capacity_log and daily_capacity_log[today] then
             selected_level = daily_capacity_log[today].capacity
         end
+    end
+end
+
+function purge_old_daily_logs(today)
+    if not daily_logs then
+        daily_logs = {}
+        return
+    end
+    
+    -- Keep only today's entry, remove all others for performance
+    local today_logs = daily_logs[today]
+    daily_logs = {}
+    
+    -- Initialize today's logs if needed
+    if not today_logs then
+        daily_logs[today] = {
+            symptoms = {},
+            activities = {},
+            interventions = {},
+            energy_levels = {}
+        }
+    else
+        daily_logs[today] = today_logs
     end
 end
 
