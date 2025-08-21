@@ -17,6 +17,11 @@ if not prefs.last_selection_date then
     prefs.last_selection_date = ""
 end
 
+-- Initialize daily logs tracking
+if not prefs.daily_logs then
+    prefs.daily_logs = {}
+end
+
 -- Capacity levels
 local levels = {
     {name = "Recovering", color = "#FF4444", key = "red", icon = "bed"},
@@ -37,9 +42,42 @@ local cached_interventions = nil
 local current_dialog_type = nil  -- Track which dialog is open: "symptom", "activity", or "intervention"
 local data_source = "none"  -- "files" or "tasker" or "none"
 
+-- Global variables to store prefs data
+local selected_level = 0
+local last_selection_date = ""
+local daily_capacity_log = {}
+local daily_logs = {}
+
+function load_prefs_data()
+    -- Load prefs data into global variables
+    selected_level = prefs.selected_level or 0
+    last_selection_date = prefs.last_selection_date or ""
+    daily_capacity_log = prefs.daily_capacity_log or {}
+    daily_logs = prefs.daily_logs or {}
+    
+    -- Initialize today's logs if needed
+    local today = os.date("%Y-%m-%d")
+    if not daily_logs[today] then
+        daily_logs[today] = {
+            symptoms = {},
+            activities = {},
+            interventions = {}
+        }
+    end
+end
+
+function save_prefs_data()
+    -- Save global variables back to prefs
+    prefs.selected_level = selected_level
+    prefs.last_selection_date = last_selection_date
+    prefs.daily_capacity_log = daily_capacity_log
+    prefs.daily_logs = daily_logs
+end
+
 function on_resume()
     -- Add error handling for the main entry point
     local success, error_msg = pcall(function()
+        load_prefs_data()
         check_daily_reset()
         load_data()
         render_widget()
@@ -52,16 +90,103 @@ end
 
 function check_daily_reset()
     local today = os.date("%Y-%m-%d")
-    if prefs.last_selection_date ~= today then
+    if last_selection_date ~= today then
         -- New day - reset to no selection
-        prefs.selected_level = 0
-        prefs.last_selection_date = today
+        selected_level = 0
+        last_selection_date = today
+        -- Clear today's tracking logs on new day
+        if daily_logs then
+            daily_logs[today] = nil
+        end
+        -- Save changes back to prefs
+        save_prefs_data()
     else
         -- Same day - check if we have a stored selection
-        if prefs.daily_capacity_log and prefs.daily_capacity_log[today] then
-            prefs.selected_level = prefs.daily_capacity_log[today].capacity
+        if daily_capacity_log and daily_capacity_log[today] then
+            selected_level = daily_capacity_log[today].capacity
         end
     end
+end
+
+function get_daily_logs(date)
+    -- Use global variable instead of prefs
+    if not daily_logs then
+        daily_logs = {}
+    end
+    
+    if not daily_logs[date] then
+        daily_logs[date] = {
+            symptoms = {},
+            activities = {},
+            interventions = {}
+        }
+    end
+    
+    return daily_logs[date]
+end
+
+function log_item(item_type, item_name)
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    -- Should always work now since we use global variables
+    if not logs then
+        ui:show_toast("ERROR: Could not get daily logs")
+        return
+    end
+    
+    local category
+    if item_type == "symptom" then
+        category = logs.symptoms
+    elseif item_type == "activity" then
+        category = logs.activities
+    elseif item_type == "intervention" then
+        category = logs.interventions
+    else
+        ui:show_toast("ERROR: Invalid item type: " .. tostring(item_type))
+        return
+    end
+    
+    category[item_name] = (category[item_name] or 0) + 1
+    
+    -- Save changes back to prefs immediately
+    save_prefs_data()
+end
+
+function format_list_items(items, item_type)
+    local today = os.date("%Y-%m-%d")
+    local logs = get_daily_logs(today)
+    
+    -- Should always work now since we use global variables
+    if not logs then
+        ui:show_toast("ERROR: Could not get daily logs for formatting")
+        return items
+    end
+    
+    local category
+    if item_type == "symptom" then
+        category = logs.symptoms
+    elseif item_type == "activity" then
+        category = logs.activities
+    elseif item_type == "intervention" then
+        category = logs.interventions
+    else
+        ui:show_toast("ERROR: Invalid item_type for formatting: " .. tostring(item_type))
+        return items
+    end
+    
+    
+    local formatted = {}
+    for _, item in ipairs(items) do
+        local count = category[item]
+        if count and count > 0 then
+            table.insert(formatted, item .. " (" .. count .. ")")
+        else
+            table.insert(formatted, item)
+        end
+    end
+    
+    return formatted
 end
 
 function on_click(idx)
@@ -76,41 +201,45 @@ function on_click(idx)
     if elem_type == "button" then
         if elem_text:find("bed") then
             -- Capacity level 1 (Recovering)
-            if prefs.selected_level == 0 or 1 <= prefs.selected_level then
-                prefs.selected_level = 1
+            if selected_level == 0 or 1 <= selected_level then
+                selected_level = 1
                 save_daily_choice(1)
+                save_prefs_data()
                 render_widget()
             else
                 ui:show_toast("Can only downgrade capacity level")
             end
         elseif elem_text:find("walking") then
             -- Capacity level 2 (Maintaining)
-            if prefs.selected_level == 0 or 2 <= prefs.selected_level then
-                prefs.selected_level = 2
+            if selected_level == 0 or 2 <= selected_level then
+                selected_level = 2
                 save_daily_choice(2)
+                save_prefs_data()
                 render_widget()
             else
                 ui:show_toast("Can only downgrade capacity level")
             end
         elseif elem_text:find("bolt") then
             -- Capacity level 3 (Engaging)
-            if prefs.selected_level == 0 or 3 <= prefs.selected_level then
-                prefs.selected_level = 3
+            if selected_level == 0 or 3 <= selected_level then
+                selected_level = 3
                 save_daily_choice(3)
+                save_prefs_data()
                 render_widget()
             else
                 ui:show_toast("Can only downgrade capacity level")
             end
         elseif elem_text:find("rotate%-right") or elem_text:find("Reset") then
             -- Reset selection button
-            prefs.selected_level = 0
+            selected_level = 0
             
             -- Also clear the stored daily capacity log for today
             local today = os.date("%Y-%m-%d")
-            if prefs.daily_capacity_log and prefs.daily_capacity_log[today] then
-                prefs.daily_capacity_log[today] = nil
+            if daily_capacity_log and daily_capacity_log[today] then
+                daily_capacity_log[today] = nil
             end
             
+            save_prefs_data()
             ui:show_toast("Selection reset")
             render_widget()
         elseif elem_text:find("sync") then
@@ -376,10 +505,10 @@ function render_widget()
         local button_text
         local gravity = nil
         
-        if i == prefs.selected_level then
+        if i == selected_level then
             color = level.color  -- Highlight selected
             button_text = "%%fa:" .. level.icon .. "%% " .. level.name  -- Icon + text for selected
-        elseif prefs.selected_level == 0 then
+        elseif selected_level == 0 then
             color = level.color  -- All available when none selected
             button_text = "%%fa:" .. level.icon .. "%% " .. level.name  -- Icon + text when all available
         else
@@ -421,7 +550,7 @@ function render_widget()
     if ui:is_expanded() then
         table.insert(ui_elements, {"new_line", 2})
         
-        if prefs.selected_level == 0 then
+        if selected_level == 0 then
             -- No selection made yet
             table.insert(ui_elements, {"text", "<b>Select your capacity level:</b>", {size = 18}})
             table.insert(ui_elements, {"new_line", 1})
@@ -441,7 +570,7 @@ function render_widget()
             
             if not success then
                 -- Show error and sync button
-                table.insert(ui_elements, {"text", "<b>Selected:</b> " .. levels[prefs.selected_level].name, {size = 18}})
+                table.insert(ui_elements, {"text", "<b>Selected:</b> " .. levels[selected_level].name, {size = 18}})
                 table.insert(ui_elements, {"new_line", 1})
                 table.insert(ui_elements, {"text", "%%fa:exclamation-triangle%% <b>Can't load plan data</b>", {color = "#ff6b6b"}})
                 table.insert(ui_elements, {"new_line", 2})
@@ -464,7 +593,7 @@ function add_plan_details(ui_elements, day)
         return
     end
     
-    local level_key = levels[prefs.selected_level].key
+    local level_key = levels[selected_level].key
     local level_plan = plan[level_key]
     
     if not level_plan then
@@ -514,11 +643,11 @@ function save_daily_choice(level_idx)
     local level_name = levels[level_idx].name
     
     -- Store locally for offline access and daily reset functionality
-    if not prefs.daily_capacity_log then
-        prefs.daily_capacity_log = {}
+    if not daily_capacity_log then
+        daily_capacity_log = {}
     end
     
-    prefs.daily_capacity_log[today] = {
+    daily_capacity_log[today] = {
         capacity = level_idx,
         capacity_name = level_name,
         timestamp = os.date("%H:%M")
@@ -643,9 +772,10 @@ end
 function show_symptom_dialog()
     current_dialog_type = "symptom"
     local symptoms = parse_symptoms_file()
+    local formatted_symptoms = format_list_items(symptoms, "symptom")
     dialogs:show_list_dialog({
         title = "Log Symptom",
-        lines = symptoms,
+        lines = formatted_symptoms,
         search = true,
         zebra = true
     })
@@ -653,6 +783,9 @@ end
 
 function log_symptom(symptom_name)
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    
+    -- Track locally with count
+    log_item("symptom", symptom_name)
     
     -- Send to AutoSheets via Tasker
     if tasker then
@@ -663,16 +796,17 @@ function log_symptom(symptom_name)
         })
         ui:show_toast("✓ Symptom logged: " .. symptom_name)
     else
-        ui:show_toast("Tasker not available")
+        ui:show_toast("✓ Symptom logged: " .. symptom_name)
     end
 end
 
 function show_activity_dialog()
     current_dialog_type = "activity"
     local activities = parse_activities_file()
+    local formatted_activities = format_list_items(activities, "activity")
     dialogs:show_list_dialog({
         title = "Log Activity",
-        lines = activities,
+        lines = formatted_activities,
         search = true,
         zebra = true
     })
@@ -680,6 +814,9 @@ end
 
 function log_activity(activity_name)
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    
+    -- Track locally with count
+    log_item("activity", activity_name)
     
     -- Send to AutoSheets via Tasker
     if tasker then
@@ -697,9 +834,10 @@ end
 function show_intervention_dialog()
     current_dialog_type = "intervention"
     local interventions = parse_interventions_file()
+    local formatted_interventions = format_list_items(interventions, "intervention")
     dialogs:show_list_dialog({
         title = "Log Intervention",
-        lines = interventions,
+        lines = formatted_interventions,
         search = true,
         zebra = true
     })
@@ -707,6 +845,9 @@ end
 
 function log_intervention(intervention_name)
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    
+    -- Track locally with count
+    log_item("intervention", intervention_name)
     
     -- Send to AutoSheets via Tasker
     if tasker then
@@ -719,6 +860,12 @@ function log_intervention(intervention_name)
     else
         ui:show_toast("Tasker not available")
     end
+end
+
+function extract_item_name(formatted_item)
+    -- Extract original item name from formatted string like "Fatigue (2)" -> "Fatigue"
+    local item_name = formatted_item:match("^(.+)%s%(%d+%)$")
+    return item_name or formatted_item -- Return original if no count found
 end
 
 function on_dialog_action(result)
@@ -737,7 +884,9 @@ function on_dialog_action(result)
         -- List dialog result
         if current_dialog_type == "symptom" then
             local symptoms = parse_symptoms_file()
-            local selected_item = symptoms[result]
+            local formatted_symptoms = format_list_items(symptoms, "symptom")
+            local selected_formatted = formatted_symptoms[result]
+            local selected_item = extract_item_name(selected_formatted)
             
             if selected_item == "Other..." then
                 -- Show edit dialog for custom symptom
@@ -752,7 +901,9 @@ function on_dialog_action(result)
             end
         elseif current_dialog_type == "activity" then
             local activities = parse_activities_file()
-            local selected_item = activities[result]
+            local formatted_activities = format_list_items(activities, "activity")
+            local selected_formatted = formatted_activities[result]
+            local selected_item = extract_item_name(selected_formatted)
             
             if selected_item == "Other..." then
                 -- Show edit dialog for custom activity
@@ -767,7 +918,9 @@ function on_dialog_action(result)
             end
         elseif current_dialog_type == "intervention" then
             local interventions = parse_interventions_file()
-            local selected_item = interventions[result]
+            local formatted_interventions = format_list_items(interventions, "intervention")
+            local selected_formatted = formatted_interventions[result]
+            local selected_item = extract_item_name(selected_formatted)
             
             if selected_item == "Other..." then
                 -- Show edit dialog for custom intervention

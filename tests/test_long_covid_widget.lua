@@ -225,7 +225,73 @@ local function test_check_daily_reset()
     if _G.prefs.last_selection_date ~= today then
         _G.prefs.selected_level = 0
         _G.prefs.last_selection_date = today
+        -- Clear today's tracking logs on new day
+        if _G.prefs.daily_logs then
+            _G.prefs.daily_logs[today] = nil
+        end
     end
+end
+
+local function test_get_daily_logs(date)
+    if not _G.prefs.daily_logs then
+        _G.prefs.daily_logs = {}
+    end
+    
+    if not _G.prefs.daily_logs[date] then
+        _G.prefs.daily_logs[date] = {
+            symptoms = {},
+            activities = {},
+            interventions = {}
+        }
+    end
+    
+    return _G.prefs.daily_logs[date]
+end
+
+local function test_log_item(item_type, item_name)
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    local category
+    if item_type == "symptom" then
+        category = logs.symptoms
+    elseif item_type == "activity" then
+        category = logs.activities
+    elseif item_type == "intervention" then
+        category = logs.interventions
+    else
+        error("Invalid item type: " .. tostring(item_type))
+    end
+    
+    category[item_name] = (category[item_name] or 0) + 1
+end
+
+local function test_format_list_items(items, item_type)
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    local category
+    if item_type == "symptom" then
+        category = logs.symptoms
+    elseif item_type == "activity" then
+        category = logs.activities
+    elseif item_type == "intervention" then
+        category = logs.interventions
+    else
+        error("Invalid item type: " .. tostring(item_type))
+    end
+    
+    local formatted = {}
+    for _, item in ipairs(items) do
+        local count = category[item]
+        if count and count > 0 then
+            table.insert(formatted, item .. " (" .. count .. ")")
+        else
+            table.insert(formatted, item)
+        end
+    end
+    
+    return formatted
 end
 
 local function test_save_daily_choice(level_idx)
@@ -517,6 +583,143 @@ add_test("Level upgrade prevention", function()
     
     assert_equals(1, _G.prefs.selected_level, "Should not allow upgrade from Recovering")
     assert_contains(test_toasts, "Can only downgrade capacity level", "Should show upgrade prevention message")
+end)
+
+-- Daily tracking tests
+add_test("Initialize daily logs", function()
+    setup_widget_env()
+    
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    assert_true(type(logs) == "table", "Should return logs table")
+    assert_true(type(logs.symptoms) == "table", "Should have symptoms table")
+    assert_true(type(logs.activities) == "table", "Should have activities table")
+    assert_true(type(logs.interventions) == "table", "Should have interventions table")
+end)
+
+add_test("Log symptom with count tracking", function()
+    setup_widget_env()
+    
+    local today = os.date("%Y-%m-%d")
+    
+    -- Log the same symptom multiple times
+    test_log_item("symptom", "Fatigue")
+    test_log_item("symptom", "Fatigue")
+    test_log_item("symptom", "Brain fog")
+    
+    local logs = test_get_daily_logs(today)
+    
+    assert_equals(2, logs.symptoms["Fatigue"], "Should track Fatigue count as 2")
+    assert_equals(1, logs.symptoms["Brain fog"], "Should track Brain fog count as 1")
+end)
+
+add_test("Log activity with count tracking", function()
+    setup_widget_env()
+    
+    local today = os.date("%Y-%m-%d")
+    
+    -- Log activities
+    test_log_item("activity", "Light walk")
+    test_log_item("activity", "Cooking")
+    test_log_item("activity", "Cooking")
+    test_log_item("activity", "Cooking")
+    
+    local logs = test_get_daily_logs(today)
+    
+    assert_equals(1, logs.activities["Light walk"], "Should track Light walk count as 1")
+    assert_equals(3, logs.activities["Cooking"], "Should track Cooking count as 3")
+end)
+
+add_test("Log intervention with count tracking", function()
+    setup_widget_env()
+    
+    local today = os.date("%Y-%m-%d")
+    
+    -- Log interventions
+    test_log_item("intervention", "Vitamin D")
+    test_log_item("intervention", "Rest")
+    test_log_item("intervention", "Rest")
+    
+    local logs = test_get_daily_logs(today)
+    
+    assert_equals(1, logs.interventions["Vitamin D"], "Should track Vitamin D count as 1")
+    assert_equals(2, logs.interventions["Rest"], "Should track Rest count as 2")
+end)
+
+add_test("Format list items with counts", function()
+    setup_widget_env()
+    
+    local today = os.date("%Y-%m-%d")
+    
+    -- Set up some logged items
+    test_log_item("symptom", "Fatigue")
+    test_log_item("symptom", "Fatigue")
+    test_log_item("symptom", "Brain fog")
+    
+    local symptoms = {"Fatigue", "Brain fog", "Headache"}
+    local formatted = test_format_list_items(symptoms, "symptom")
+    
+    assert_contains(formatted[1], "Fatigue (2)", "Should show count for multiple logs")
+    assert_contains(formatted[2], "Brain fog (1)", "Should show count for single log")
+    assert_equals("Headache", formatted[3], "Should show plain text for unlogged items")
+end)
+
+add_test("Daily reset clears tracking logs", function()
+    setup_widget_env()
+    
+    local today = os.date("%Y-%m-%d")
+    
+    -- Log some items
+    test_log_item("symptom", "Fatigue")
+    test_log_item("activity", "Walking")
+    
+    -- Verify items are logged
+    local logs = test_get_daily_logs(today)
+    assert_equals(1, logs.symptoms["Fatigue"], "Should have logged Fatigue")
+    assert_equals(1, logs.activities["Walking"], "Should have logged Walking")
+    
+    -- Simulate new day by changing last_selection_date
+    _G.prefs.last_selection_date = "2023-01-01"
+    test_check_daily_reset()
+    
+    -- Check that today's logs are cleared
+    local new_logs = test_get_daily_logs(today)
+    assert_equals(0, new_logs.symptoms["Fatigue"] or 0, "Should clear Fatigue count on new day")
+    assert_equals(0, new_logs.activities["Walking"] or 0, "Should clear Walking count on new day")
+end)
+
+add_test("Extract item name from formatted string", function()
+    setup_widget_env()
+    
+    -- Test the extract_item_name function that needs to be implemented in main widget
+    local function test_extract_item_name(formatted_item)
+        local item_name = formatted_item:match("^(.+)%s%(%d+%)$")
+        return item_name or formatted_item
+    end
+    
+    assert_equals("Fatigue", test_extract_item_name("Fatigue (2)"), "Should extract name from counted item")
+    assert_equals("Brain fog", test_extract_item_name("Brain fog (1)"), "Should extract name from single count")
+    assert_equals("Headache", test_extract_item_name("Headache"), "Should return original for uncounted item")
+    assert_equals("Other...", test_extract_item_name("Other..."), "Should handle special items")
+end)
+
+add_test("Widget initialization creates daily logs", function()
+    setup_widget_env()
+    
+    -- Simulate widget initialization
+    if not _G.prefs.daily_logs then
+        _G.prefs.daily_logs = {}
+    end
+    
+    local today = os.date("%Y-%m-%d")
+    local logs = test_get_daily_logs(today)
+    
+    assert_true(_G.prefs.daily_logs ~= nil, "Should initialize daily_logs table")
+    assert_true(logs ~= nil, "Should create today's logs")
+    assert_true(logs.symptoms ~= nil, "Should create symptoms table")
+    assert_true(logs.activities ~= nil, "Should create activities table") 
+    assert_true(logs.interventions ~= nil, "Should create interventions table")
 end)
 
 -- Run tests
