@@ -945,8 +945,8 @@ add_test("Extract item name from formatted string", function()
     
     -- Test the extract_item_name function that needs to be implemented in main widget
     local function test_extract_item_name(formatted_item)
-        -- First, remove checkmark and leading spaces
-        local cleaned = formatted_item:gsub("^[✓%s]*", "")
+        -- First, remove all icons, checkmarks and leading spaces
+        local cleaned = formatted_item:gsub("^[✓✅⚠️%s]*", "")
         
         -- Then extract name before count if present: "Fatigue (2)" -> "Fatigue"
         -- This will only match the LAST (number) pattern, preserving existing brackets
@@ -958,6 +958,14 @@ add_test("Extract item name from formatted string", function()
     assert_equals("Brain fog", test_extract_item_name("✓ Brain fog (1)"), "Should extract name from checked single count")
     assert_equals("Headache", test_extract_item_name("   Headache"), "Should extract name from spaced uncounted item")
     assert_equals("Other...", test_extract_item_name("   Other..."), "Should handle special items with spacing")
+    
+    -- Test warning icon stripping for required items
+    assert_equals("Required Activity", test_extract_item_name("⚠️ Required Activity"), "Should strip warning icon from required item")
+    assert_equals("Required Intervention", test_extract_item_name("⚠️ Required Intervention"), "Should strip warning icon from required intervention")
+    
+    -- Test green checkmark stripping for completed required items  
+    assert_equals("Completed Required Activity", test_extract_item_name("✅ Completed Required Activity (1)"), "Should strip green checkmark from completed required item")
+    assert_equals("Daily Vitamins", test_extract_item_name("✅ Daily Vitamins (2)"), "Should strip green checkmark and preserve count")
     
     -- Test items with existing brackets
     assert_equals("Physio (full)", test_extract_item_name("   Physio (full)"), "Should preserve existing brackets in unlogged items")
@@ -987,7 +995,7 @@ add_test("Bracket handling in item names", function()
     
     -- Test extraction from formatted strings
     local function test_extract_item_name(formatted_item)
-        local cleaned = formatted_item:gsub("^[✓%s]*", "")
+        local cleaned = formatted_item:gsub("^[✓✅⚠️%s]*", "")
         local item_name = cleaned:match("^(.+)%s%(%d+%)$")
         return item_name or cleaned
     end

@@ -1198,9 +1198,11 @@ end
 function extract_item_name(formatted_item)
     -- Extract original item name from formatted string
     -- Handle: "✓ Fatigue (2)" -> "Fatigue" or "   Headache" -> "Headache"
+    -- Handle: "⚠️ Required Item" -> "Required Item"
+    -- Handle: "✅ Required Item (1)" -> "Required Item"
     
-    -- First, remove checkmark and leading spaces
-    local cleaned = formatted_item:gsub("^[✓%s]*", "")
+    -- First, remove all icons, checkmarks and leading spaces
+    local cleaned = formatted_item:gsub("^[✓✅⚠️%s]*", "")
     
     -- Then extract name before count if present
     -- This regex matches only the LAST (number) pattern, preserving existing brackets:
