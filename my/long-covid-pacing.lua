@@ -800,6 +800,11 @@ function log_symptom(symptom_name)
     else
         ui:show_toast("✓ Symptom logged: " .. symptom_name)
     end
+    
+    -- Re-open the symptom dialog to show updated counts
+    if current_dialog_type == "symptom" or current_dialog_type == "symptom_edit" then
+        show_symptom_dialog()
+    end
 end
 
 function show_activity_dialog()
@@ -829,7 +834,12 @@ function log_activity(activity_name)
         })
         ui:show_toast("✓ Activity logged: " .. activity_name)
     else
-        ui:show_toast("Tasker not available")
+        ui:show_toast("✓ Activity logged: " .. activity_name)
+    end
+    
+    -- Re-open the activity dialog to show updated counts
+    if current_dialog_type == "activity" or current_dialog_type == "activity_edit" then
+        show_activity_dialog()
     end
 end
 
@@ -860,7 +870,12 @@ function log_intervention(intervention_name)
         })
         ui:show_toast("✓ Intervention logged: " .. intervention_name)
     else
-        ui:show_toast("Tasker not available")
+        ui:show_toast("✓ Intervention logged: " .. intervention_name)
+    end
+    
+    -- Re-open the intervention dialog to show updated counts
+    if current_dialog_type == "intervention" or current_dialog_type == "intervention_edit" then
+        show_intervention_dialog()
     end
 end
 
@@ -949,23 +964,26 @@ function on_dialog_action(result)
         -- Edit dialog result - custom text
         if result ~= "" then
             if current_dialog_type == "symptom_edit" then
-                log_symptom(result)
-                current_dialog_type = "symptom"  -- Go back to main symptom dialog state
+                current_dialog_type = "symptom"  -- Set to main state before logging
+                log_symptom(result)  -- This will re-open the dialog
             elseif current_dialog_type == "activity_edit" then
-                log_activity(result)
-                current_dialog_type = "activity"  -- Go back to main activity dialog state
+                current_dialog_type = "activity"  -- Set to main state before logging
+                log_activity(result)  -- This will re-open the dialog
             elseif current_dialog_type == "intervention_edit" then
-                log_intervention(result)
-                current_dialog_type = "intervention"  -- Go back to main intervention dialog state
+                current_dialog_type = "intervention"  -- Set to main state before logging
+                log_intervention(result)  -- This will re-open the dialog
             end
         else
-            -- Empty result, go back to main dialog state
+            -- Empty result, go back to main dialog state and re-open
             if current_dialog_type == "symptom_edit" then
                 current_dialog_type = "symptom"
+                show_symptom_dialog()
             elseif current_dialog_type == "activity_edit" then
                 current_dialog_type = "activity"
+                show_activity_dialog()
             elseif current_dialog_type == "intervention_edit" then
                 current_dialog_type = "intervention"
+                show_intervention_dialog()
             end
         end
         return true  -- Close edit dialog

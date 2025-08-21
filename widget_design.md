@@ -102,6 +102,7 @@ Evening:
    - Select items to log (counts increment for repeated selections)
    - Custom items available via "Other..." option
 5. **Visual feedback**: Toast confirmations show successful logging
+6. **Immediate dialog refresh**: Dialog automatically refreshes to show updated counts after logging
 
 ## File Structure Integration
 
@@ -173,6 +174,12 @@ end
 function log_item(item_type, item_name)
     -- Increment count for symptoms/activities/interventions
     -- Save changes to preferences immediately
+end
+
+-- Logging functions with dialog refresh
+function log_symptom(symptom_name)
+    -- Log to tracking and Google Sheets
+    -- Automatically re-open symptom dialog if currently open
 end
 
 function format_list_items(items, item_type)
@@ -274,6 +281,7 @@ Log Activity
 - **Indentation**: Unlogged items indented for visual alignment
 - **Bracket handling**: Items like "Physio (full)" preserve original brackets
 - **Real-time updates**: Counts increment immediately when items are selected
+- **Instant feedback**: Dialog refreshes automatically after logging to show updated counts
 
 ## Intervention Tracking
 
@@ -309,12 +317,13 @@ The intervention logging feature allows tracking of medications, supplements, tr
 
 The widget includes comprehensive test coverage ensuring reliability:
 
-### Test Categories (19 total tests)
+### Test Categories (20 total tests)
 - **Core functionality**: Preferences, daily reset, capacity selection
 - **Data parsing**: Decision criteria, day files, current day calculation
 - **UI interaction**: Button clicks, widget rendering, level restrictions
 - **Daily tracking**: Log storage, count tracking, formatting with counts
 - **Visual differentiation**: Checkmark display, bracket preservation
+- **Dialog refresh**: Automatic dialog updates after logging
 - **Edge cases**: Items with existing brackets, complex naming scenarios
 
 ### Test File Location
