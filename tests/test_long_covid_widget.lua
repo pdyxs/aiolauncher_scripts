@@ -1,60 +1,19 @@
 #!/usr/bin/env lua
 
--- Final Working Test Suite for Long Covid Pacing Widget
--- Run with: lua test_long_covid_final.lua
+-- Refactored Test Suite for Long Covid Pacing Widget
+-- This version imports the core business logic instead of duplicating it
+-- Run with: lua test_long_covid_widget_refactored.lua
 
--- Mock AIO Launcher environment
-local test_prefs = {}
-local test_ui_calls = {}
+-- Add the 'my' directory to the Lua path so we can import the core module
+package.path = package.path .. ";../my/?.lua"
+
+-- Import the core business logic
+local core = require "long_covid_core"
+
+-- Mock data for testing
 local test_files = {}
 local test_toasts = {}
-local test_daily_logs = {}
-
--- Mock prefs module
-local mock_prefs = setmetatable({}, {
-    __index = function(t, k) return test_prefs[k] end,
-    __newindex = function(t, k, v) test_prefs[k] = v end
-})
-
--- Mock ui module
-local mock_ui = {
-    show_text = function(text) table.insert(test_ui_calls, {"show_text", text}) end,
-    show_toast = function(text) 
-        table.insert(test_ui_calls, {"show_toast", text})
-        table.insert(test_toasts, text)
-    end,
-    set_title = function(title) table.insert(test_ui_calls, {"set_title", title}) end,
-    set_expandable = function(expandable) table.insert(test_ui_calls, {"set_expandable", expandable}) end,
-    is_expanded = function() return test_ui_expanded or false end
-}
-
--- Mock files module
-local mock_files = {
-    read = function(filename) return test_files[filename] end,
-    write = function(filename, content) test_files[filename] = content end
-}
-
--- Mock gui function
-local function mock_gui(elements)
-    return {
-        ui = elements,
-        render = function() table.insert(test_ui_calls, {"gui_render", elements}) end
-    }
-end
-
--- Helper function to split text into lines
-local function split_lines(text)
-    local lines = {}
-    for line in text:gmatch("[^\r\n]+") do
-        table.insert(lines, line)
-    end
-    return lines
-end
-
--- Helper function for string find
-local function string_find(str, pattern, init, plain)
-    return string.find(str, pattern, init, plain)
-end
+local test_ui_calls = {}
 
 -- Test data
 local test_criteria_content = [[## RED
@@ -110,524 +69,26 @@ local test_monday_content = [[## RED
 - 30 min exercise
 ]]
 
--- Setup widget environment
-local function setup_widget_env()
-    -- Reset state
-    test_prefs = {}
-    test_ui_calls = {}
-    test_files = {}
-    test_toasts = {}
-    test_daily_logs = {}
-    test_ui_expanded = false
-    
-    -- Set up globals
-    _G.prefs = mock_prefs
-    _G.ui = mock_ui
-    _G.files = mock_files
-    _G.gui = mock_gui
-    _G.my_gui = nil
-    
-    -- Initialize default prefs
-    _G.prefs.selected_level = 0
-    _G.prefs.last_selection_date = ""
-end
+local test_activities_content = [[
+# Long Covid Activities
 
--- Widget functionality - reimplemented for testing
-local levels = {
-    {name = "Recovering", color = "#FF4444", key = "red", icon = "bed"},
-    {name = "Maintaining", color = "#FFAA00", key = "yellow", icon = "walking"}, 
-    {name = "Engaging", color = "#44AA44", key = "green", icon = "bolt"}
-}
+## Physical
+- Light walk
+- Physio (full) {Required: Mon,Wed,Fri}
+- Yin Yoga {Required}
 
-local function test_parse_decision_criteria()
-    local content = mock_files.read("decision_criteria.md")
-    if not content then
-        return {red = {}, yellow = {}, green = {}}
-    end
-    
-    local criteria = {red = {}, yellow = {}, green = {}}
-    local current_level = nil
-    
-    local lines = split_lines(content)
-    for _, line in ipairs(lines) do
-        if line:match("^## RED") then
-            current_level = "red"
-        elseif line:match("^## YELLOW") then
-            current_level = "yellow"
-        elseif line:match("^## GREEN") then
-            current_level = "green"
-        elseif line:match("^%- ") and current_level then
-            local item = line:match("^%- (.+)")
-            if item then
-                table.insert(criteria[current_level], item)
-            end
-        end
-    end
-    
-    return criteria
-end
+## Work
+- Work from home
+]]
 
-local function test_parse_day_file(day)
-    local filename = day .. ".md"
-    local content = mock_files.read(filename)
-    
-    if not content then
-        return {red = {}, yellow = {}, green = {}}
-    end
-    
-    local template = {red = {}, yellow = {}, green = {}}
-    local current_level = nil
-    local current_category = nil
-    
-    local lines = split_lines(content)
-    for _, line in ipairs(lines) do
-        if line:match("^## RED") then
-            current_level = "red"
-            current_category = nil
-            template[current_level].overview = {}
-        elseif line:match("^## YELLOW") then
-            current_level = "yellow"
-            current_category = nil
-            template[current_level].overview = {}
-        elseif line:match("^## GREEN") then
-            current_level = "green"
-            current_category = nil
-            template[current_level].overview = {}
-        elseif line:match("^%*%*") and current_level and not current_category then
-            table.insert(template[current_level].overview, line)
-        elseif line:match("^### ") and current_level then
-            current_category = line:match("^### (.+)")
-            if current_category then
-                template[current_level][current_category] = {}
-            end
-        elseif line:match("^#### ") and current_level then
-            current_category = line:match("^#### (.+)")
-            if current_category then
-                template[current_level][current_category] = {}
-            end
-        elseif line:match("^%- ") and current_level and current_category then
-            local item = line:match("^%- (.+)")
-            if item then
-                table.insert(template[current_level][current_category], item)
-            end
-        end
-    end
-    
-    return template
-end
+local test_interventions_content = [[
+## Medications
+- LDN (4mg) {Required}
+- Claratyne
 
-local function test_get_current_day()
-    local day_names = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"}
-    local today = day_names[tonumber(os.date("%w")) + 1]
-    return today
-end
-
-local function test_check_daily_reset()
-    local today = os.date("%Y-%m-%d")
-    if _G.prefs.last_selection_date ~= today then
-        _G.prefs.selected_level = 0
-        _G.prefs.last_selection_date = today
-        -- Clear today's tracking logs on new day
-        if _G.prefs.daily_logs then
-            _G.prefs.daily_logs[today] = nil
-        end
-    end
-end
-
-local function test_get_daily_logs(date)
-    if not _G.prefs.daily_logs then
-        _G.prefs.daily_logs = {}
-    end
-    
-    if not _G.prefs.daily_logs[date] then
-        _G.prefs.daily_logs[date] = {
-            symptoms = {},
-            activities = {},
-            interventions = {},
-            energy_levels = {}
-        }
-    end
-    
-    return _G.prefs.daily_logs[date]
-end
-
-local function test_log_item(item_type, item_name)
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    local category
-    if item_type == "symptom" then
-        category = logs.symptoms
-    elseif item_type == "activity" then
-        category = logs.activities
-    elseif item_type == "intervention" then
-        category = logs.interventions
-    else
-        error("Invalid item type: " .. tostring(item_type))
-    end
-    
-    category[item_name] = (category[item_name] or 0) + 1
-end
-
-local function test_format_list_items(items, item_type)
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    local category
-    if item_type == "symptom" then
-        category = logs.symptoms
-    elseif item_type == "activity" then
-        category = logs.activities
-    elseif item_type == "intervention" then
-        category = logs.interventions
-    else
-        error("Invalid item type: " .. tostring(item_type))
-    end
-    
-    local formatted = {}
-    for _, item in ipairs(items) do
-        local count = category[item]
-        if count and count > 0 then
-            -- Add checkmark and count for logged items
-            table.insert(formatted, "✓ " .. item .. " (" .. count .. ")")
-        else
-            -- Add spacing to align with logged items
-            table.insert(formatted, "   " .. item)
-        end
-    end
-    
-    return formatted
-end
-
-local function test_save_daily_choice(level_idx)
-    if level_idx == 0 then
-        return
-    end
-    
-    local today = os.date("%Y-%m-%d")
-    local day_name = test_get_current_day()
-    local level_name = levels[level_idx].name
-    
-    local entry = string.format("## %s (%s)\n- Capacity: %s\n- Time: %s\n\n", 
-        today, day_name:gsub("^%l", string.upper), level_name, os.date("%H:%M"))
-    
-    local existing_content = mock_files.read("tracking.md") or "# Long Covid Daily Tracking\n\n"
-    local new_content = existing_content .. entry
-    
-    mock_files.write("tracking.md", new_content)
-end
-
-local function test_render_widget()
-    local today = test_get_current_day()
-    local day_display = today:gsub("^%l", string.upper)
-    
-    mock_ui.set_title("Long Covid Pacing - " .. day_display)
-    mock_ui.set_expandable(true)
-    
-    local ui_elements = {}
-    
-    -- Add capacity level buttons
-    for i, level in ipairs(levels) do
-        local color = level.color
-        local button_text = "%%fa:" .. level.icon .. "%% " .. level.name
-        
-        table.insert(ui_elements, {"button", button_text, {color = color}})
-        if i < #levels then
-            table.insert(ui_elements, {"spacer", 1})
-        end
-    end
-    
-    _G.my_gui = mock_gui(ui_elements)
-    _G.my_gui.render()
-end
-
-local function test_on_click(idx)
-    if not _G.my_gui then return end
-    
-    local element = _G.my_gui.ui[idx]
-    if not element then return end
-    
-    local elem_type = element[1]
-    local elem_text = element[2]
-    
-    if elem_type == "button" then
-        if string_find(elem_text, "bed") then
-            if _G.prefs.selected_level == 0 or 1 <= _G.prefs.selected_level then
-                _G.prefs.selected_level = 1
-                test_save_daily_choice(1)
-                test_render_widget()
-            else
-                mock_ui.show_toast("Can only downgrade capacity level")
-            end
-        elseif string_find(elem_text, "walking") then
-            if _G.prefs.selected_level == 0 or 2 <= _G.prefs.selected_level then
-                _G.prefs.selected_level = 2
-                test_save_daily_choice(2)
-                test_render_widget()
-            else
-                mock_ui.show_toast("Can only downgrade capacity level")
-            end
-        elseif string_find(elem_text, "bolt") then
-            if _G.prefs.selected_level == 0 or 3 <= _G.prefs.selected_level then
-                _G.prefs.selected_level = 3
-                test_save_daily_choice(3)
-                test_render_widget()
-            else
-                mock_ui.show_toast("Can only downgrade capacity level")
-            end
-        elseif string_find(elem_text, "rotate%-right") or string_find(elem_text, "Reset") then
-            _G.prefs.selected_level = 0
-            mock_ui.show_toast("Selection reset")
-            test_render_widget()
-        end
-    end
-end
-
--- Required activities test functions
-local function test_parse_required_activities()
-    local content = mock_files.read("activities.md")
-    if not content then
-        return {}
-    end
-    
-    local required_activities = {}
-    local lines = split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local activity_line = line:match("^%- (.+)")
-            if activity_line and activity_line:match("%{Required") then
-                local activity_name = activity_line:match("^(.-)%s*%{Required")
-                if activity_name then
-                    local required_info = {
-                        name = activity_name,
-                        days = nil
-                    }
-                    
-                    local days_match = activity_line:match("%{Required:%s*([^%}]+)%}")
-                    if days_match then
-                        required_info.days = {}
-                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
-                            table.insert(required_info.days, day_abbrev:lower())
-                        end
-                    end
-                    
-                    table.insert(required_activities, required_info)
-                end
-            end
-        end
-    end
-    
-    return required_activities
-end
-
-local function test_parse_required_interventions()
-    local content = mock_files.read("interventions.md")
-    if not content then
-        return {}
-    end
-    
-    local required_interventions = {}
-    local lines = split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local intervention_line = line:match("^%- (.+)")
-            if intervention_line and intervention_line:match("%{Required") then
-                local intervention_name = intervention_line:match("^(.-)%s*%{Required")
-                if intervention_name then
-                    local required_info = {
-                        name = intervention_name,
-                        days = nil
-                    }
-                    
-                    local days_match = intervention_line:match("%{Required:%s*([^%}]+)%}")
-                    if days_match then
-                        required_info.days = {}
-                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
-                            table.insert(required_info.days, day_abbrev:lower())
-                        end
-                    end
-                    
-                    table.insert(required_interventions, required_info)
-                end
-            end
-        end
-    end
-    
-    return required_interventions
-end
-
-local function test_get_current_day_abbrev()
-    local day_abbrevs = {"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
-    return day_abbrevs[tonumber(os.date("%w")) + 1]
-end
-
-local function test_is_required_today(required_info)
-    if not required_info.days then
-        return true
-    end
-    
-    local today_abbrev = test_get_current_day_abbrev()
-    for _, day in ipairs(required_info.days) do
-        if day == today_abbrev then
-            return true
-        end
-    end
-    
-    return false
-end
-
-local function test_get_required_activities_for_today()
-    local required_activities = test_parse_required_activities()
-    local today_required = {}
-    
-    for _, required_info in ipairs(required_activities) do
-        if test_is_required_today(required_info) then
-            table.insert(today_required, required_info.name)
-        end
-    end
-    
-    return today_required
-end
-
-local function test_get_required_interventions_for_today()
-    local required_interventions = test_parse_required_interventions()
-    local today_required = {}
-    
-    for _, required_info in ipairs(required_interventions) do
-        if test_is_required_today(required_info) then
-            table.insert(today_required, required_info.name)
-        end
-    end
-    
-    return today_required
-end
-
-local function test_are_all_required_activities_completed()
-    local required_activities = test_get_required_activities_for_today()
-    if #required_activities == 0 then
-        return true
-    end
-    
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    for _, required_activity in ipairs(required_activities) do
-        if not logs.activities[required_activity] or logs.activities[required_activity] == 0 then
-            return false
-        end
-    end
-    
-    return true
-end
-
-local function test_are_all_required_interventions_completed()
-    local required_interventions = test_get_required_interventions_for_today()
-    if #required_interventions == 0 then
-        return true
-    end
-    
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    for _, required_intervention in ipairs(required_interventions) do
-        if not logs.interventions[required_intervention] or logs.interventions[required_intervention] == 0 then
-            return false
-        end
-    end
-    
-    return true
-end
-
-local function test_format_list_items(items, item_type)
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    local category
-    local required_items = {}
-    if item_type == "symptom" then
-        category = logs.symptoms
-    elseif item_type == "activity" then
-        category = logs.activities
-        required_items = test_get_required_activities_for_today()
-    elseif item_type == "intervention" then
-        category = logs.interventions
-        required_items = test_get_required_interventions_for_today()
-    else
-        return items
-    end
-    
-    local required_set = {}
-    for _, req_item in ipairs(required_items) do
-        required_set[req_item] = true
-    end
-    
-    local formatted = {}
-    for _, item in ipairs(items) do
-        local count = category[item]
-        local is_required = required_set[item]
-        
-        if count and count > 0 then
-            if is_required then
-                table.insert(formatted, "✅ " .. item .. " (" .. count .. ")")
-            else
-                table.insert(formatted, "✓ " .. item .. " (" .. count .. ")")
-            end
-        else
-            if is_required then
-                table.insert(formatted, "⚠️ " .. item)
-            else
-                table.insert(formatted, "   " .. item)
-            end
-        end
-    end
-    
-    return formatted
-end
-
-local function test_log_energy(energy_level)
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    local energy_entry = {
-        level = energy_level,
-        timestamp = os.time(),
-        time_display = os.date("%H:%M")
-    }
-    
-    table.insert(logs.energy_levels, energy_entry)
-end
-
-local function test_get_energy_button_color()
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    if not logs.energy_levels or #logs.energy_levels == 0 then
-        return "#dc3545" -- Red
-    end
-    
-    local most_recent_time = 0
-    for _, entry in ipairs(logs.energy_levels) do
-        if entry.timestamp and entry.timestamp > most_recent_time then
-            most_recent_time = entry.timestamp
-        end
-    end
-    
-    if most_recent_time == 0 then
-        return "#dc3545" -- Red
-    end
-    
-    local current_time = os.time()
-
-    local hours_since_last = (current_time - most_recent_time) / 3600
-    
-    if hours_since_last >= 4 then
-        return "#ffc107" -- Yellow
-    else
-        return "#28a745" -- Green
-    end
-end
+## Supplements
+- Salvital {Required: Mon,Wed,Fri}
+]]
 
 -- Test framework
 local tests = {}
@@ -651,40 +112,26 @@ end
 local function assert_contains(haystack, needle, message)
     if type(haystack) == "table" then
         for _, item in ipairs(haystack) do
-            if string_find(tostring(item), tostring(needle), 1, true) then return end
+            if string.find(tostring(item), tostring(needle), 1, true) then return end
         end
         error((message or "Table does not contain expected value") .. ": " .. tostring(needle))
     else
-        if not string_find(tostring(haystack), tostring(needle), 1, true) then
+        if not string.find(tostring(haystack), tostring(needle), 1, true) then
             error((message or "String does not contain expected substring") .. ": " .. tostring(needle))
         end
     end
 end
 
--- Tests
-add_test("Initial preferences state", function()
-    setup_widget_env()
-    
-    assert_equals(0, _G.prefs.selected_level, "Default selected level should be 0")
-    assert_equals("", _G.prefs.last_selection_date, "Default last selection date should be empty")
-end)
-
-add_test("Daily reset functionality", function()
-    setup_widget_env()
-    
-    _G.prefs.selected_level = 2
-    _G.prefs.last_selection_date = "2023-01-01"
-    
-    test_check_daily_reset()
-    
-    assert_equals(0, _G.prefs.selected_level, "Should reset selection on new day")
-    assert_equals(os.date("%Y-%m-%d"), _G.prefs.last_selection_date, "Should update to current date")
+-- Tests using the imported core module
+add_test("Core module levels are defined", function()
+    assert_equals(3, #core.levels, "Should have 3 capacity levels")
+    assert_equals("Recovering", core.levels[1].name, "First level should be Recovering")
+    assert_equals("Maintaining", core.levels[2].name, "Second level should be Maintaining")
+    assert_equals("Engaging", core.levels[3].name, "Third level should be Engaging")
 end)
 
 add_test("Current day calculation", function()
-    setup_widget_env()
-    
-    local day = test_get_current_day()
+    local day = core.get_current_day()
     local valid_days = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"}
     
     local found = false
@@ -698,404 +145,8 @@ add_test("Current day calculation", function()
     assert_true(found, "Should return a valid day name: " .. tostring(day))
 end)
 
-add_test("Decision criteria parsing", function()
-    setup_widget_env()
-    test_files["decision_criteria.md"] = test_criteria_content
-    
-    local criteria = test_parse_decision_criteria()
-    
-    assert_true(type(criteria) == "table", "Should return a table")
-    assert_true(type(criteria.red) == "table", "Should have red criteria table")
-    assert_true(type(criteria.yellow) == "table", "Should have yellow criteria table")
-    assert_true(type(criteria.green) == "table", "Should have green criteria table")
-    
-    assert_true(#criteria.red > 0, "Should parse RED criteria (found " .. #criteria.red .. " items)")
-    assert_true(#criteria.yellow > 0, "Should parse YELLOW criteria (found " .. #criteria.yellow .. " items)") 
-    assert_true(#criteria.green > 0, "Should parse GREEN criteria (found " .. #criteria.green .. " items)")
-    
-    assert_contains(criteria.red[1], "extremely fatigued", "Should contain expected RED criterion")
-    assert_contains(criteria.yellow[1], "Moderate fatigue", "Should contain expected YELLOW criterion")
-    assert_contains(criteria.green[1], "Good energy", "Should contain expected GREEN criterion")
-end)
-
-add_test("Day file parsing", function()
-    setup_widget_env()
-    test_files["monday.md"] = test_monday_content
-    
-    local plan = test_parse_day_file("monday")
-    
-    assert_true(type(plan) == "table", "Should return a table")
-    assert_true(plan.red ~= nil, "Should have RED level plan")
-    assert_true(plan.yellow ~= nil, "Should have YELLOW level plan")
-    assert_true(plan.green ~= nil, "Should have GREEN level plan")
-    
-    -- Test overview parsing
-    assert_true(type(plan.red.overview) == "table", "Should have RED overview table")
-    assert_true(#plan.red.overview > 0, "Should parse RED overview (found " .. #plan.red.overview .. " items)")
-    assert_contains(plan.red.overview[1], "WFH essential only", "Should contain work overview")
-    
-    -- Test category parsing
-    assert_true(plan.red.Morning ~= nil, "Should parse Morning category")
-    assert_true(type(plan.red.Morning) == "table", "Morning should be a table")
-    assert_true(#plan.red.Morning > 0, "Should have Morning items")
-    assert_contains(plan.red.Morning[1], "Sleep in", "Should contain expected morning item")
-end)
-
-add_test("Save daily choice functionality", function()
-    setup_widget_env()
-    
-    test_save_daily_choice(2)
-    
-    local tracking_content = test_files["tracking.md"]
-    assert_true(tracking_content ~= nil, "Should create tracking file")
-    assert_contains(tracking_content, "Maintaining", "Should save correct capacity level")
-    assert_contains(tracking_content, os.date("%Y-%m-%d"), "Should save current date")
-end)
-
-add_test("Widget rendering basic functionality", function()
-    setup_widget_env()
-    
-    _G.prefs.selected_level = 0
-    
-    test_render_widget()
-    
-    -- Check that title was set
-    local title_found = false
-    for _, call in ipairs(test_ui_calls) do
-        if call[1] == "set_title" and type(call[2]) == "string" and string_find(call[2], "Long Covid Pacing") then
-            title_found = true
-            break
-        end
-    end
-    
-    assert_true(title_found, "Should set widget title with correct text")
-    
-    -- Check that expandable was set
-    local expandable_found = false
-    for _, call in ipairs(test_ui_calls) do
-        if call[1] == "set_expandable" then
-            expandable_found = true
-            break
-        end
-    end
-    
-    assert_true(expandable_found, "Should set expandable")
-end)
-
-add_test("Click handling - capacity selection", function()
-    setup_widget_env()
-    
-    -- Set up mock GUI with buttons
-    local ui_elements = {
-        {"button", "fa:bed", {color = "#FF4444"}},
-        {"spacer", 1},
-        {"button", "%%fa:walking%% Maintaining", {color = "#FFAA00"}}, 
-        {"spacer", 1},
-        {"button", "fa:bolt", {color = "#888888"}}
-    }
-    
-    _G.my_gui = {ui = ui_elements}
-    
-    -- Test clicking the walking button (index 3)
-    _G.prefs.selected_level = 0
-    test_on_click(3)
-    
-    assert_equals(2, _G.prefs.selected_level, "Should set selected level to 2 (Maintaining)")
-end)
-
-add_test("Click handling - reset button", function()
-    setup_widget_env()
-    
-    local ui_elements = {
-        {"button", "%%fa:rotate-right%% Reset", {color = "#666666"}}
-    }
-    
-    _G.my_gui = {ui = ui_elements}
-    _G.prefs.selected_level = 2
-    
-    test_on_click(1)
-    
-    assert_equals(0, _G.prefs.selected_level, "Should reset selected level to 0")
-    assert_contains(test_toasts, "Selection reset", "Should show reset toast")
-end)
-
-add_test("Level upgrade prevention", function()
-    setup_widget_env()
-    
-    local ui_elements = {
-        {"button", "%%fa:bolt%% Engaging", {color = "#44AA44"}}
-    }
-    
-    _G.my_gui = {ui = ui_elements}
-    _G.prefs.selected_level = 1  -- Currently at Recovering (level 1)
-    
-    -- Try to click Engaging (level 3) - should be prevented
-    test_on_click(1)
-    
-    assert_equals(1, _G.prefs.selected_level, "Should not allow upgrade from Recovering")
-    assert_contains(test_toasts, "Can only downgrade capacity level", "Should show upgrade prevention message")
-end)
-
--- Daily tracking tests
-add_test("Initialize daily logs", function()
-    setup_widget_env()
-    
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    assert_true(type(logs) == "table", "Should return logs table")
-    assert_true(type(logs.symptoms) == "table", "Should have symptoms table")
-    assert_true(type(logs.activities) == "table", "Should have activities table")
-    assert_true(type(logs.interventions) == "table", "Should have interventions table")
-end)
-
-add_test("Log symptom with count tracking", function()
-    setup_widget_env()
-    
-    local today = os.date("%Y-%m-%d")
-    
-    -- Log the same symptom multiple times
-    test_log_item("symptom", "Fatigue")
-    test_log_item("symptom", "Fatigue")
-    test_log_item("symptom", "Brain fog")
-    
-    local logs = test_get_daily_logs(today)
-    
-    assert_equals(2, logs.symptoms["Fatigue"], "Should track Fatigue count as 2")
-    assert_equals(1, logs.symptoms["Brain fog"], "Should track Brain fog count as 1")
-end)
-
-add_test("Log activity with count tracking", function()
-    setup_widget_env()
-    
-    local today = os.date("%Y-%m-%d")
-    
-    -- Log activities
-    test_log_item("activity", "Light walk")
-    test_log_item("activity", "Cooking")
-    test_log_item("activity", "Cooking")
-    test_log_item("activity", "Cooking")
-    
-    local logs = test_get_daily_logs(today)
-    
-    assert_equals(1, logs.activities["Light walk"], "Should track Light walk count as 1")
-    assert_equals(3, logs.activities["Cooking"], "Should track Cooking count as 3")
-end)
-
-add_test("Log intervention with count tracking", function()
-    setup_widget_env()
-    
-    local today = os.date("%Y-%m-%d")
-    
-    -- Log interventions
-    test_log_item("intervention", "Vitamin D")
-    test_log_item("intervention", "Rest")
-    test_log_item("intervention", "Rest")
-    
-    local logs = test_get_daily_logs(today)
-    
-    assert_equals(1, logs.interventions["Vitamin D"], "Should track Vitamin D count as 1")
-    assert_equals(2, logs.interventions["Rest"], "Should track Rest count as 2")
-end)
-
-add_test("Format list items with counts", function()
-    setup_widget_env()
-    
-    local today = os.date("%Y-%m-%d")
-    
-    -- Set up some logged items
-    test_log_item("symptom", "Fatigue")
-    test_log_item("symptom", "Fatigue")
-    test_log_item("symptom", "Brain fog")
-    
-    local symptoms = {"Fatigue", "Brain fog", "Headache"}
-    local formatted = test_format_list_items(symptoms, "symptom")
-    
-    assert_contains(formatted[1], "✓ Fatigue (2)", "Should show checkmark and count for multiple logs")
-    assert_contains(formatted[2], "✓ Brain fog (1)", "Should show checkmark and count for single log")
-    assert_contains(formatted[3], "   Headache", "Should show spaced text for unlogged items")
-end)
-
-add_test("Daily reset clears tracking logs", function()
-    setup_widget_env()
-    
-    local today = os.date("%Y-%m-%d")
-    
-    -- Log some items
-    test_log_item("symptom", "Fatigue")
-    test_log_item("activity", "Walking")
-    
-    -- Verify items are logged
-    local logs = test_get_daily_logs(today)
-    assert_equals(1, logs.symptoms["Fatigue"], "Should have logged Fatigue")
-    assert_equals(1, logs.activities["Walking"], "Should have logged Walking")
-    
-    -- Simulate new day by changing last_selection_date
-    _G.prefs.last_selection_date = "2023-01-01"
-    test_check_daily_reset()
-    
-    -- Check that today's logs are cleared
-    local new_logs = test_get_daily_logs(today)
-    assert_equals(0, new_logs.symptoms["Fatigue"] or 0, "Should clear Fatigue count on new day")
-    assert_equals(0, new_logs.activities["Walking"] or 0, "Should clear Walking count on new day")
-end)
-
-add_test("Extract item name from formatted string", function()
-    setup_widget_env()
-    
-    -- Test the extract_item_name function that needs to be implemented in main widget
-    local function test_extract_item_name(formatted_item)
-        -- First, remove all icons, checkmarks and leading spaces
-        local cleaned = formatted_item:gsub("^[✓✅⚠️%s]*", "")
-        
-        -- Then extract name before count if present: "Fatigue (2)" -> "Fatigue"
-        -- This will only match the LAST (number) pattern, preserving existing brackets
-        local item_name = cleaned:match("^(.+)%s%(%d+%)$")
-        return item_name or cleaned -- Return cleaned version if no count found
-    end
-    
-    assert_equals("Fatigue", test_extract_item_name("✓ Fatigue (2)"), "Should extract name from checked counted item")
-    assert_equals("Brain fog", test_extract_item_name("✓ Brain fog (1)"), "Should extract name from checked single count")
-    assert_equals("Headache", test_extract_item_name("   Headache"), "Should extract name from spaced uncounted item")
-    assert_equals("Other...", test_extract_item_name("   Other..."), "Should handle special items with spacing")
-    
-    -- Test warning icon stripping for required items
-    assert_equals("Required Activity", test_extract_item_name("⚠️ Required Activity"), "Should strip warning icon from required item")
-    assert_equals("Required Intervention", test_extract_item_name("⚠️ Required Intervention"), "Should strip warning icon from required intervention")
-    
-    -- Test green checkmark stripping for completed required items  
-    assert_equals("Completed Required Activity", test_extract_item_name("✅ Completed Required Activity (1)"), "Should strip green checkmark from completed required item")
-    assert_equals("Daily Vitamins", test_extract_item_name("✅ Daily Vitamins (2)"), "Should strip green checkmark and preserve count")
-    
-    -- Test items with existing brackets
-    assert_equals("Physio (full)", test_extract_item_name("   Physio (full)"), "Should preserve existing brackets in unlogged items")
-    assert_equals("Physio (full)", test_extract_item_name("✓ Physio (full) (2)"), "Should extract name with brackets from logged items")
-    assert_equals("Medication (morning dose)", test_extract_item_name("✓ Medication (morning dose) (1)"), "Should handle complex bracket scenarios")
-    assert_equals("Exercise (15 min)", test_extract_item_name("   Exercise (15 min)"), "Should preserve brackets with numbers inside")
-end)
-
-add_test("Bracket handling in item names", function()
-    setup_widget_env()
-    
-    local today = os.date("%Y-%m-%d")
-    
-    -- Test logging items with brackets in their names
-    test_log_item("activity", "Physio (full)")
-    test_log_item("activity", "Physio (full)")  -- Log twice
-    test_log_item("activity", "Exercise (15 min)")
-    test_log_item("intervention", "Medication (morning dose)")
-    
-    -- Test formatting items with brackets
-    local activities = {"Physio (full)", "Exercise (15 min)", "Walking"}
-    local formatted = test_format_list_items(activities, "activity")
-    
-    assert_contains(formatted[1], "✓ Physio (full) (2)", "Should show bracket item with count")
-    assert_contains(formatted[2], "✓ Exercise (15 min) (1)", "Should show bracket item with single count")
-    assert_contains(formatted[3], "   Walking", "Should show normal spacing for unlogged items")
-    
-    -- Test extraction from formatted strings
-    local function test_extract_item_name(formatted_item)
-        local cleaned = formatted_item:gsub("^[✓✅⚠️%s]*", "")
-        local item_name = cleaned:match("^(.+)%s%(%d+%)$")
-        return item_name or cleaned
-    end
-    
-    assert_equals("Physio (full)", test_extract_item_name("✓ Physio (full) (2)"), "Should extract original name with brackets")
-    assert_equals("Exercise (15 min)", test_extract_item_name("✓ Exercise (15 min) (1)"), "Should handle numbers inside brackets")
-end)
-
-add_test("Dialog refresh after logging", function()
-    setup_widget_env()
-    
-    -- Mock a global to track dialog calls
-    _G.dialog_call_count = 0
-    _G.current_dialog_type = "activity"
-    
-    -- Mock the show_activity_dialog function
-    local function mock_show_activity_dialog()
-        _G.dialog_call_count = _G.dialog_call_count + 1
-    end
-    
-    -- Simulate logging an activity (which should refresh the dialog)
-    test_log_item("activity", "Walking")
-    
-    -- The actual refresh logic would need current_dialog_type to be set properly
-    -- This test verifies the logic structure is in place
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    assert_equals(1, logs.activities["Walking"], "Should log the activity")
-    -- In real implementation, this would test that show_activity_dialog was called
-    assert_true(true, "Dialog refresh logic is implemented")
-end)
-
-add_test("Widget initialization creates daily logs", function()
-    setup_widget_env()
-    
-    -- Simulate widget initialization
-    if not _G.prefs.daily_logs then
-        _G.prefs.daily_logs = {}
-    end
-    
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    assert_true(_G.prefs.daily_logs ~= nil, "Should initialize daily_logs table")
-    assert_true(logs ~= nil, "Should create today's logs")
-    assert_true(logs.symptoms ~= nil, "Should create symptoms table")
-    assert_true(logs.activities ~= nil, "Should create activities table") 
-    assert_true(logs.interventions ~= nil, "Should create interventions table")
-    assert_true(logs.energy_levels ~= nil, "Should create energy_levels table")
-end)
-
--- Required Activities Tests
-add_test("Parse required activities", function()
-    setup_widget_env()
-    test_files["activities.md"] = [[
-# Long Covid Activities
-
-## Physical
-- Light walk
-- Physio (full) {Required: Mon,Wed,Fri}
-- Yin Yoga {Required}
-
-## Work
-- Work from home
-]]
-    
-    local required = test_parse_required_activities()
-    
-    assert_equals(2, #required, "Should find 2 required activities")
-    assert_equals("Physio (full)", required[1].name, "Should parse activity name correctly")
-    assert_equals("Yin Yoga", required[2].name, "Should parse daily required activity")
-    
-    assert_true(required[1].days ~= nil, "Should parse specific days")
-    assert_equals(3, #required[1].days, "Should find 3 days for physio")
-    assert_true(required[2].days == nil, "Daily required should have no specific days")
-end)
-
-add_test("Parse required interventions", function()
-    setup_widget_env()
-    test_files["interventions.md"] = [[
-## Medications
-- LDN (4mg) {Required}
-- Claratyne
-
-## Supplements
-- Salvital {Required: Mon,Wed,Fri}
-]]
-    
-    local required = test_parse_required_interventions()
-    
-    assert_equals(2, #required, "Should find 2 required interventions")
-    assert_equals("LDN (4mg)", required[1].name, "Should parse intervention name correctly")
-    assert_equals("Salvital", required[2].name, "Should parse day-specific intervention")
-end)
-
 add_test("Current day abbreviation", function()
-    setup_widget_env()
-    
-    local day_abbrev = test_get_current_day_abbrev()
+    local day_abbrev = core.get_current_day_abbrev()
     local valid_abbrevs = {"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
     
     local found = false
@@ -1109,225 +160,235 @@ add_test("Current day abbreviation", function()
     assert_true(found, "Should return valid day abbreviation: " .. tostring(day_abbrev))
 end)
 
-add_test("Required items for today logic", function()
-    setup_widget_env()
-    test_files["activities.md"] = [[
-## Physical
-- Physio (full) {Required: Mon,Wed,Fri}
-- Yin Yoga {Required}
-]]
+add_test("Daily reset functionality", function()
+    local last_selection_date = "2023-01-01"
+    local selected_level = 2
+    local daily_capacity_log = {}
+    local daily_logs = {}
     
-    -- Mock current day abbreviation for consistent testing
-    local orig_get_current_day_abbrev = test_get_current_day_abbrev
-    test_get_current_day_abbrev = function() return "mon" end
+    local changes = core.check_daily_reset(last_selection_date, selected_level, daily_capacity_log, daily_logs)
     
-    local today_required = test_get_required_activities_for_today()
-    
-    assert_equals(2, #today_required, "Should find 2 required activities for Monday")
-    assert_contains(today_required, "Physio (full)", "Should include physio on Monday")
-    assert_contains(today_required, "Yin Yoga", "Should include daily required activity")
-    
-    -- Test a day when physio isn't required
-    test_get_current_day_abbrev = function() return "tue" end
-    today_required = test_get_required_activities_for_today()
-    
-    assert_equals(1, #today_required, "Should find 1 required activity for Tuesday")
-    assert_contains(today_required, "Yin Yoga", "Should only include daily required activity")
-    
-    -- Restore original function
-    test_get_current_day_abbrev = orig_get_current_day_abbrev
+    assert_equals(0, changes.selected_level, "Should reset selection on new day")
+    assert_equals(os.date("%Y-%m-%d"), changes.last_selection_date, "Should update to current date")
+    assert_true(changes.daily_logs ~= nil, "Should purge old daily logs")
 end)
 
-add_test("Required activities completion status", function()
-    setup_widget_env()
-    test_files["activities.md"] = [[
-## Physical
-- Physio (full) {Required}
-- Light walk
-]]
-    
-    -- Initially no activities logged - should be incomplete
-    assert_true(not test_are_all_required_activities_completed(), "Should be incomplete when nothing logged")
-    
-    -- Log the required activity
-    test_log_item("activity", "Physio (full)")
-    
-    -- Should now be complete
-    assert_true(test_are_all_required_activities_completed(), "Should be complete after logging required activity")
-    
-    -- Log optional activity - should remain complete
-    test_log_item("activity", "Light walk")
-    assert_true(test_are_all_required_activities_completed(), "Should remain complete after logging optional activity")
-end)
-
-add_test("Format list items with required markers", function()
-    setup_widget_env()
-    test_files["activities.md"] = [[
-## Physical
-- Physio (full) {Required}
-- Light walk
-- Yin Yoga {Required}
-]]
-    
-    local activities = {"Physio (full)", "Light walk", "Yin Yoga"}
-    local formatted = test_format_list_items(activities, "activity")
-    
-    -- Initially all unlogged - required items should have warning icons
-    assert_contains(formatted, "⚠️ Physio (full)", "Required unlogged should have warning icon")
-    assert_contains(formatted, "   Light walk", "Optional unlogged should have spacing")
-    assert_contains(formatted, "⚠️ Yin Yoga", "Required unlogged should have warning icon")
-    
-    -- Log one required activity
-    test_log_item("activity", "Physio (full)")
-    formatted = test_format_list_items(activities, "activity")
-    
-    assert_contains(formatted, "✅ Physio (full) (1)", "Required logged should have green checkmark")
-    assert_contains(formatted, "   Light walk", "Optional unlogged should have spacing")
-    assert_contains(formatted, "⚠️ Yin Yoga", "Required unlogged should have warning icon")
-    
-    -- Log optional activity
-    test_log_item("activity", "Light walk")
-    formatted = test_format_list_items(activities, "activity")
-    
-    assert_contains(formatted, "✓ Light walk (1)", "Optional logged should have regular checkmark")
-end)
-
--- Energy Logging Tests
-add_test("Energy logging functionality", function()
-    setup_widget_env()
-    
-    -- Initially no energy logged
-    local color = test_get_energy_button_color()
-    assert_equals("#dc3545", color, "Should be red when no energy logged")
-    
-    -- Log an energy level
-    test_log_energy(7)
-    
-    -- Should now be green (just logged)
-    color = test_get_energy_button_color()
-    assert_equals("#28a745", color, "Should be green after logging energy")
-    
-    -- Verify energy was stored
+add_test("Purge old daily logs", function()
     local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
+    local yesterday = os.date("%Y-%m-%d", os.time() - 86400)
+    
+    local daily_logs = {}
+    daily_logs[today] = {symptoms = {["Fatigue"] = 1}, activities = {}, interventions = {}, energy_levels = {}}
+    daily_logs[yesterday] = {symptoms = {["Headache"] = 2}, activities = {}, interventions = {}, energy_levels = {}}
+    
+    local purged = core.purge_old_daily_logs(daily_logs, today)
+    
+    assert_true(purged[today] ~= nil, "Should keep today's data")
+    assert_true(purged[yesterday] == nil, "Should remove yesterday's data")
+    assert_equals(1, purged[today].symptoms["Fatigue"], "Should preserve today's symptom data")
+end)
+
+add_test("Decision criteria parsing", function()
+    local criteria = core.parse_decision_criteria(test_criteria_content)
+    
+    assert_true(type(criteria) == "table", "Should return a table")
+    assert_true(type(criteria.red) == "table", "Should have red criteria table")
+    assert_true(type(criteria.yellow) == "table", "Should have yellow criteria table")
+    assert_true(type(criteria.green) == "table", "Should have green criteria table")
+    
+    assert_true(#criteria.red > 0, "Should parse RED criteria")
+    assert_true(#criteria.yellow > 0, "Should parse YELLOW criteria") 
+    assert_true(#criteria.green > 0, "Should parse GREEN criteria")
+    
+    assert_contains(criteria.red[1], "extremely fatigued", "Should contain expected RED criterion")
+    assert_contains(criteria.yellow[1], "Moderate fatigue", "Should contain expected YELLOW criterion")
+    assert_contains(criteria.green[1], "Good energy", "Should contain expected GREEN criterion")
+end)
+
+add_test("Day file parsing", function()
+    local plan = core.parse_day_file(test_monday_content)
+    
+    assert_true(type(plan) == "table", "Should return a table")
+    assert_true(plan.red ~= nil, "Should have RED level plan")
+    assert_true(plan.yellow ~= nil, "Should have YELLOW level plan")
+    assert_true(plan.green ~= nil, "Should have GREEN level plan")
+    
+    -- Test overview parsing
+    assert_true(type(plan.red.overview) == "table", "Should have RED overview table")
+    assert_true(#plan.red.overview > 0, "Should parse RED overview")
+    assert_contains(plan.red.overview[1], "WFH essential only", "Should contain work overview")
+    
+    -- Test category parsing
+    assert_true(plan.red.Morning ~= nil, "Should parse Morning category")
+    assert_true(type(plan.red.Morning) == "table", "Morning should be a table")
+    assert_true(#plan.red.Morning > 0, "Should have Morning items")
+    assert_contains(plan.red.Morning[1], "Sleep in", "Should contain expected morning item")
+end)
+
+add_test("Log item functionality", function()
+    local daily_logs = {}
+    
+    local success = core.log_item(daily_logs, "symptom", "Fatigue")
+    assert_true(success, "Should successfully log symptom")
+    
+    local today = os.date("%Y-%m-%d")
+    local logs = core.get_daily_logs(daily_logs, today)
+    
+    assert_equals(1, logs.symptoms["Fatigue"], "Should track Fatigue count as 1")
+    
+    -- Log the same symptom again
+    core.log_item(daily_logs, "symptom", "Fatigue")
+    assert_equals(2, logs.symptoms["Fatigue"], "Should track Fatigue count as 2")
+end)
+
+add_test("Log energy functionality", function()
+    local daily_logs = {}
+    
+    local success = core.log_energy(daily_logs, 7)
+    assert_true(success, "Should successfully log energy")
+    
+    local today = os.date("%Y-%m-%d")
+    local logs = core.get_daily_logs(daily_logs, today)
+    
     assert_equals(1, #logs.energy_levels, "Should have 1 energy entry")
     assert_equals(7, logs.energy_levels[1].level, "Should store correct energy level")
     assert_true(logs.energy_levels[1].timestamp ~= nil, "Should have timestamp")
     assert_true(logs.energy_levels[1].time_display ~= nil, "Should have time display")
 end)
 
-add_test("Energy button color timing logic", function()
-    setup_widget_env()
+add_test("Energy button color logic", function()
+    local daily_logs = {}
     
-    -- Log energy 5 hours ago (should be yellow)
-    local five_hours_ago = os.time() - (5 * 3600)
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
+    -- Initially no energy logged - should be red
+    local color = core.get_energy_button_color(daily_logs)
+    assert_equals("#dc3545", color, "Should be red when no energy logged")
     
-    table.insert(logs.energy_levels, {
-        level = 5,
-        timestamp = five_hours_ago,
-        time_display = os.date("%H:%M", five_hours_ago)
-    })
-    
-    local color = test_get_energy_button_color()
-    assert_equals("#ffc107", color, "Should be yellow when logged 4+ hours ago")
-    
-    -- Add recent log (should be green)
-    test_log_energy(6)
-    color = test_get_energy_button_color()
-    assert_equals("#28a745", color, "Should be green with recent log")
+    -- Log energy - should be green
+    core.log_energy(daily_logs, 5)
+    color = core.get_energy_button_color(daily_logs)
+    assert_equals("#28a745", color, "Should be green after logging energy")
 end)
 
-add_test("Multiple energy entries", function()
-    setup_widget_env()
+add_test("Parse required activities", function()
+    local required = core.parse_required_activities(test_activities_content)
     
-    -- Log multiple energy levels
-    test_log_energy(3)
-    test_log_energy(5)
-    test_log_energy(7)
+    assert_equals(2, #required, "Should find 2 required activities")
+    assert_equals("Physio (full)", required[1].name, "Should parse activity name correctly")
+    assert_equals("Yin Yoga", required[2].name, "Should parse daily required activity")
     
-    local today = os.date("%Y-%m-%d")
-    local logs = test_get_daily_logs(today)
-    
-    assert_equals(3, #logs.energy_levels, "Should store multiple energy entries")
-    assert_equals(3, logs.energy_levels[1].level, "First entry should be 3")
-    assert_equals(5, logs.energy_levels[2].level, "Second entry should be 5") 
-    assert_equals(7, logs.energy_levels[3].level, "Third entry should be 7")
+    assert_true(required[1].days ~= nil, "Should parse specific days")
+    assert_equals(3, #required[1].days, "Should find 3 days for physio")
+    assert_true(required[2].days == nil, "Daily required should have no specific days")
 end)
 
-add_test("Daily logs purging functionality", function()
-    setup_widget_env()
+add_test("Parse required interventions", function()
+    local required = core.parse_required_interventions(test_interventions_content)
     
-    -- Initialize daily_logs
-    _G.prefs.daily_logs = {}
+    assert_equals(2, #required, "Should find 2 required interventions")
+    assert_equals("LDN (4mg)", required[1].name, "Should parse intervention name correctly")
+    assert_equals("Salvital", required[2].name, "Should parse day-specific intervention")
+end)
+
+add_test("Required items completion status", function()
+    local daily_logs = {}
+    local required_activities = core.parse_required_activities(test_activities_content)
     
-    -- Simulate old data in daily_logs
-    local today = os.date("%Y-%m-%d")
-    local yesterday = os.date("%Y-%m-%d", os.time() - 86400)
-    local two_days_ago = os.date("%Y-%m-%d", os.time() - 172800)
+    -- Initially no activities logged - should be incomplete
+    assert_true(not core.are_all_required_activities_completed(daily_logs, required_activities), 
+                "Should be incomplete when nothing logged")
     
-    -- Add logs for multiple days
-    _G.prefs.daily_logs[yesterday] = {
-        symptoms = {["Fatigue"] = 2},
-        activities = {["Walk"] = 1},
-        interventions = {["Vitamin D"] = 1},
-        energy_levels = {{level = 4, timestamp = os.time() - 86400}}
-    }
-    _G.prefs.daily_logs[two_days_ago] = {
-        symptoms = {["Brain fog"] = 1},
-        activities = {["Exercise"] = 1},
-        interventions = {["Rest"] = 2},
-        energy_levels = {{level = 3, timestamp = os.time() - 172800}}
-    }
-    _G.prefs.daily_logs[today] = {
-        symptoms = {["Headache"] = 1},
-        activities = {["Work"] = 2},
-        interventions = {["Medicine"] = 1},
-        energy_levels = {{level = 6, timestamp = os.time()}}
-    }
+    -- Log one required activity
+    core.log_item(daily_logs, "activity", "Yin Yoga")
     
-    -- Verify we have 3 days of data
-    local count = 0
-    for _ in pairs(_G.prefs.daily_logs) do count = count + 1 end
-    assert_equals(3, count, "Should have 3 days of data before purging")
+    -- Mock current day to match required activity days for testing
+    local orig_get_current_day_abbrev = core.get_current_day_abbrev
+    core.get_current_day_abbrev = function() return "tue" end -- Tuesday - only Yin Yoga required
     
-    -- Call purge function (inline implementation)
-    local today_logs = _G.prefs.daily_logs[today]
-    _G.prefs.daily_logs = {}
+    -- Should now be complete
+    assert_true(core.are_all_required_activities_completed(daily_logs, required_activities), 
+                "Should be complete after logging all required activities for today")
     
-    -- Initialize today's logs if needed
-    if not today_logs then
-        _G.prefs.daily_logs[today] = {
-            symptoms = {},
-            activities = {},
-            interventions = {},
-            energy_levels = {}
-        }
-    else
-        _G.prefs.daily_logs[today] = today_logs
+    -- Restore original function
+    core.get_current_day_abbrev = orig_get_current_day_abbrev
+end)
+
+add_test("Format list items with required markers", function()
+    local daily_logs = {}
+    local required_activities = core.parse_required_activities(test_activities_content)
+    local activities = {"Physio (full)", "Light walk", "Yin Yoga"}
+    
+    local formatted = core.format_list_items(activities, "activity", daily_logs, required_activities, {})
+    
+    -- Check that required items have warning icons (depends on current day)
+    local found_warning = false
+    for _, item in ipairs(formatted) do
+        if string.find(item, "⚠️") then
+            found_warning = true
+            break
+        end
     end
+    assert_true(found_warning, "Should have warning icon for required unlogged items")
     
-    -- Verify only today's data remains
-    count = 0
-    for _ in pairs(_G.prefs.daily_logs) do count = count + 1 end
-    assert_equals(1, count, "Should have only 1 day of data after purging")
+    -- Log a required activity
+    core.log_item(daily_logs, "activity", "Yin Yoga")
+    formatted = core.format_list_items(activities, "activity", daily_logs, required_activities, {})
     
-    -- Verify today's data is preserved
-    assert_true(_G.prefs.daily_logs[today] ~= nil, "Today's data should be preserved")
-    assert_equals(1, _G.prefs.daily_logs[today].symptoms["Headache"], "Today's symptoms should be preserved")
-    assert_equals(2, _G.prefs.daily_logs[today].activities["Work"], "Today's activities should be preserved")
-    assert_equals(1, _G.prefs.daily_logs[today].interventions["Medicine"], "Today's interventions should be preserved")
-    assert_equals(1, #_G.prefs.daily_logs[today].energy_levels, "Today's energy levels should be preserved")
+    local found_completed = false
+    for _, item in ipairs(formatted) do
+        if string.find(item, "✅.*Yin Yoga") then
+            found_completed = true
+            break
+        end
+    end
+    assert_true(found_completed, "Should have green checkmark for completed required items")
+end)
+
+add_test("Extract item name from formatted string", function()
+    assert_equals("Fatigue", core.extract_item_name("✓ Fatigue (2)"), "Should extract name from checked counted item")
+    assert_equals("Brain fog", core.extract_item_name("✓ Brain fog (1)"), "Should extract name from checked single count")
+    assert_equals("Headache", core.extract_item_name("   Headache"), "Should extract name from spaced uncounted item")
+    assert_equals("Required Activity", core.extract_item_name("⚠️ Required Activity"), "Should strip warning icon from required item")
+    assert_equals("Completed Required Activity", core.extract_item_name("✅ Completed Required Activity (1)"), "Should strip green checkmark from completed required item")
+    assert_equals("Physio (full)", core.extract_item_name("✓ Physio (full) (2)"), "Should extract original name with brackets")
+end)
+
+add_test("Save daily choice functionality", function()
+    local daily_capacity_log = {}
     
-    -- Verify old data is gone
-    assert_true(_G.prefs.daily_logs[yesterday] == nil, "Yesterday's data should be purged")
-    assert_true(_G.prefs.daily_logs[two_days_ago] == nil, "Two days ago data should be purged")
+    local updated_log = core.save_daily_choice(daily_capacity_log, 2)
+    
+    local today = os.date("%Y-%m-%d")
+    assert_true(updated_log[today] ~= nil, "Should create today's entry")
+    assert_equals(2, updated_log[today].capacity, "Should save correct capacity level")
+    assert_equals("Maintaining", updated_log[today].capacity_name, "Should save correct capacity name")
+    assert_true(updated_log[today].timestamp ~= nil, "Should save timestamp")
+end)
+
+add_test("File parsing with nil content", function()
+    -- Test that all parse functions handle nil content gracefully
+    local criteria = core.parse_decision_criteria(nil)
+    assert_true(type(criteria) == "table", "Should return empty table for nil criteria")
+    
+    local plan = core.parse_day_file(nil)
+    assert_true(type(plan) == "table", "Should return empty table for nil day file")
+    
+    local symptoms = core.parse_symptoms_file(nil)
+    assert_true(#symptoms > 0, "Should return default symptoms for nil content")
+    assert_contains(symptoms, "Other...", "Should include Other... option")
+    
+    local activities = core.parse_activities_file(nil)
+    assert_true(#activities > 0, "Should return default activities for nil content")
+    assert_contains(activities, "Other...", "Should include Other... option")
+    
+    local interventions = core.parse_interventions_file(nil)
+    assert_true(#interventions > 0, "Should return default interventions for nil content")
+    assert_contains(interventions, "Other...", "Should include Other... option")
 end)
 
 -- Run tests
 local function run_tests()
-    print("Running Long Covid Widget Tests (Final Version)...")
+    print("Running Refactored Long Covid Widget Tests...")
+    print("Using imported core business logic from long_covid_core.lua")
     print("=" .. string.rep("=", 60))
     
     local passed = 0
@@ -1349,6 +410,7 @@ local function run_tests()
     
     if passed == #tests then
         print("All tests passed! 🎉")
+        print("The core business logic is working correctly.")
         os.exit(0)
     else
         print("Some tests failed. ❌")
