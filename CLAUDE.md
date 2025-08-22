@@ -10,7 +10,7 @@ My scripts are all in the `my` folder.
 
 The long covid widget can be found under my/long-covid-pacing.lua
 
-The widget design can be found in widget_design.md. Update this whenever the design changes.
+The widget design can be found in widget_design.md. **IMPORTANT**: Follow the documentation maintenance guidelines below to keep this accurate.
 
 #### Long Covid data
 
@@ -96,3 +96,116 @@ Tests use a lightweight framework with:
 - Comprehensive error reporting with line numbers
 
 See `tests/README.md` for detailed testing guidelines and examples.
+
+## Documentation Maintenance Guidelines
+
+**CRITICAL**: Keep documentation synchronized with code changes to maintain project clarity and prevent confusion.
+
+### Documentation Update Requirements
+
+When making changes to the Long Covid widget, **ALWAYS** update documentation in this exact order:
+
+1. **Update widget_design.md FIRST** - Before committing any code changes
+2. **Run tests** - Ensure all 87 tests pass after implementation changes
+3. **Update CLAUDE.md** - If architectural changes affect development process
+4. **Update tests/README.md** - If test structure or count changes
+
+### Widget Design Documentation (widget_design.md)
+
+**Update widget_design.md whenever you make changes to:**
+
+#### User Interface Changes
+- ✅ **Button layout, icons, or colors** - Update "Widget Layout" and "User Interface Elements" sections
+- ✅ **Capacity level names or behavior** - Update capacity level documentation throughout
+- ✅ **Dialog functionality** - Update interaction flow and dialog examples
+- ✅ **Visual feedback or indicators** - Update button color logic and visual differentiation sections
+
+#### Technical Implementation Changes  
+- ✅ **Architecture changes** - Update "Technical Implementation" section with new components/managers
+- ✅ **Function signatures** - Update code examples to match current implementation
+- ✅ **Data structures** - Update internal storage and file format sections
+- ✅ **Testing changes** - Update "Testing Coverage" section with new test counts/suites
+
+#### Feature Changes
+- ✅ **New logging types** - Update logging sections and examples
+- ✅ **New data sources** - Update "File Structure Integration" section
+- ✅ **Requirement tracking** - Update required items specification and examples
+- ✅ **Energy tracking** - Update energy level sections if scale or behavior changes
+
+### Documentation Quality Standards
+
+#### What to INCLUDE in documentation:
+- ✅ **Current functionality only** - Document what exists now
+- ✅ **Accurate visual layouts** - Match exact icons and button text  
+- ✅ **Working code examples** - Test all code snippets for accuracy
+- ✅ **Complete interaction flows** - Document all user paths through the interface
+- ✅ **Current test coverage** - Keep test numbers and suite descriptions up to date
+
+#### What to EXCLUDE from documentation:
+- ❌ **Future plans or enhancements** - Remove all "Phase 2", "Future Features", etc.
+- ❌ **Outdated function signatures** - Remove old implementation details
+- ❌ **Deprecated features** - Remove documentation for removed functionality
+- ❌ **Speculative content** - Only document implemented and tested features
+
+### Documentation Review Process
+
+**Before marking any task complete:**
+
+1. **Accuracy Check** - Does the documentation match the current code?
+2. **Completeness Check** - Are all user-visible features documented?
+3. **Clarity Check** - Can someone new understand the widget from the documentation?
+4. **Organization Check** - Is information easy to find and logically structured?
+
+### Common Documentation Maintenance Tasks
+
+#### When Adding New Features
+```
+1. Write/update tests for the new feature
+2. Implement the feature
+3. Update widget_design.md with:
+   - New UI elements or interactions
+   - Updated user flows
+   - Technical implementation changes
+   - Updated test coverage numbers
+4. Verify all documentation sections are still accurate
+```
+
+#### When Refactoring Code
+```
+1. Update widget_design.md "Technical Implementation" section
+2. Update any affected code examples
+3. Update architecture diagrams or descriptions
+4. Verify UI documentation still matches behavior
+```
+
+#### When Fixing Bugs
+```
+1. If the bug affects user behavior, update interaction flows
+2. If the bug affects visual appearance, update UI documentation
+3. If tests were added/changed, update test coverage numbers
+```
+
+### Documentation Anti-Patterns to Avoid
+
+- ❌ **"Will implement later"** - Only document current functionality
+- ❌ **Copy-paste from old versions** - Always verify against current code
+- ❌ **Generic descriptions** - Use specific examples and current data
+- ❌ **Inconsistent terminology** - Use same names as in the actual code
+- ❌ **Outdated screenshots/layouts** - Update visual examples to match current state
+
+### Validation Commands
+
+**Before committing documentation changes, run:**
+
+```bash
+# Verify tests still pass with current documentation claims
+cd tests && lua run_all_tests.lua
+
+# Check for outdated references in documentation
+grep -n "Phase\|TODO\|FIXME\|deprecated" widget_design.md
+
+# Verify file references are accurate
+grep -n "\.lua\|\.md" widget_design.md | head -10
+```
+
+This ensures documentation stays **current, accurate, and useful** as the project evolves.

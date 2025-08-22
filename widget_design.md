@@ -5,17 +5,17 @@ The Long Covid planning widget provides a comprehensive interface for daily capa
 
 ## Widget Layout
 
-### Widget Layout
+### Collapsed State
 ```
 Long Covid Pacing - Monday
-     🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging
+     🛏️ Recovering | 🚶 Maintaining | 🚀 Engaging
         💗 ⚡     🏃 💊
 ```
 
 ### Expanded State with Plan
 ```
 Long Covid Pacing - Monday
-     🛏️ Recovering | 🚶 Maintaining | ⚡ Engaging
+     🛏️ Recovering | 🚶 Maintaining | 🚀 Engaging
         💗 ⚡     🏃 💊
 
 Today's Overview:
@@ -42,7 +42,7 @@ Evening:
 ## User Interface Elements
 
 ### 1. Capacity Level Selection
-- **Three buttons**: 🛏️ Recovering, 🚶 Maintaining, ⚡ Engaging
+- **Three buttons**: 🛏️ Recovering, 🚶 Maintaining, 🚀 Engaging
 - **Visual feedback**: Selected level highlighted, others dimmed
 - **Alignment**: Always centered on first line
 - **Persistence**: Choice saved locally and logged to Google Sheets
@@ -183,83 +183,46 @@ Activities and interventions can be marked as required using special syntax:
 
 ## Technical Implementation
 
-### Widget Functions
+### Architecture Overview
+The widget uses a modular architecture with the following components:
+
+- **Main Widget** (`long-covid-pacing.lua`): User interface handling and AIO integration
+- **Core Module** (`long_covid_core.lua`): Business logic and data processing
+- **Managers**: Specialized components for different responsibilities
+  - `dialog_manager`: Handles dialog interactions and data loading
+  - `cache_manager`: Manages file caching and data persistence
+  - `button_mapper`: Maps button interactions to actions
+  - `ui_generator`: Creates UI elements based on state
+
+### Key Functions
 ```lua
--- Core functions
+-- Main widget lifecycle
 function on_resume()
-    load_prefs_data()        -- Load prefs into global variables
+    load_prefs_data()        -- Load preferences into globals
     check_daily_reset()      -- Clear tracking on new day
-    load_data()             -- Load plan files
-    render_widget()
+    load_data()             -- Load plan files via cache_manager
+    render_widget()         -- Generate UI via ui_generator
 end
 
 function on_click(idx)
-    if idx <= 3 then
-        select_capacity_level(idx)
-    elseif element_is_activity_button() then
-        show_activity_dialog()
-    elseif element_is_symptom_button() then
-        show_symptom_dialog()
-    elseif element_is_intervention_button() then
-        show_intervention_dialog()
-    end
+    -- Uses button_mapper to identify action from clicked element
+    local action_type, level = button_mapper:identify_button_action(elem_text)
+    -- Handles capacity selection, dialog opening, etc.
 end
 
--- Daily tracking functions
-function get_daily_logs(date)
-    -- Initialize and return daily logs structure for given date
-end
-
-function log_item(item_type, item_name)
+-- Core business logic (from long_covid_core.lua)
+function M.log_item(daily_logs, item_type, item_name)
     -- Increment count for symptoms/activities/interventions
-    -- Save changes to preferences immediately
+    -- Thread-safe logging with immediate persistence
 end
 
--- Logging functions with dialog refresh
-function log_symptom(symptom_name)
-    -- Log to tracking and Google Sheets
-    -- Automatically re-open symptom dialog if currently open
-end
-
-function format_list_items(items, item_type)
+function M.format_list_items(items, item_type, daily_logs, required_activities, required_interventions)
     -- Add checkmarks and counts to logged items
-    -- Format: "✓ Fatigue (2)" or "   Headache"
+    -- Visual differentiation for required vs optional items
 end
 
-function extract_item_name(formatted_item)
-    -- Extract original name from formatted display text
-    -- Handles existing brackets: "✓ Physio (full) (2)" -> "Physio (full)"
-end
-
--- Data parsing
-function parse_day_file(day)
-    -- Parse markdown file for current day
-    -- Return structured data for RED/YELLOW/GREEN
-end
-
-function save_daily_choice(level)
-    -- Save to daily_capacity_log and preferences
-    -- Send to Google Sheets via Tasker
-end
-```
-
-### UI Rendering
-```lua
-function render_widget()
-    local day = get_current_day()
-    local plan = get_plan_for_level(selected_level, day)
-    
-    ui:set_title("Long Covid Pacing - " .. day)
-    
-    local buttons = {"🔴 RED", "🟡 YELLOW", "🟢 GREEN"}
-    local colors = {"#FF4444", "#FFAA00", "#44AA44"}
-    
-    ui:show_buttons(buttons, colors)
-    
-    if ui:is_expanded() then
-        local lines = format_plan_for_display(plan)
-        ui:show_lines(lines)
-    end
+function M.check_daily_reset(last_selection_date, selected_level, daily_capacity_log, daily_logs)
+    -- Handles daily reset logic and preference management
 end
 ```
 
@@ -368,25 +331,20 @@ The intervention logging feature allows tracking of medications, supplements, tr
 3. Track patterns over time to identify what helps with specific symptoms or capacity levels
 4. Use "Other..." option for unlisted interventions that get added to custom tracking
 
-## Future Enhancements
-
-### Phase 2 Features
-- **Quick metrics input**: HRV, sleep quality, energy level
-- **Smart suggestions**: Based on recent patterns
-- **Weekly review**: Summary of capacity trends
-- **Intervention effectiveness**: Analytics on intervention timing vs. symptom patterns
-
-### Phase 3 Features
-- **Notification reminders**: Morning decision prompt
-- **Integration**: With health apps/smartwatch
-- **Analytics**: Capacity level trends and intervention effectiveness insights
-- **Dosage tracking**: Amount/frequency for medications and supplements
 
 ## Testing Coverage
 
-The widget includes comprehensive test coverage ensuring reliability:
+The widget includes comprehensive test coverage with **87 total tests** across 6 test suites ensuring reliability:
 
-### Test Categories (29 total tests)
+### Test Suites
+1. **Core Business Logic** (17 tests): File parsing, data management, calculations, energy tracking
+2. **Logging Functions** (14 tests): Tasker integration, error handling, callback validation
+3. **Dialog Manager** (14 tests): State management, data loading, result processing
+4. **Cache Manager** (11 tests): File caching, data loading, cache invalidation
+5. **Button Mapper** (17 tests): Action identification, level validation, pattern matching
+6. **UI Generator** (14 tests): Element creation, state-based rendering, layout management
+
+### Key Coverage Areas
 - **Core functionality**: Preferences, daily reset, capacity selection
 - **Data parsing**: Decision criteria, day files, current day calculation
 - **UI interaction**: Button clicks, widget rendering, level restrictions
@@ -399,7 +357,10 @@ The widget includes comprehensive test coverage ensuring reliability:
 - **Energy logging**: Time-based color logic, multiple entries, timing validation
 - **Edge cases**: Items with existing brackets, complex naming scenarios
 
-### Test File Location
-- `tests/test_long_covid_widget.lua` - Complete test suite
-- Run with: `lua test_long_covid_widget.lua`
-- All tests passing ensures widget stability and feature completeness
+### Running Tests
+```bash
+cd tests
+lua run_all_tests.lua  # Run complete test suite (87 tests)
+```
+
+The modular architecture allows for focused testing of each component, with the widget reduced from 680 lines to 428 lines (-37%) while maintaining full functionality through the core module.
