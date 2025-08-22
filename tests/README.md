@@ -8,30 +8,66 @@ Tests are written in Lua and can be run locally without AIO Launcher dependencie
 
 ### Long Covid Widget Tests
 
+#### Comprehensive Test Suite (Recommended)
+Run all focused test suites covering the simplified widget architecture:
+
+```bash
+cd tests
+lua run_all_tests.lua
+```
+
+#### Individual Test Suites
+Run specific test suites for targeted testing:
+
+```bash
+cd tests
+lua test_core_logic.lua          # Core business logic (17 tests)
+lua test_logging_functions.lua   # Tasker integration (12 tests)
+lua test_dialog_manager.lua      # Dialog state management (11 tests)
+lua test_cache_manager.lua       # File caching (10 tests)
+lua test_button_mapper.lua       # Button action mapping (12 tests)
+lua test_ui_generator.lua        # UI element generation (10 tests)
+```
+
+#### Legacy Test (Original)
+Run the original comprehensive test for comparison:
+
 ```bash
 cd tests
 lua test_long_covid_widget.lua
 ```
 
-**Coverage:**
-- Initial preferences state and defaults
-- Daily reset functionality
-- Current day calculation
-- Decision criteria parsing from markdown
-- Day file parsing with sections and categories
-- Daily choice saving and tracking
-- Widget rendering and UI state
-- Click handling for capacity selection
-- Reset button functionality
-- Level upgrade prevention business logic
+**Comprehensive Coverage (72 tests total):**
+- **Core Business Logic** - File parsing, data management, daily reset, calculations
+- **Logging Functions** - Tasker integration, error handling, callback mechanisms
+- **Dialog Manager** - State management, data loading, result processing for all dialog types
+- **Cache Manager** - File caching, invalidation, multi-day plan management
+- **Button Mapper** - Action identification, level validation, special character handling
+- **UI Generator** - Element creation, state-based rendering, error content generation
 
 ## Test Structure
 
-Tests use a simple framework with:
-- Mock AIO Launcher APIs (prefs, ui, files, gui)
-- Assertion helpers (assert_equals, assert_true, assert_contains)
-- Setup/teardown for each test
-- Comprehensive error reporting
+The test suite is organized into focused, modular files:
+
+### Core Framework Files
+- **`test_framework.lua`** - Shared testing utilities and assertion functions
+- **`test_data.lua`** - Common test data and mock functions  
+- **`run_all_tests.lua`** - Main test runner that executes all test suites
+
+### Framework Features
+- Mock AIO Launcher APIs (prefs, ui, files, gui, tasker, dialogs)
+- Comprehensive assertions (assert_equals, assert_true, assert_contains, assert_type, etc.)
+- Mock data factory for consistent test data across suites
+- Callback tracking for testing Tasker integration
+- Individual and collective test execution
+- Detailed error reporting with performance metrics
+
+### Benefits of Modular Structure
+- **Maintainability** - Easy to add tests for new features or edge cases  
+- **Isolation** - Individual suites can be run independently for debugging
+- **Focus** - Each test suite covers specific functionality area
+- **Reusability** - Shared framework reduces code duplication
+- **Comprehensive** - 72 tests covering all manager functions in the core module
 
 ## Adding New Tests
 

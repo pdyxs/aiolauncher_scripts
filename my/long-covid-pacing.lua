@@ -25,15 +25,11 @@ if not prefs.daily_capacity_log then
     prefs.daily_capacity_log = {}
 end
 
--- Cache for parsed data
-local cached_plans = {}
-local cached_criteria = nil
-local cached_symptoms = nil
-local cached_activities = nil
-local cached_interventions = nil
-local cached_required_activities = nil
-local cached_required_interventions = nil
-local current_dialog_type = nil
+-- Create managers
+local dialog_manager = core.create_dialog_manager()
+local cache_manager = core.create_cache_manager()
+local button_mapper = core.create_button_mapper()
+local ui_generator = core.create_ui_generator()
 
 -- Global variables to store prefs data
 local selected_level = 0
@@ -106,41 +102,19 @@ function on_click(idx)
     local elem_text = element[2]
     
     if elem_type == "button" then
-        if elem_text:find("bed") then
-            -- Capacity level 1 (Recovering)
-            if selected_level == 0 or 1 <= selected_level then
-                selected_level = 1
-                daily_capacity_log = core.save_daily_choice(daily_capacity_log, 1)
-                save_daily_choice_to_tasker(1)
+        local action_type, level = button_mapper:identify_button_action(elem_text)
+        
+        if action_type == "capacity_level" then
+            if button_mapper:can_select_level(selected_level, level) then
+                selected_level = level
+                daily_capacity_log = core.save_daily_choice(daily_capacity_log, level)
+                save_daily_choice_to_tasker(level)
                 save_prefs_data()
                 render_widget()
             else
                 ui:show_toast("Can only downgrade capacity level")
             end
-        elseif elem_text:find("walking") then
-            -- Capacity level 2 (Maintaining)
-            if selected_level == 0 or 2 <= selected_level then
-                selected_level = 2
-                daily_capacity_log = core.save_daily_choice(daily_capacity_log, 2)
-                save_daily_choice_to_tasker(2)
-                save_prefs_data()
-                render_widget()
-            else
-                ui:show_toast("Can only downgrade capacity level")
-            end
-        elseif elem_text:find("rocket%-launch") then
-            -- Capacity level 3 (Engaging)
-            if selected_level == 0 or 3 <= selected_level then
-                selected_level = 3
-                daily_capacity_log = core.save_daily_choice(daily_capacity_log, 3)
-                save_daily_choice_to_tasker(3)
-                save_prefs_data()
-                render_widget()
-            else
-                ui:show_toast("Can only downgrade capacity level")
-            end
-        elseif elem_text:find("rotate%-right") or elem_text:find("Reset") then
-            -- Reset selection button
+        elseif action_type == "reset" then
             selected_level = 0
             local today = os.date("%Y-%m-%d")
             if daily_capacity_log and daily_capacity_log[today] then
@@ -149,33 +123,31 @@ function on_click(idx)
             save_prefs_data()
             ui:show_toast("Selection reset")
             render_widget()
-        elseif elem_text:find("sync") then
+        elseif action_type == "sync" then
             sync_plan_files()
-        elseif elem_text:find("heart%-pulse") then
+        elseif action_type == "symptom_dialog" then
             show_symptom_dialog()
-        elseif elem_text:find("bolt%-lightning") then
+        elseif action_type == "energy_dialog" then
             show_energy_dialog()
-        elseif elem_text:find("running") then
+        elseif action_type == "activity_dialog" then
             show_activity_dialog()
-        elseif elem_text:find("pills") then
+        elseif action_type == "intervention_dialog" then
             show_intervention_dialog()
-        elseif elem_text == "Back" then
+        elseif action_type == "back" then
             render_widget()
         end
     end
 end
 
 function load_data()
-    if not cached_criteria then
-        local content = files:read("decision_criteria.md")
-        cached_criteria = core.parse_decision_criteria(content)
-    end
+    cache_manager:load_decision_criteria(function(filename) return files:read(filename) end)
     
     local today = core.get_current_day()
-    if not cached_plans[today] then
-        local content = files:read(today .. ".md")
-        cached_plans[today] = core.parse_day_file(content)
-    end
+    cache_manager:load_day_plan(today, function(filename) return files:read(filename) end)
+    
+    -- Pre-load required activities and interventions for button colors
+    cache_manager:load_activities(function(filename) return files:read(filename) end)
+    cache_manager:load_interventions(function(filename) return files:read(filename) end)
 end
 
 function save_daily_choice_to_tasker(level_idx)
@@ -203,141 +175,48 @@ function render_widget()
     local ui_elements = {}
     
     -- Add capacity level buttons
-    for i, level in ipairs(core.levels) do
-        local color
-        local button_text
-        local gravity = nil
-        
-        if i == selected_level then
-            color = level.color
-            button_text = "%%fa:" .. level.icon .. "%% " .. level.name
-        elseif selected_level == 0 then
-            color = level.color
-            button_text = "%%fa:" .. level.icon .. "%% " .. level.name
-        else
-            color = "#888888"
-            button_text = "fa:" .. level.icon
-        end
-        
-        if i == 1 then
-            gravity = "center_h"
-        else
-            gravity = "anchor_prev"
-        end
-        
-        local button_props = {color = color}
-        if gravity then
-            button_props.gravity = gravity
-        end
-        
-        table.insert(ui_elements, {"button", button_text, button_props})
-        if i < #core.levels then
-            table.insert(ui_elements, {"spacer", 1})
-        end
+    local capacity_buttons = ui_generator:create_capacity_buttons(selected_level)
+    for _, element in ipairs(capacity_buttons) do
+        table.insert(ui_elements, element)
     end
     
-    table.insert(ui_elements, {"new_line", 1})
-    
-    -- Determine button colors
-    local activity_color = "#dc3545" -- Default red
-    local intervention_color = "#dc3545" -- Default red
-    
-    if cached_required_activities then
-        activity_color = core.are_all_required_activities_completed(daily_logs, cached_required_activities) and "#28a745" or "#dc3545"
+    -- Add health tracking buttons
+    local required_activities = cache_manager:get_required_activities()
+    local required_interventions = cache_manager:get_required_interventions()
+    local health_buttons = ui_generator:create_health_tracking_buttons(daily_logs, required_activities, required_interventions)
+    for _, element in ipairs(health_buttons) do
+        table.insert(ui_elements, element)
     end
-    
-    if cached_required_interventions then
-        intervention_color = core.are_all_required_interventions_completed(daily_logs, cached_required_interventions) and "#007bff" or "#dc3545"
-    end
-    
-    local energy_color = core.get_energy_button_color(daily_logs)
-    
-    -- Health tracking buttons
-    table.insert(ui_elements, {"button", "fa:heart-pulse", {color = "#6c757d", gravity = "center_h"}})
-    table.insert(ui_elements, {"button", "fa:bolt-lightning", {color = energy_color, gravity = "anchor_prev"}})
-    table.insert(ui_elements, {"spacer", 3})
-    table.insert(ui_elements, {"button", "fa:running", {color = activity_color, gravity = "anchor_prev"}})
-    table.insert(ui_elements, {"button", "fa:pills", {color = intervention_color, gravity = "anchor_prev"}})
 
     ui:set_expandable(true)
     
     if ui:is_expanded() then
-        table.insert(ui_elements, {"new_line", 2})
-        
         if selected_level == 0 then
-            table.insert(ui_elements, {"text", "<b>Select your capacity level:</b>", {size = 18}})
-            table.insert(ui_elements, {"new_line", 1})
-            table.insert(ui_elements, {"text", "%%fa:bed%% <b>Recovering</b> - Low energy, prioritize rest", {color = "#FF4444"}})
-            table.insert(ui_elements, {"new_line", 1})
-            table.insert(ui_elements, {"text", "%%fa:walking%% <b>Maintaining</b> - Moderate energy, standard routine", {color = "#FFAA00"}})
-            table.insert(ui_elements, {"new_line", 1})
-            table.insert(ui_elements, {"text", "%%fa:rocket-launch%% <b>Engaging</b> - High energy, can handle challenges", {color = "#44AA44"}})
-            table.insert(ui_elements, {"new_line", 2})
-            table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}})
-            table.insert(ui_elements, {"spacer", 2})
-            table.insert(ui_elements, {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}})
+            local no_selection_content = ui_generator:create_no_selection_content()
+            for _, element in ipairs(no_selection_content) do
+                table.insert(ui_elements, element)
+            end
         else
-            local success, error_msg = pcall(function()
-                add_plan_details(ui_elements, today)
+            local success, content = pcall(function()
+                local day_plan = cache_manager:load_day_plan(today, function(filename) return files:read(filename) end)
+                return ui_generator:create_plan_details(day_plan, selected_level)
             end)
             
             if not success then
-                table.insert(ui_elements, {"text", "<b>Selected:</b> " .. core.levels[selected_level].name, {size = 18}})
-                table.insert(ui_elements, {"new_line", 1})
-                table.insert(ui_elements, {"text", "%%fa:exclamation-triangle%% <b>Can't load plan data</b>", {color = "#ff6b6b"}})
-                table.insert(ui_elements, {"new_line", 2})
-                table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}})
-                table.insert(ui_elements, {"spacer", 2})
-                table.insert(ui_elements, {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}})
+                local error_content = ui_generator:create_error_content("Can't load plan data")
+                for _, element in ipairs(error_content) do
+                    table.insert(ui_elements, element)
+                end
+            else
+                for _, element in ipairs(content) do
+                    table.insert(ui_elements, element)
+                end
             end
         end
     end
     
     my_gui = gui(ui_elements)
     my_gui.render()
-end
-
-function add_plan_details(ui_elements, day)
-    local plan = cached_plans[day]
-    if not plan then
-        table.insert(ui_elements, {"text", "No plan available for " .. day, {color = "#ff6b6b"}})
-        return
-    end
-    
-    local level_key = core.levels[selected_level].key
-    local level_plan = plan[level_key]
-    
-    if not level_plan then
-        table.insert(ui_elements, {"text", "No plan available for selected level", {color = "#ff6b6b"}})
-        return
-    end
-    
-    if level_plan.overview and #level_plan.overview > 0 then
-        table.insert(ui_elements, {"text", "<b>Today's Overview:</b>", {size = 18}})
-        table.insert(ui_elements, {"new_line", 1})
-        for _, overview_line in ipairs(level_plan.overview) do
-            local formatted_line = overview_line:gsub("%*%*([^%*]+)%*%*", "<b>%1</b>")
-            table.insert(ui_elements, {"text", formatted_line, {size = 16}})
-            table.insert(ui_elements, {"new_line", 1})
-        end
-        table.insert(ui_elements, {"new_line", 1})
-    end
-    
-    for category, items in pairs(level_plan) do
-        if category ~= "overview" and #items > 0 then
-            table.insert(ui_elements, {"text", "<b>" .. category .. ":</b>", {size = 16}})
-            table.insert(ui_elements, {"new_line", 1})
-            for _, item in ipairs(items) do
-                table.insert(ui_elements, {"text", "• " .. item})
-                table.insert(ui_elements, {"new_line", 1})
-            end
-            table.insert(ui_elements, {"new_line", 1})
-        end
-    end
-    
-    table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}})
-    table.insert(ui_elements, {"spacer", 2})
-    table.insert(ui_elements, {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}})
 end
 
 function on_long_click(idx)
@@ -350,15 +229,13 @@ function on_long_click(idx)
     local elem_text = element[2]
     
     if elem_type == "button" then
-        if elem_text:find("bed") then
-            show_decision_criteria(1)
-        elseif elem_text:find("walking") then
-            show_decision_criteria(2)
-        elseif elem_text:find("rocket%-launch") then
-            show_decision_criteria(3)
-        elseif elem_text:find("rotate%-right") or elem_text:find("Reset") then
+        local action_type, level = button_mapper:identify_button_action(elem_text)
+        
+        if action_type == "capacity_level" then
+            show_decision_criteria(level)
+        elseif action_type == "reset" then
             ui:show_toast("Reset button - tap to clear selection")
-        elseif elem_text:find("sync") then
+        elseif action_type == "sync" then
             ui:show_toast("Syncing plan files with Tasker...")
             sync_plan_files()
         end
@@ -396,13 +273,12 @@ function on_command(data)
         files:write(filename, content)
         
         -- Clear cache to reload data
-        cached_plans = {}
-        cached_criteria = nil
-        cached_symptoms = nil
-        cached_activities = nil
-        cached_interventions = nil
-        cached_required_activities = nil
-        cached_required_interventions = nil
+        cache_manager:clear_cache()
+        dialog_manager:cached_symptoms = nil
+        dialog_manager:cached_activities = nil
+        dialog_manager:cached_interventions = nil
+        dialog_manager:cached_required_activities = nil
+        dialog_manager:cached_required_interventions = nil
         
         load_data()
         render_widget()
@@ -412,37 +288,20 @@ function on_command(data)
 end
 
 function show_decision_criteria(level_idx)
+    local all_criteria = cache_manager:load_decision_criteria(function(filename) return files:read(filename) end)
     local level_key = core.levels[level_idx].key
-    local criteria = cached_criteria[level_key]
+    local criteria = all_criteria[level_key]
     
-    if not criteria or #criteria == 0 then
-        ui:show_toast("No criteria available")
-        return
-    end
-    
-    local ui_elements = {}
-    table.insert(ui_elements, {"text", "<b>" .. core.levels[level_idx].name .. " - Decision Criteria:</b>", {size = 18, color = core.levels[level_idx].color}})
-    table.insert(ui_elements, {"new_line", 2})
-    
-    for _, criterion in ipairs(criteria) do
-        table.insert(ui_elements, {"text", "• " .. criterion})
-        table.insert(ui_elements, {"new_line", 1})
-    end
-    
-    table.insert(ui_elements, {"new_line", 1})
-    table.insert(ui_elements, {"button", "Back", {color = "#666666"}})
+    local ui_elements = ui_generator:create_decision_criteria_ui(level_idx, criteria)
     
     my_gui = gui(ui_elements)
     my_gui.render()
 end
 
 function show_symptom_dialog()
-    current_dialog_type = "symptom"
-    if not cached_symptoms then
-        local content = files:read("symptoms.md")
-        cached_symptoms = core.parse_symptoms_file(content)
-    end
-    local formatted_symptoms = core.format_list_items(cached_symptoms, "symptom", daily_logs, {}, {})
+    dialog_manager:set_dialog_type("symptom")
+    local symptoms = dialog_manager:load_symptoms(function(filename) return files:read(filename) end)
+    local formatted_symptoms = core.format_list_items(symptoms, "symptom", daily_logs, {}, {})
     dialogs:show_list_dialog({
         title = "Log Symptom",
         lines = formatted_symptoms,
@@ -452,16 +311,9 @@ function show_symptom_dialog()
 end
 
 function show_activity_dialog()
-    current_dialog_type = "activity"
-    if not cached_activities then
-        local content = files:read("activities.md")
-        cached_activities = core.parse_activities_file(content)
-    end
-    if not cached_required_activities then
-        local content = files:read("activities.md")
-        cached_required_activities = core.parse_required_activities(content)
-    end
-    local formatted_activities = core.format_list_items(cached_activities, "activity", daily_logs, cached_required_activities, {})
+    dialog_manager:set_dialog_type("activity")
+    local activities, required_activities = dialog_manager:load_activities(function(filename) return files:read(filename) end)
+    local formatted_activities = core.format_list_items(activities, "activity", daily_logs, required_activities, {})
     dialogs:show_list_dialog({
         title = "Log Activity",
         lines = formatted_activities,
@@ -471,16 +323,9 @@ function show_activity_dialog()
 end
 
 function show_intervention_dialog()
-    current_dialog_type = "intervention"
-    if not cached_interventions then
-        local content = files:read("interventions.md")
-        cached_interventions = core.parse_interventions_file(content)
-    end
-    if not cached_required_interventions then
-        local content = files:read("interventions.md")
-        cached_required_interventions = core.parse_required_interventions(content)
-    end
-    local formatted_interventions = core.format_list_items(cached_interventions, "intervention", daily_logs, {}, cached_required_interventions)
+    dialog_manager:set_dialog_type("intervention")
+    local interventions, required_interventions = dialog_manager:load_interventions(function(filename) return files:read(filename) end)
+    local formatted_interventions = core.format_list_items(interventions, "intervention", daily_logs, {}, required_interventions)
     dialogs:show_list_dialog({
         title = "Log Intervention",
         lines = formatted_interventions,
@@ -490,190 +335,77 @@ function show_intervention_dialog()
 end
 
 function show_energy_dialog()
-    current_dialog_type = "energy"
-    local energy_levels = {"1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
-                           "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
-                           "9 - Excellent", "10 - Peak energy"}
+    dialog_manager:set_dialog_type("energy")
+    local energy_levels = dialog_manager:get_energy_levels()
     dialogs:show_radio_dialog("Log Energy Level", energy_levels, 0)
 end
 
-function log_symptom(symptom_name)
-    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-    
-    core.log_item(daily_logs, "symptom", symptom_name)
-    save_prefs_data()
+-- Generic logging function that handles all item types
+function log_item(item_type, item_value)
+    local tasker_callback = nil
+    local ui_callback = nil
     
     if tasker then
-        tasker:run_task("LongCovid_LogEvent", {
-            timestamp = timestamp,
-            event_type = "Symptom",
-            value = symptom_name
-        })
-        ui:show_toast("✓ Symptom logged: " .. symptom_name)
-    else
-        ui:show_toast("✓ Symptom logged: " .. symptom_name)
+        tasker_callback = function(params)
+            tasker:run_task("LongCovid_LogEvent", params)
+        end
     end
     
-    if current_dialog_type == "symptom" or current_dialog_type == "symptom_edit" then
-        show_symptom_dialog()
+    ui_callback = function(message)
+        ui:show_toast(message)
+    end
+    
+    local success
+    if item_type == "energy" then
+        success = core.log_energy_with_tasker(daily_logs, item_value, tasker_callback, ui_callback)
+    else
+        success = core.log_item_with_tasker(daily_logs, item_type, item_value, tasker_callback, ui_callback)
+    end
+    
+    if success then
+        save_prefs_data()
+        
+        -- Show appropriate dialog or return to widget
+        local dialog_type = dialog_manager:get_dialog_type()
+        if dialog_type == "symptom" or dialog_type == "symptom_edit" then
+            show_symptom_dialog()
+        elseif dialog_type == "activity" or dialog_type == "activity_edit" then
+            show_activity_dialog()
+        elseif dialog_type == "intervention" or dialog_type == "intervention_edit" then
+            show_intervention_dialog()
+        else
+            render_widget()
+        end
     end
 end
 
-function log_activity(activity_name)
-    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-    
-    core.log_item(daily_logs, "activity", activity_name)
-    save_prefs_data()
-    
-    if tasker then
-        tasker:run_task("LongCovid_LogEvent", {
-            timestamp = timestamp,
-            event_type = "Activity",
-            value = activity_name
-        })
-        ui:show_toast("✓ Activity logged: " .. activity_name)
-    else
-        ui:show_toast("✓ Activity logged: " .. activity_name)
-    end
-    
-    if current_dialog_type == "activity" or current_dialog_type == "activity_edit" then
-        show_activity_dialog()
-    end
-    
-    -- Re-render widget to update button colors
-    render_widget()
-end
-
-function log_intervention(intervention_name)
-    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-    
-    core.log_item(daily_logs, "intervention", intervention_name)
-    save_prefs_data()
-    
-    if tasker then
-        tasker:run_task("LongCovid_LogEvent", {
-            timestamp = timestamp,
-            event_type = "Intervention",
-            value = intervention_name
-        })
-        ui:show_toast("✓ Intervention logged: " .. intervention_name)
-    else
-        ui:show_toast("✓ Intervention logged: " .. intervention_name)
-    end
-    
-    if current_dialog_type == "intervention" or current_dialog_type == "intervention_edit" then
-        show_intervention_dialog()
-    end
-    
-    -- Re-render widget to update button colors
-    render_widget()
-end
-
-function log_energy(energy_level)
-    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-    
-    core.log_energy(daily_logs, energy_level)
-    save_prefs_data()
-    
-    if tasker then
-        tasker:run_task("LongCovid_LogEvent", {
-            timestamp = timestamp,
-            event_type = "Energy",
-            value = tostring(energy_level)
-        })
-        ui:show_toast("✓ Energy level " .. energy_level .. " logged")
-    else
-        ui:show_toast("✓ Energy level " .. energy_level .. " logged")
-    end
-    
-    render_widget()
-end
 
 function on_dialog_action(result)
-    if result == -1 then
-        if current_dialog_type == "symptom" or current_dialog_type == "activity" or current_dialog_type == "intervention" or current_dialog_type == "energy" then
-            current_dialog_type = nil
+    local action, param1, param2, param3, param4 = dialog_manager:handle_dialog_result(
+        result, 
+        daily_logs, 
+        function(filename) return files:read(filename) end, 
+        log_item
+    )
+    
+    if action == "cancelled" then
+        return true
+    elseif action == "edit_dialog" then
+        dialogs:show_edit_dialog(param1, param2, param3)
+        return true
+    elseif action == "logged" then
+        return true
+    elseif action == "return_to_list" then
+        local dialog_type = dialog_manager:get_dialog_type()
+        if dialog_type == "symptom" then
+            show_symptom_dialog()
+        elseif dialog_type == "activity" then
+            show_activity_dialog()
+        elseif dialog_type == "intervention" then
+            show_intervention_dialog()
         end
         return true
     end
     
-    if type(result) == "number" then
-        if current_dialog_type == "symptom" then
-            local formatted_symptoms = core.format_list_items(cached_symptoms, "symptom", daily_logs, {}, {})
-            local selected_formatted = formatted_symptoms[result]
-            local selected_item = core.extract_item_name(selected_formatted)
-            
-            if selected_item == "Other..." then
-                current_dialog_type = "symptom_edit"
-                dialogs:show_edit_dialog("Custom Symptom", "Enter symptom name:", "")
-                return true
-            else
-                log_symptom(selected_item)
-                return true
-            end
-        elseif current_dialog_type == "activity" then
-            local formatted_activities = core.format_list_items(cached_activities, "activity", daily_logs, cached_required_activities, {})
-            local selected_formatted = formatted_activities[result]
-            local selected_item = core.extract_item_name(selected_formatted)
-            
-            if selected_item == "Other..." then
-                current_dialog_type = "activity_edit"
-                dialogs:show_edit_dialog("Custom Activity", "Enter activity name:", "")
-                return true
-            else
-                log_activity(selected_item)
-                return true
-            end
-        elseif current_dialog_type == "intervention" then
-            local formatted_interventions = core.format_list_items(cached_interventions, "intervention", daily_logs, {}, cached_required_interventions)
-            local selected_formatted = formatted_interventions[result]
-            local selected_item = core.extract_item_name(selected_formatted)
-            
-            if selected_item == "Other..." then
-                current_dialog_type = "intervention_edit"
-                dialogs:show_edit_dialog("Custom Intervention", "Enter intervention name:", "")
-                return true
-            else
-                log_intervention(selected_item)
-                return true
-            end
-        elseif current_dialog_type == "energy" then
-            local energy_levels = {"1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
-                                   "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
-                                   "9 - Excellent", "10 - Peak energy"}
-            local selected_text = energy_levels[result]
-            if selected_text then
-                local energy_level = tonumber(selected_text:match("^(%d+)"))
-                if energy_level then
-                    log_energy(energy_level)
-                end
-            end
-            return true
-        end
-    elseif type(result) == "string" then
-        if result ~= "" then
-            if current_dialog_type == "symptom_edit" then
-                current_dialog_type = "symptom"
-                log_symptom(result)
-            elseif current_dialog_type == "activity_edit" then
-                current_dialog_type = "activity"
-                log_activity(result)
-            elseif current_dialog_type == "intervention_edit" then
-                current_dialog_type = "intervention"
-                log_intervention(result)
-            end
-        else
-            if current_dialog_type == "symptom_edit" then
-                current_dialog_type = "symptom"
-                show_symptom_dialog()
-            elseif current_dialog_type == "activity_edit" then
-                current_dialog_type = "activity"
-                show_activity_dialog()
-            elseif current_dialog_type == "intervention_edit" then
-                current_dialog_type = "intervention"
-                show_intervention_dialog()
-            end
-        end
-        return true
-    end
+    return true
 end

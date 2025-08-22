@@ -557,4 +557,525 @@ function M.save_daily_choice(daily_capacity_log, level_idx)
     return daily_capacity_log
 end
 
+-- Generic logging function with Tasker integration
+function M.log_item_with_tasker(daily_logs, item_type, item_name, tasker_callback, ui_callback)
+    local success, error_msg = pcall(function()
+        local result, err = M.log_item(daily_logs, item_type, item_name)
+        if not result then
+            error(err or "Unknown error")
+        end
+        return result
+    end)
+    
+    if not success then
+        if ui_callback then
+            ui_callback("Error logging " .. item_type .. ": " .. tostring(error_msg))
+        end
+        return false
+    end
+    
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    local event_type = item_type:gsub("^%l", string.upper) -- Capitalize first letter
+    
+    if tasker_callback then
+        tasker_callback({
+            timestamp = timestamp,
+            event_type = event_type,
+            value = item_name
+        })
+    end
+    
+    if ui_callback then
+        ui_callback("✓ " .. event_type .. " logged: " .. item_name)
+    end
+    
+    return true
+end
+
+-- Energy logging with Tasker integration
+function M.log_energy_with_tasker(daily_logs, energy_level, tasker_callback, ui_callback)
+    local success, error_msg = pcall(function()
+        local result = M.log_energy(daily_logs, energy_level)
+        if not result then
+            error("Energy logging failed")
+        end
+        return result
+    end)
+    
+    if not success then
+        if ui_callback then
+            ui_callback("Error logging energy: " .. tostring(error_msg))
+        end
+        return false
+    end
+    
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    
+    if tasker_callback then
+        tasker_callback({
+            timestamp = timestamp,
+            event_type = "Energy",
+            value = tostring(energy_level)
+        })
+    end
+    
+    if ui_callback then
+        ui_callback("✓ Energy level " .. tostring(energy_level or "unknown") .. " logged")
+    end
+    
+    return true
+end
+
+-- Dialog manager for handling different dialog types
+function M.create_dialog_manager()
+    local manager = {
+        current_dialog_type = nil,
+        cached_symptoms = nil,
+        cached_activities = nil,
+        cached_interventions = nil,
+        cached_required_activities = nil,
+        cached_required_interventions = nil
+    }
+    
+    function manager:set_dialog_type(dialog_type)
+        self.current_dialog_type = dialog_type
+    end
+    
+    function manager:get_dialog_type()
+        return self.current_dialog_type
+    end
+    
+    function manager:clear_dialog_type()
+        self.current_dialog_type = nil
+    end
+    
+    function manager:load_symptoms(file_reader)
+        if not self.cached_symptoms then
+            local content = file_reader("symptoms.md")
+            self.cached_symptoms = M.parse_symptoms_file(content)
+        end
+        return self.cached_symptoms
+    end
+    
+    function manager:load_activities(file_reader)
+        if not self.cached_activities then
+            local content = file_reader("activities.md")
+            self.cached_activities = M.parse_activities_file(content)
+        end
+        if not self.cached_required_activities then
+            local content = file_reader("activities.md")
+            self.cached_required_activities = M.parse_required_activities(content)
+        end
+        return self.cached_activities, self.cached_required_activities
+    end
+    
+    function manager:load_interventions(file_reader)
+        if not self.cached_interventions then
+            local content = file_reader("interventions.md")
+            self.cached_interventions = M.parse_interventions_file(content)
+        end
+        if not self.cached_required_interventions then
+            local content = file_reader("interventions.md")
+            self.cached_required_interventions = M.parse_required_interventions(content)
+        end
+        return self.cached_interventions, self.cached_required_interventions
+    end
+    
+    function manager:get_energy_levels()
+        return {"1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
+                "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
+                "9 - Excellent", "10 - Peak energy"}
+    end
+    
+    function manager:handle_dialog_result(result, daily_logs, file_reader, log_callback)
+        if result == -1 then
+            self:clear_dialog_type()
+            return "cancelled"
+        end
+        
+        if type(result) == "number" then
+            if self.current_dialog_type == "symptom" then
+                local symptoms = self:load_symptoms(file_reader)
+                local formatted_symptoms = M.format_list_items(symptoms, "symptom", daily_logs, {}, {})
+                local selected_item = M.extract_item_name(formatted_symptoms[result])
+                
+                if selected_item == "Other..." then
+                    self.current_dialog_type = "symptom_edit"
+                    return "edit_dialog", "Custom Symptom", "Enter symptom name:", ""
+                else
+                    log_callback("symptom", selected_item)
+                    return "logged", selected_item
+                end
+            elseif self.current_dialog_type == "activity" then
+                local activities, required_activities = self:load_activities(file_reader)
+                local formatted_activities = M.format_list_items(activities, "activity", daily_logs, required_activities, {})
+                local selected_item = M.extract_item_name(formatted_activities[result])
+                
+                if selected_item == "Other..." then
+                    self.current_dialog_type = "activity_edit"
+                    return "edit_dialog", "Custom Activity", "Enter activity name:", ""
+                else
+                    log_callback("activity", selected_item)
+                    return "logged", selected_item
+                end
+            elseif self.current_dialog_type == "intervention" then
+                local interventions, required_interventions = self:load_interventions(file_reader)
+                local formatted_interventions = M.format_list_items(interventions, "intervention", daily_logs, {}, required_interventions)
+                local selected_item = M.extract_item_name(formatted_interventions[result])
+                
+                if selected_item == "Other..." then
+                    self.current_dialog_type = "intervention_edit"
+                    return "edit_dialog", "Custom Intervention", "Enter intervention name:", ""
+                else
+                    log_callback("intervention", selected_item)
+                    return "logged", selected_item
+                end
+            elseif self.current_dialog_type == "energy" then
+                local energy_levels = self:get_energy_levels()
+                local selected_text = energy_levels[result]
+                if selected_text then
+                    local energy_level = tonumber(selected_text:match("^(%d+)"))
+                    if energy_level then
+                        log_callback("energy", energy_level)
+                        return "logged", energy_level
+                    end
+                end
+            end
+        elseif type(result) == "string" then
+            if result ~= "" then
+                if self.current_dialog_type == "symptom_edit" then
+                    self.current_dialog_type = "symptom"
+                    log_callback("symptom", result)
+                    return "logged", result
+                elseif self.current_dialog_type == "activity_edit" then
+                    self.current_dialog_type = "activity"
+                    log_callback("activity", result)
+                    return "logged", result
+                elseif self.current_dialog_type == "intervention_edit" then
+                    self.current_dialog_type = "intervention"
+                    log_callback("intervention", result)
+                    return "logged", result
+                end
+            else
+                if self.current_dialog_type:find("_edit$") then
+                    self.current_dialog_type = self.current_dialog_type:gsub("_edit$", "")
+                    return "return_to_list"
+                end
+            end
+        end
+        
+        return "unknown"
+    end
+    
+    return manager
+end
+
+-- Cache manager for handling file caching and data loading
+function M.create_cache_manager()
+    local manager = {
+        cached_plans = {},
+        cached_criteria = nil,
+        cached_symptoms = nil,
+        cached_activities = nil,
+        cached_interventions = nil,
+        cached_required_activities = nil,
+        cached_required_interventions = nil
+    }
+    
+    function manager:clear_cache()
+        self.cached_plans = {}
+        self.cached_criteria = nil
+        self.cached_symptoms = nil
+        self.cached_activities = nil
+        self.cached_interventions = nil
+        self.cached_required_activities = nil
+        self.cached_required_interventions = nil
+    end
+    
+    function manager:load_decision_criteria(file_reader)
+        if not self.cached_criteria then
+            local content = file_reader("decision_criteria.md")
+            self.cached_criteria = M.parse_decision_criteria(content)
+        end
+        return self.cached_criteria
+    end
+    
+    function manager:load_day_plan(day, file_reader)
+        if not self.cached_plans[day] then
+            local content = file_reader(day .. ".md")
+            self.cached_plans[day] = M.parse_day_file(content)
+        end
+        return self.cached_plans[day]
+    end
+    
+    function manager:load_symptoms(file_reader)
+        if not self.cached_symptoms then
+            local content = file_reader("symptoms.md")
+            self.cached_symptoms = M.parse_symptoms_file(content)
+        end
+        return self.cached_symptoms
+    end
+    
+    function manager:load_activities(file_reader)
+        if not self.cached_activities then
+            local content = file_reader("activities.md")
+            self.cached_activities = M.parse_activities_file(content)
+        end
+        if not self.cached_required_activities then
+            local content = file_reader("activities.md")
+            self.cached_required_activities = M.parse_required_activities(content)
+        end
+        return self.cached_activities, self.cached_required_activities
+    end
+    
+    function manager:load_interventions(file_reader)
+        if not self.cached_interventions then
+            local content = file_reader("interventions.md")
+            self.cached_interventions = M.parse_interventions_file(content)
+        end
+        if not self.cached_required_interventions then
+            local content = file_reader("interventions.md")
+            self.cached_required_interventions = M.parse_required_interventions(content)
+        end
+        return self.cached_interventions, self.cached_required_interventions
+    end
+    
+    function manager:get_required_activities()
+        return self.cached_required_activities
+    end
+    
+    function manager:get_required_interventions()
+        return self.cached_required_interventions
+    end
+    
+    return manager
+end
+
+-- Button action mapper for handling clicks
+function M.create_button_mapper()
+    local mapper = {}
+    
+    function mapper:identify_button_action(elem_text)
+        if elem_text:find("bed") then
+            return "capacity_level", 1
+        elseif elem_text:find("walking") then
+            return "capacity_level", 2
+        elseif elem_text:find("rocket%-launch") then
+            return "capacity_level", 3
+        elseif elem_text:find("rotate%-right") or elem_text:find("Reset") then
+            return "reset", nil
+        elseif elem_text:find("sync") then
+            return "sync", nil
+        elseif elem_text:find("heart%-pulse") then
+            return "symptom_dialog", nil
+        elseif elem_text:find("bolt%-lightning") then
+            return "energy_dialog", nil
+        elseif elem_text:find("running") then
+            return "activity_dialog", nil
+        elseif elem_text:find("pills") then
+            return "intervention_dialog", nil
+        elseif elem_text == "Back" then
+            return "back", nil
+        else
+            return "unknown", nil
+        end
+    end
+    
+    function mapper:can_select_level(current_level, target_level)
+        return current_level == 0 or target_level <= current_level
+    end
+    
+    return mapper
+end
+
+-- UI element generator
+function M.create_ui_generator()
+    local generator = {}
+    
+    function generator:create_capacity_buttons(selected_level)
+        local ui_elements = {}
+        
+        for i, level in ipairs(M.levels) do
+            local color, button_text, gravity
+            
+            if i == selected_level then
+                color = level.color
+                button_text = "%%fa:" .. level.icon .. "%% " .. level.name
+            elseif selected_level == 0 then
+                color = level.color
+                button_text = "%%fa:" .. level.icon .. "%% " .. level.name
+            else
+                color = "#888888"
+                button_text = "fa:" .. level.icon
+            end
+            
+            gravity = (i == 1) and "center_h" or "anchor_prev"
+            
+            local button_props = {color = color}
+            if gravity then
+                button_props.gravity = gravity
+            end
+            
+            table.insert(ui_elements, {"button", button_text, button_props})
+            if i < #M.levels then
+                table.insert(ui_elements, {"spacer", 1})
+            end
+        end
+        
+        table.insert(ui_elements, {"new_line", 1})
+        return ui_elements
+    end
+    
+    function generator:create_health_tracking_buttons(daily_logs, required_activities, required_interventions)
+        local activity_color = "#dc3545" -- Default red
+        local intervention_color = "#dc3545" -- Default red
+        
+        if required_activities then
+            activity_color = M.are_all_required_activities_completed(daily_logs, required_activities) and "#28a745" or "#dc3545"
+        end
+        
+        if required_interventions then
+            intervention_color = M.are_all_required_interventions_completed(daily_logs, required_interventions) and "#007bff" or "#dc3545"
+        end
+        
+        local energy_color = M.get_energy_button_color(daily_logs)
+        
+        return {
+            {"button", "fa:heart-pulse", {color = "#6c757d", gravity = "center_h"}},
+            {"button", "fa:bolt-lightning", {color = energy_color, gravity = "anchor_prev"}},
+            {"spacer", 3},
+            {"button", "fa:running", {color = activity_color, gravity = "anchor_prev"}},
+            {"button", "fa:pills", {color = intervention_color, gravity = "anchor_prev"}}
+        }
+    end
+    
+    function generator:create_no_selection_content()
+        return {
+            {"new_line", 2},
+            {"text", "<b>Select your capacity level:</b>", {size = 18}},
+            {"new_line", 1},
+            {"text", "%%fa:bed%% <b>Recovering</b> - Low energy, prioritize rest", {color = "#FF4444"}},
+            {"new_line", 1},
+            {"text", "%%fa:walking%% <b>Maintaining</b> - Moderate energy, standard routine", {color = "#FFAA00"}},
+            {"new_line", 1},
+            {"text", "%%fa:rocket-launch%% <b>Engaging</b> - High energy, can handle challenges", {color = "#44AA44"}},
+            {"new_line", 2},
+            {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}},
+            {"spacer", 2},
+            {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}}
+        }
+    end
+    
+    function generator:create_plan_details(day_plan, selected_level)
+        if not day_plan then
+            return {
+                {"text", "No plan available for " .. (M.get_current_day() or "today"), {color = "#ff6b6b"}},
+                {"new_line", 2},
+                {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}},
+                {"spacer", 2},
+                {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}}
+            }
+        end
+        
+        -- Validate selected level is within valid range
+        if not M.levels[selected_level] then
+            return {
+                {"text", "Invalid level selected", {color = "#ff6b6b"}},
+                {"new_line", 2},
+                {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}},
+                {"spacer", 2},
+                {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}}
+            }
+        end
+        
+        local level_key = M.levels[selected_level].key
+        local level_plan = day_plan[level_key]
+        
+        if not level_plan then
+            return {
+                {"text", "No plan available for selected level", {color = "#ff6b6b"}},
+                {"new_line", 2},
+                {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}},
+                {"spacer", 2},
+                {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}}
+            }
+        end
+        
+        local ui_elements = {}
+        
+        -- Add overview section
+        if level_plan.overview and #level_plan.overview > 0 then
+            table.insert(ui_elements, {"text", "<b>Today's Overview:</b>", {size = 18}})
+            table.insert(ui_elements, {"new_line", 1})
+            for _, overview_line in ipairs(level_plan.overview) do
+                local formatted_line = overview_line:gsub("%*%*([^%*]+)%*%*", "<b>%1</b>")
+                table.insert(ui_elements, {"text", formatted_line, {size = 16}})
+                table.insert(ui_elements, {"new_line", 1})
+            end
+            table.insert(ui_elements, {"new_line", 1})
+        end
+        
+        -- Add other categories
+        for category, items in pairs(level_plan) do
+            if category ~= "overview" and #items > 0 then
+                table.insert(ui_elements, {"text", "<b>" .. category .. ":</b>", {size = 16}})
+                table.insert(ui_elements, {"new_line", 1})
+                for _, item in ipairs(items) do
+                    table.insert(ui_elements, {"text", "• " .. item})
+                    table.insert(ui_elements, {"new_line", 1})
+                end
+                table.insert(ui_elements, {"new_line", 1})
+            end
+        end
+        
+        -- Add action buttons
+        table.insert(ui_elements, {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}})
+        table.insert(ui_elements, {"spacer", 2})
+        table.insert(ui_elements, {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}})
+        
+        return ui_elements
+    end
+    
+    function generator:create_error_content(error_message)
+        return {
+            {"text", "<b>Selected:</b> " .. (M.levels[1] and M.levels[1].name or "Unknown"), {size = 18}},
+            {"new_line", 1},
+            {"text", "%%fa:exclamation-triangle%% <b>" .. (error_message or "Can't load plan data") .. "</b>", {color = "#ff6b6b"}},
+            {"new_line", 2},
+            {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}},
+            {"spacer", 2},
+            {"button", "%%fa:rotate-right%% Reset", {color = "#666666", gravity = "anchor_prev"}}
+        }
+    end
+    
+    function generator:create_decision_criteria_ui(level_idx, criteria)
+        if not criteria or #criteria == 0 then
+            return {
+                {"text", "No criteria available", {color = "#ff6b6b"}},
+                {"new_line", 2},
+                {"button", "Back", {color = "#666666"}}
+            }
+        end
+        
+        local ui_elements = {}
+        local level = M.levels[level_idx]
+        if level then
+            table.insert(ui_elements, {"text", "<b>" .. level.name .. " - Decision Criteria:</b>", {size = 18, color = level.color}})
+            table.insert(ui_elements, {"new_line", 2})
+        end
+        
+        for _, criterion in ipairs(criteria) do
+            table.insert(ui_elements, {"text", "• " .. criterion})
+            table.insert(ui_elements, {"new_line", 1})
+        end
+        
+        table.insert(ui_elements, {"new_line", 1})
+        table.insert(ui_elements, {"button", "Back", {color = "#666666"}})
+        
+        return ui_elements
+    end
+    
+    return generator
+end
+
 return M
