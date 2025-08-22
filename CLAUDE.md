@@ -209,3 +209,170 @@ grep -n "\.lua\|\.md" widget_design.md | head -10
 ```
 
 This ensures documentation stays **current, accurate, and useful** as the project evolves.
+
+## Feature Lifecycle Documentation Framework
+
+**CRITICAL PRINCIPLE**: Keep planning, development, and final documentation completely separate to prevent documentation debt and confusion.
+
+### 🎯 Phase 1: Planning (Keep SEPARATE from main docs)
+
+**Objective**: Explore and define requirements without polluting current state documentation.
+
+#### What to DO during planning:
+- ✅ **Create temporary planning documents** in a `planning/` folder or dev notes
+- ✅ **Use clear "DRAFT" or "PLANNING" markers** on all exploratory content
+- ✅ **Focus on requirements and user goals**, not implementation details
+- ✅ **Document decision criteria** for choosing between approaches
+- ✅ **Keep planning documents outside main documentation files**
+
+#### What NOT to do during planning:
+- ❌ **Add future features to widget_design.md** - This creates confusion about current state
+- ❌ **Mix speculative content with current documentation** - Readers can't tell what exists now
+- ❌ **Commit "will implement" language** to main docs - Only document what exists
+- ❌ **Update main documentation** until feature is implemented and tested
+
+#### Planning Document Structure:
+```
+planning/                           # Temporary folder (gitignore if desired)
+├── feature-name-requirements.md    # User needs, success criteria
+├── feature-name-ui-exploration.md  # UI/UX design options  
+├── feature-name-technical-plan.md  # Implementation approaches
+└── feature-name-decision-log.md    # Decisions made and rationale
+```
+
+**Example Planning Content:**
+```markdown
+# DRAFT - Sleep Quality Tracking Feature Planning
+
+## User Requirements
+- [ ] Users want to log sleep quality on 1-10 scale
+- [ ] Sleep data should correlate with energy levels
+- [ ] Sleep tracking should be optional, not required
+
+## UI Design Options
+Option A: Add sleep button to health tracking row
+Option B: Include in energy dialog as compound input
+Option C: Separate sleep-focused dialog
+
+## Decision: Choosing Option A because...
+```
+
+### 🔨 Phase 2: Development (Test-Driven Documentation)
+
+**Objective**: Implement features with tests as executable specification, keeping main docs unchanged.
+
+#### Development Documentation Strategy:
+- ✅ **Write tests FIRST** - Tests serve as living specification of intended behavior
+- ✅ **Update tests incrementally** as you implement each piece
+- ✅ **Use detailed code comments** for complex implementation decisions
+- ✅ **Create draft documentation** in development folders if needed for large features
+
+#### Development Documentation Structure:
+```
+tests/
+├── test_sleep_tracking.lua         # Executable specification
+├── test_sleep_energy_correlation.lua  # Integration testing
+└── test_ui_sleep_integration.lua   # UI behavior specification
+
+dev_notes/                          # Temporary implementation notes
+└── sleep-feature-implementation.md # Development progress, blockers, decisions
+```
+
+**Key Development Principles:**
+1. **Tests define the feature** - If it's not tested, it's not done
+2. **Code comments explain WHY** - Use comments for implementation decisions
+3. **Main docs stay current** - Don't update widget_design.md until feature is complete
+4. **Development notes are temporary** - Clean up dev notes when feature is done
+
+### ✅ Phase 3: Completion (Documentation as Definition of Done)
+
+**Objective**: Feature is NOT complete until all documentation is updated to reflect new current state.
+
+#### Documentation Completion Checklist:
+
+**1. Verify Implementation Completeness**
+```bash
+cd tests && lua run_all_tests.lua  # All tests must pass
+```
+
+**2. Update Main Documentation (in order)**
+- ✅ **Update widget_design.md** - Add complete feature documentation
+  - Update UI layouts with new elements
+  - Update interaction flows with new behaviors  
+  - Update technical implementation with new components
+  - Update test coverage numbers
+- ✅ **Update CLAUDE.md** - If development process or guidelines changed
+- ✅ **Update tests/README.md** - If test structure or organization changed
+
+**3. Clean Up Temporary Documentation**
+- ✅ **Remove or archive planning documents** - Move to `archive/` or delete
+- ✅ **Remove development notes** - Implementation details are now in code/tests
+- ✅ **Remove "DRAFT" or "TODO" markers** from any remaining docs
+
+**4. Verify Documentation Quality**
+- ✅ **Accuracy**: Does documentation match actual implementation?
+- ✅ **Completeness**: Are all user-visible features documented?
+- ✅ **Clarity**: Can someone new understand the feature from docs?
+- ✅ **Integration**: Does new content fit well with existing documentation?
+
+#### Example Completion Process:
+
+```markdown
+# Before marking feature complete:
+
+## 1. Implementation Verification
+- [x] All new tests pass (15 new tests added)
+- [x] All existing tests still pass (87 total tests)
+- [x] Feature works in actual AIO launcher environment
+
+## 2. Documentation Updates
+- [x] widget_design.md: Added "Sleep Quality Tracking" section
+- [x] widget_design.md: Updated "Health & Activity Logging" with sleep button
+- [x] widget_design.md: Updated "Testing Coverage" (87 → 102 tests)
+- [x] tests/README.md: Updated test count and added sleep tracking suite
+
+## 3. Cleanup
+- [x] Deleted planning/sleep-quality-tracking-*.md files
+- [x] Removed dev_notes/sleep-implementation.md
+- [x] Verified no "TODO" or "DRAFT" content in main docs
+
+## 4. Quality Check
+- [x] New user can understand sleep tracking from widget_design.md
+- [x] Documentation matches actual UI behavior
+- [x] All file references are accurate
+```
+
+### 🚫 Common Anti-Patterns to Avoid
+
+#### Planning Phase Mistakes:
+- ❌ Adding "Coming Soon: Sleep Tracking" to widget_design.md
+- ❌ Documenting UI that doesn't exist yet
+- ❌ Mixing planning content with current state docs
+
+#### Development Phase Mistakes:
+- ❌ Updating main docs before feature is complete
+- ❌ Leaving TODO comments in widget_design.md
+- ❌ Committing half-implemented documentation
+
+#### Completion Phase Mistakes:
+- ❌ Marking feature "done" without updating docs
+- ❌ Leaving planning documents in the repo
+- ❌ Forgetting to update test coverage numbers
+
+### 📋 Quick Reference Workflow
+
+```
+Planning:     Create planning/feature-name-*.md files
+              DO NOT touch main documentation
+
+Development:  Write tests first
+              Keep main docs unchanged
+              Use dev_notes/ for temporary content
+
+Completion:   Update widget_design.md with complete feature
+              Update other docs if needed
+              Clean up planning/ and dev_notes/
+              Verify all tests pass
+```
+
+This approach ensures that main documentation always reflects current reality while providing space for planning and development work.
