@@ -21,7 +21,8 @@ local test_suites = {
     {name = "Dialog Manager", file = "test_dialog_manager"},
     {name = "Cache Manager", file = "test_cache_manager"},
     {name = "Button Mapper", file = "test_button_mapper"},
-    {name = "UI Generator", file = "test_ui_generator"}
+    {name = "UI Generator", file = "test_ui_generator"},
+    {name = "Day Reset Scenarios", file = "test_day_reset"}
 }
 
 -- Track overall results
@@ -99,6 +100,7 @@ if framework_success and suites_failed == 0 then
     print("   • Cache manager - File caching, data loading, cache invalidation")
     print("   • Button mapper - Action identification, level validation")
     print("   • UI generator - Element creation, state-based rendering")
+    print("   • Day reset scenarios - Widget reset handling, manager initialization")
     print()
     print("✨ The simplified widget architecture is working correctly!")
     print("   Widget reduced from ~680 lines to 428 lines (-37%)")

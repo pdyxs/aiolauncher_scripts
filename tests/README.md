@@ -27,6 +27,7 @@ lua test_dialog_manager.lua      # Dialog state management (11 tests)
 lua test_cache_manager.lua       # File caching (10 tests)
 lua test_button_mapper.lua       # Button action mapping (12 tests)
 lua test_ui_generator.lua        # UI element generation (10 tests)
+lua test_day_reset.lua           # Day reset scenarios (6 tests)
 ```
 
 #### Legacy Test (Original)
@@ -37,13 +38,14 @@ cd tests
 lua test_long_covid_widget.lua
 ```
 
-**Comprehensive Coverage (72 tests total):**
-- **Core Business Logic** - File parsing, data management, daily reset, calculations
-- **Logging Functions** - Tasker integration, error handling, callback mechanisms
-- **Dialog Manager** - State management, data loading, result processing for all dialog types
-- **Cache Manager** - File caching, invalidation, multi-day plan management
-- **Button Mapper** - Action identification, level validation, special character handling
-- **UI Generator** - Element creation, state-based rendering, error content generation
+**Comprehensive Coverage (93 tests total):**
+- **Core Business Logic** - File parsing, data management, daily reset, calculations (17 tests)
+- **Logging Functions** - Tasker integration, error handling, callback mechanisms (12 tests)
+- **Dialog Manager** - State management, data loading, result processing for all dialog types (11 tests)
+- **Cache Manager** - File caching, invalidation, multi-day plan management (10 tests)
+- **Button Mapper** - Action identification, level validation, special character handling (12 tests)
+- **UI Generator** - Element creation, state-based rendering, error content generation (10 tests)
+- **Day Reset Scenarios** - Widget reset handling, manager initialization, error prevention (6 tests)
 
 ## Test Structure
 

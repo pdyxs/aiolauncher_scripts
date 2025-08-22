@@ -273,12 +273,16 @@ function on_command(data)
         files:write(filename, content)
         
         -- Clear cache to reload data
-        cache_manager:clear_cache()
-        dialog_manager:cached_symptoms = nil
-        dialog_manager:cached_activities = nil
-        dialog_manager:cached_interventions = nil
-        dialog_manager:cached_required_activities = nil
-        dialog_manager:cached_required_interventions = nil
+        if cache_manager then
+            cache_manager:clear_cache()
+        end
+        if dialog_manager then
+            dialog_manager.cached_symptoms = nil
+            dialog_manager.cached_activities = nil
+            dialog_manager.cached_interventions = nil
+            dialog_manager.cached_required_activities = nil
+            dialog_manager.cached_required_interventions = nil
+        end
         
         load_data()
         render_widget()
