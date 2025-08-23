@@ -76,6 +76,38 @@ lua test_long_covid_widget.lua
 4. **Verify all tests pass** - Run the full test suite to ensure nothing is broken
 5. **Refactor if needed** - Improve code while keeping tests passing
 
+### Debugging On-Device Issues with Test Harnesses
+
+**CRITICAL**: When encountering bugs or unexpected behavior on the AIO device, always create test harnesses to simulate the issue locally before attempting fixes.
+
+**Why this approach is essential:**
+- **Faster iteration** - Testing on device requires restarting AIO, navigating to widget, reproducing steps
+- **Better debugging** - Local tests allow detailed logging, step-by-step analysis, and controlled conditions
+- **Reproducible results** - Ensures the issue is understood and fix is verified before device testing
+- **Preserves context** - Debug output is easier to capture and analyze locally
+
+**Process for device-specific issues:**
+1. **Analyze the device behavior** - Note exact sequences, timing, and unexpected results
+2. **Create a test harness** - Write a test that simulates the device's API calls and behavior patterns
+3. **Reproduce the issue locally** - Ensure the test shows the same problem as the device
+4. **Debug and fix locally** - Use the test to understand root cause and verify fix
+5. **Test final fix on device** - Only after local test confirms the fix works
+
+**Example scenarios requiring test harnesses:**
+- Dialog timing issues (selection followed by automatic cancel)
+- Module loading and caching problems  
+- State management across widget restarts
+- Complex user interaction sequences
+- AIO-specific API behaviors
+
+**Test harness naming convention:**
+```
+tests/test_[feature]_simulation.lua    # For simulating device behavior
+tests/test_[bug]_reproduction.lua      # For reproducing specific bugs
+```
+
+This approach transforms frustrating device debugging sessions into efficient local development cycles.
+
 ### Test Coverage Requirements
 
 All widget functionality should have tests covering:
@@ -376,3 +408,4 @@ Completion:   Update widget_design.md with complete feature
 ```
 
 This approach ensures that main documentation always reflects current reality while providing space for planning and development work.
+- can you always use debug toasts for debugging instead of ui toasts?

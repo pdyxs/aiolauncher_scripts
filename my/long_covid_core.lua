@@ -3,6 +3,9 @@
 
 local M = {}
 
+-- Module version for cache detection
+M.VERSION = "2.1.0-dialog-stack"
+
 -- Capacity levels
 M.levels = {
     {name = "Recovering", color = "#FF4444", key = "red", icon = "bed"},
@@ -652,7 +655,38 @@ function M.create_dialog_manager()
     function manager:load_symptoms(file_reader)
         if not self.cached_symptoms then
             local content = file_reader("symptoms.md")
-            self.cached_symptoms = M.parse_symptoms_file(content)
+            -- Inline the parsing logic to avoid module reference issues
+            if not content then
+                self.cached_symptoms = {
+                    "Fatigue",
+                    "Brain fog", 
+                    "Headache",
+                    "Shortness of breath",
+                    "Joint pain",
+                    "Muscle aches",
+                    "Sleep issues",
+                    "Other..."
+                }
+            else
+                local symptoms = {}
+                -- Inline split_lines to avoid module dependencies
+                local lines = {}
+                for line in content:gmatch("[^\r\n]+") do
+                    table.insert(lines, line)
+                end
+                
+                for _, line in ipairs(lines) do
+                    if line:match("^%- ") then
+                        local symptom = line:match("^%- (.+)")
+                        if symptom then
+                            table.insert(symptoms, symptom)
+                        end
+                    end
+                end
+                
+                table.insert(symptoms, "Other...")
+                self.cached_symptoms = symptoms
+            end
         end
         return self.cached_symptoms
     end
@@ -1129,7 +1163,7 @@ M.flow_definitions = {
             dialog_type = "list",
             title = "Select Symptom",
             get_items = function(manager, daily_logs)
-                local symptoms = manager:load_symptoms()
+                local symptoms = manager:load_symptoms(function(filename) return files:read(filename) end)
                 return M.format_list_items(symptoms, "symptom", daily_logs, {}, {})
             end,
             next_step = function(selected_item, context)
@@ -1261,8 +1295,7 @@ function M.create_dialog_flow_manager()
             local selected_item = M.extract_item_name(current_dialog.data.items[result])
             current_dialog.data.selected_item = selected_item
             processed_result = selected_item
-            -- Clear ignore flag after successful list selection
-            self.ignore_next_cancel = false
+            -- DON'T clear ignore flag here - it should stay true until the spurious cancel arrives
         elseif current_dialog.type == "radio" and type(result) == "number" then
             local selected_option = current_dialog.data.options[result]
             current_dialog.data.selected_option = selected_option
@@ -1357,5 +1390,6 @@ function M.create_dialog_flow_manager()
     
     return manager
 end
+
 
 return M

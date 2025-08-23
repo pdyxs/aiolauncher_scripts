@@ -27,7 +27,29 @@ end
 
 -- Create managers
 local dialog_manager = core.create_dialog_manager()
-local dialog_flow_manager = core.create_dialog_flow_manager()
+
+-- Check core module version and function availability
+local core_version = core.VERSION or "unknown"
+local has_dialog_flow_function = core.create_dialog_flow_manager ~= nil
+
+prefs.debug_core_info = "Core version: " .. core_version .. 
+                       " | Has dialog flow function: " .. tostring(has_dialog_flow_function) ..
+                       " | parse_symptoms_file: " .. tostring(core.parse_symptoms_file ~= nil)
+
+-- Create dialog flow manager with error handling
+local dialog_flow_manager = nil
+if has_dialog_flow_function then
+    local success, result = pcall(function() return core.create_dialog_flow_manager() end)
+    if success then
+        dialog_flow_manager = result
+        prefs.debug_flow_manager = "created successfully"
+    else
+        prefs.debug_flow_manager = "ERROR calling function: " .. tostring(result)
+    end
+else
+    prefs.debug_flow_manager = "ERROR: Function does not exist - module cache issue"
+end
+
 local cache_manager = core.create_cache_manager()
 local button_mapper = core.create_button_mapper()
 local ui_generator = core.create_ui_generator()
@@ -49,8 +71,13 @@ function load_prefs_data()
     daily_logs = core.purge_old_daily_logs(daily_logs, today)
     
     -- Initialize dialog flow manager
-    dialog_flow_manager:set_data_manager(dialog_manager)
-    dialog_flow_manager:set_daily_logs(daily_logs)
+    if dialog_flow_manager then
+        dialog_flow_manager:set_data_manager(dialog_manager)
+        dialog_flow_manager:set_daily_logs(daily_logs)
+        prefs.debug_init = "Dialog flow manager initialized successfully"
+    else
+        prefs.debug_init = "ERROR: dialog_flow_manager is nil - " .. (prefs.debug_flow_manager or "unknown error")
+    end
 end
 
 function save_prefs_data()
@@ -308,12 +335,20 @@ function show_decision_criteria(level_idx)
 end
 
 function show_symptom_dialog()
+    -- Check if dialog flow manager exists
+    if not dialog_flow_manager then
+        ui:show_text("ERROR: Dialog flow manager not available")
+        return
+    end
+    
     local status, dialog_config = dialog_flow_manager:start_flow("symptom")
     
     if status == "show_dialog" then
         show_aio_dialog(dialog_config)
     elseif status == "error" then
         ui:show_text("Error starting symptom flow: " .. tostring(dialog_config))
+    else
+        ui:show_text("Unexpected status: " .. tostring(status))
     end
 end
 
@@ -410,7 +445,7 @@ end
 
 function on_dialog_action(result)
     -- Check if we have an active dialog flow (new system)
-    if dialog_flow_manager:get_current_dialog() then
+    if dialog_flow_manager:get_current_dialog() then        
         local status, flow_result = dialog_flow_manager:handle_dialog_result(result)
         
         if status == "show_dialog" then
