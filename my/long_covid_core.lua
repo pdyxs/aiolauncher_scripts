@@ -1262,10 +1262,8 @@ function M.create_dialog_flow_manager()
         
         self.current_stack:push_dialog(dialog_config)
         
-        -- Handle list dialog quirk - they don't auto-close on selection
-        if step_config.dialog_type == "list" then
-            self.ignore_next_cancel = true
-        end
+        -- Handle AIO dialog quirk - all dialogs can trigger spurious cancels
+        self.ignore_next_cancel = true
         
         return "show_dialog", dialog_config
     end
@@ -1330,6 +1328,7 @@ function M.create_dialog_flow_manager()
     function manager:handle_cancel()
         if self.ignore_next_cancel then
             self.ignore_next_cancel = false
+            -- DON'T pop dialog when ignoring - the dialog is still visually open
             return "continue"
         end
         

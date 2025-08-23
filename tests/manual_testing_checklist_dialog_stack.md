@@ -20,14 +20,14 @@ This checklist focuses on testing the new dialog stack system for symptoms with 
 
 2. **Select Symptom**:
    - [✅] Select "Fatigue" (or any symptom from list)
-   - [❌] Verify "Symptom Severity" dialog appears automatically >> Symptom is logged immediately
-   - [ ] Verify severity options show: "1 - Minimal" through "10 - Extreme"
+   - [✅] Verify "Symptom Severity" dialog appears automatically
+   - [✅] Verify severity options show: "1 - Minimal" through "10 - Extreme"
 
 3. **Select Severity**:
-   - [ ] Select severity level (e.g., "5 - Moderate-High")
-   - [ ] Verify dialog closes and returns to main widget
-   - [ ] Verify toast confirmation shows successful logging
-   - [ ] Verify symptom logged as: `"Fatigue (severity: 5)"`
+   - [✅] Select severity level (e.g., "5 - Moderate-High")
+   - [✅] Verify dialog closes and returns to main widget
+   - [❌] Verify toast confirmation shows successful logging
+   - [❌] Verify symptom logged as: `"Fatigue (severity: 5)"`
 
 ### Test 2: Custom Symptom Flow (List → Custom Input → Severity → Log)
 1. **Start Flow**:
@@ -40,29 +40,36 @@ This checklist focuses on testing the new dialog stack system for symptoms with 
    - [✅] Confirm entry
 
 3. **Severity Selection**:
-   - [❌] Verify "Symptom Severity" dialog appears >> Dialog doesn't appear, symptom is NOT logged
-   - [ ] Select severity (e.g., "7 - High-Severe")
-   - [ ] Verify returns to widget with confirmation
-   - [ ] Verify logged as: `"My Test Symptom (severity: 7)"`
+   - [✅] Verify "Symptom Severity" dialog appears >> Dialog doesn't appear, symptom is NOT logged
+   - [✅] Select severity (e.g., "7 - High-Severe")
+   - [✅] Verify returns to widget with confirmation
+   - [✅] Verify logged as: `"My Test Symptom (severity: 7)"`
 
 ### Test 3: Dialog Cancellation Testing
 1. **Cancel at Symptom List**:
    - [✅] Click symptom button
    - [✅] Press back/cancel in symptom list
-   - [❌] First cancel: Should do nothing (list dialog quirk) >> Returns to widget with no logging (which is the desired behaviour)
-   - [ ] Second cancel: Should return to widget with no logging
+   - [✅] Should return to widget with no logging
 
 2. **Cancel at Severity Level**:
-   - [❌] Click symptom button → select symptom → reach severity dialog >> Severity dialog doesn't appear
-   - [ ] Press back/cancel in severity dialog
-   - [ ] Should return to symptom list (back navigation)
-   - [ ] Cancel again to exit completely
+   - [✅] Click symptom button → select symptom → reach severity dialog >> Severity dialog doesn't appear
+   - [✅] Press back/cancel in severity dialog
+   - [✅] Should return to symptom list (back navigation)
+   - [✅] Clicking on another symptom opens the severity dialog
+   - [✅] Cancel again to exit completely
 
 3. **Cancel Custom Input**:
    - [✅] Click symptom button → select "Other..." → reach custom input
-   - [❌] Press back/cancel or enter empty string >> Returns to the widget, no logging occurs
-   - [ ] Should return to symptom list
-   - [ ] Verify no logging occurred
+   - [✅] Press back/cancel or enter empty string
+   - [✅] Should return to symptom list
+   - [✅] Clicking on another symptom opens the custom input dialog
+   - [✅] Verify no logging occurred
+
+4. **Cancel Custom Input Severity**:
+   - [✅] Click symptom button → select "Other..." → reach custom input
+   - [✅] Enter custom symptom: "My Test Symptom" and confirm entry → reach severity dialog
+   - [✅] Press cancel
+   - [✅] Should return to custom input with no text
 
 ### Test 4: Multiple Symptom Logging
 1. **Log Same Symptom Multiple Times**:
