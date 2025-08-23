@@ -13,6 +13,11 @@ M.levels = {
     {name = "Engaging", color = "#44AA44", key = "green", icon = "rocket-launch"}
 }
 
+-- Helper function to escape special pattern characters
+function M.escape_pattern(text)
+    return text:gsub("([^%w])", "%%%1")
+end
+
 -- Helper function to split text into lines
 function M.split_lines(text)
     local lines = {}
@@ -508,7 +513,7 @@ function M.format_list_items(items, item_type, daily_logs, required_activities, 
     
     local formatted = {}
     for _, item in ipairs(items) do
-        local count = category[item]
+        local count = category[item] or 0
         local is_required = required_set[item]
         
         if count and count > 0 then
@@ -589,7 +594,8 @@ function M.log_item_with_tasker(daily_logs, item_type, item_name, tasker_callbac
     end
     
     if ui_callback then
-        ui_callback("✓ " .. event_type .. " logged: " .. item_name)
+        local message = "✓ " .. event_type .. " logged: " .. item_name
+        ui_callback(message)
     end
     
     return true
@@ -1160,9 +1166,9 @@ end
 M.flow_definitions = {
     symptom = {
         main_list = {
-            dialog_type = "list",
-            title = "Select Symptom",
-            get_items = function(manager, daily_logs)
+            dialog_type = "radio",
+            title = "Select Symptom", 
+            get_options = function(manager, daily_logs)
                 local symptoms = manager:load_symptoms(function(filename) return files:read(filename) end)
                 return M.format_list_items(symptoms, "symptom", daily_logs, {}, {})
             end,
@@ -1254,7 +1260,7 @@ function M.create_dialog_flow_manager()
         if step_config.dialog_type == "list" and step_config.get_items then
             dialog_config.data.items = step_config.get_items(self.data_manager, self.daily_logs)
         elseif step_config.dialog_type == "radio" and step_config.get_options then
-            dialog_config.data.options = step_config.get_options()
+            dialog_config.data.options = step_config.get_options(self.data_manager, self.daily_logs)
         elseif step_config.dialog_type == "edit" then
             dialog_config.data.prompt = step_config.prompt
             dialog_config.data.default_text = step_config.default_text or ""
@@ -1293,13 +1299,18 @@ function M.create_dialog_flow_manager()
             local selected_item = M.extract_item_name(current_dialog.data.items[result])
             current_dialog.data.selected_item = selected_item
             processed_result = selected_item
-            -- DON'T clear ignore flag here - it should stay true until the spurious cancel arrives
         elseif current_dialog.type == "radio" and type(result) == "number" then
             local selected_option = current_dialog.data.options[result]
             current_dialog.data.selected_option = selected_option
-            -- Extract severity number from option like "5 - Moderate-High"
+            
             if current_dialog.name == "severity" then
+                -- Extract severity number from option like "5 - Moderate-High"
                 processed_result = tonumber(selected_option:match("^(%d+)"))
+            elseif current_dialog.name == "main_list" then
+                -- For symptom selection, extract the item name and store it
+                local selected_item = M.extract_item_name(selected_option)
+                current_dialog.data.selected_item = selected_item
+                processed_result = selected_item
             else
                 processed_result = selected_option
             end

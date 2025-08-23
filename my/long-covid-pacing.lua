@@ -402,19 +402,30 @@ function log_item(item_type, item_value, metadata)
     local tasker_callback = nil
     local ui_callback = nil
     
-    -- Handle metadata (for new dialog flows)
+    -- For Tasker/Google Sheets, include severity in the logged value
+    local tasker_item_value = item_value
     if metadata and metadata.severity then
-        -- For symptoms with severity, append severity to the logged item
-        item_value = item_value .. " (severity: " .. metadata.severity .. ")"
+        tasker_item_value = item_value .. " (severity: " .. metadata.severity .. ")"
     end
     
     if tasker then
         tasker_callback = function(params)
+            -- Override the value with severity info for Google Sheets
+            if metadata and metadata.severity then
+                params.value = tasker_item_value
+            end
             tasker:run_task("LongCovid_LogEvent", params)
         end
     end
     
     ui_callback = function(message)
+        if type(message) ~= "string" then
+            message = tostring(message)
+        end
+        -- For symptoms with severity, show the severity in the toast
+        if metadata and metadata.severity and message:find("Symptom logged:") then
+            message = message:gsub("(Symptom logged: " .. core.escape_pattern(item_value) .. ")", "%1 (severity: " .. metadata.severity .. ")")
+        end
         ui:show_toast(message)
     end
     

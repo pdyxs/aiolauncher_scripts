@@ -26,8 +26,8 @@ This checklist focuses on testing the new dialog stack system for symptoms with 
 3. **Select Severity**:
    - [✅] Select severity level (e.g., "5 - Moderate-High")
    - [✅] Verify dialog closes and returns to main widget
-   - [❌] Verify toast confirmation shows successful logging
-   - [❌] Verify symptom logged as: `"Fatigue (severity: 5)"`
+   - [✅] Verify toast confirmation shows successful logging
+   - [✅] Verify symptom logged as: `"Fatigue (severity: 5)"`
 
 ### Test 2: Custom Symptom Flow (List → Custom Input → Severity → Log)
 1. **Start Flow**:
@@ -73,14 +73,14 @@ This checklist focuses on testing the new dialog stack system for symptoms with 
 
 ### Test 4: Multiple Symptom Logging
 1. **Log Same Symptom Multiple Times**:
-   - [ ] Log "Brain fog" with severity 3
-   - [ ] Log "Brain fog" again with severity 6
-   - [ ] Verify both entries logged separately with different severities
+   - [✅] Log "Brain fog" with severity 3
+   - [✅] Log "Brain fog" again with severity 6
+   - [✅] Verify both entries logged separately with different severities
 
 2. **Log Different Symptoms**:
-   - [ ] Log 3-4 different symptoms with various severities
-   - [ ] Verify all logged correctly with severity metadata
-   - [ ] Check symptom list shows proper count markers
+   - [✅] Log 3-4 different symptoms with various severities
+   - [✅] Verify all logged correctly with severity metadata
+   - [✅] Check symptom list shows proper count markers
 
 ---
 
