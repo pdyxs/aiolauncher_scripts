@@ -51,6 +51,10 @@ Evening:
 ### 2. Health & Activity Logging
 - **Symptom button**: 💗 Heart-pulse icon (left group, centered on second line)
   - **Color**: Always grey (#6c757d) - symptoms are not "required"
+  - **Dialog Flow**: Multi-level dialog with severity tracking (NEW)
+    1. **Symptom Selection**: List dialog with search functionality
+    2. **Severity Rating**: Radio dialog with 1-10 scale for all symptoms
+    3. **Logging**: Records symptom with severity metadata
 - **Energy button**: ⚡ Lightning icon (left group, next to symptom button)
   - **Color**: Red (#dc3545) when never logged, Yellow (#ffc107) when 4+ hours since last log, Green (#28a745) when logged within 4 hours
   - **Dialog**: Radio button selection for single-choice energy level
@@ -107,10 +111,18 @@ Evening:
 2. Can change capacity level if needed (downgrade only)
 3. Plan updates automatically
 4. **Activity/Symptom/Intervention logging**:
-   - Click activity/symptom/intervention buttons to open dialogs
-   - Previously logged items show with checkmarks and counts
-   - Select items to log (counts increment for repeated selections)
-   - Custom items available via "Other..." option
+   - **Symptom logging (NEW ENHANCED FLOW)**:
+     - Click symptom button to open symptom selection dialog
+     - Select from list (with checkmarks and counts) or choose "Other..." for custom input
+     - If "Other..." selected: Enter custom symptom name in edit dialog
+     - Choose severity level (1-10 scale): "1 - Minimal" to "10 - Extreme" 
+     - Item logged with severity: "Fatigue (severity: 5)"
+     - Can cancel at any level to return to previous step or main widget
+   - **Activity/Intervention logging (LEGACY SYSTEM)**:
+     - Click buttons to open single dialogs  
+     - Previously logged items show with checkmarks and counts
+     - Select items to log (counts increment for repeated selections)
+     - Custom items available via "Other..." option
 5. **Visual feedback**: Toast confirmations show successful logging
 6. **Immediate dialog refresh**: Dialog automatically refreshes to show updated counts after logging
 
@@ -158,7 +170,11 @@ Activities and interventions can be marked as required using special syntax:
   ```lua
   daily_logs = {
     ["2025-01-21"] = {
-      symptoms = {["Fatigue"] = 2, ["Brain fog"] = 1},
+      symptoms = {
+        ["Fatigue (severity: 5)"] = 1, 
+        ["Brain fog (severity: 3)"] = 2,
+        ["Custom Headache (severity: 7)"] = 1
+      },
       activities = {["Light walk"] = 1, ["Physio (full)"] = 2},
       interventions = {["Vitamin D"] = 1, ["Rest"] = 3}
     }
@@ -189,10 +205,34 @@ The widget uses a modular architecture with the following components:
 - **Main Widget** (`long-covid-pacing.lua`): User interface handling and AIO integration
 - **Core Module** (`long_covid_core.lua`): Business logic and data processing
 - **Managers**: Specialized components for different responsibilities
-  - `dialog_manager`: Handles dialog interactions and data loading
+  - `dialog_manager`: Handles legacy dialog interactions and data loading (activities/interventions)
+  - `dialog_flow_manager`: **NEW** - Manages multi-level dialog flows with severity tracking (symptoms)
   - `cache_manager`: Manages file caching and data persistence
   - `button_mapper`: Maps button interactions to actions
   - `ui_generator`: Creates UI elements based on state
+
+### Dialog Stack System (NEW)
+**Components**:
+- `DialogStack` class (`long_covid_core.lua:1082-1123`): Stack operations for multi-level flows
+- `Dialog Flow Manager` (`long_covid_core.lua:1170-1351`): Orchestrates complex dialog sequences  
+- `Flow Definitions` (`long_covid_core.lua:1126-1167`): Declarative flow configurations
+
+**Architecture**:
+```lua
+-- Dialog Stack manages context across multiple dialog levels
+dialog_stack = {
+    category = "symptom",
+    dialogs = {
+        {type = "list", name = "main_list", data = {...}},
+        {type = "radio", name = "severity", data = {...}}
+    }
+}
+
+-- Flow Manager coordinates the entire user journey
+dialog_flow_manager:start_flow("symptom")
+  → dialog_flow_manager:handle_dialog_result(user_selection)  
+  → dialog_flow_manager:complete_flow() -- with severity metadata
+```
 
 ### Key Functions
 ```lua
@@ -331,10 +371,40 @@ The intervention logging feature allows tracking of medications, supplements, tr
 3. Track patterns over time to identify what helps with specific symptoms or capacity levels
 4. Use "Other..." option for unlisted interventions that get added to custom tracking
 
+## Symptom Severity Tracking (NEW)
+
+### Severity Scale
+All symptoms are now tracked with a 1-10 severity scale:
+- **1 - Minimal**: Barely noticeable, doesn't affect daily activities
+- **2 - Mild**: Noticeable but easily manageable
+- **3 - Mild-Moderate**: Slightly bothersome, minor impact on activities
+- **4 - Moderate**: Noticeable impact, some difficulty with tasks
+- **5 - Moderate-High**: Significant discomfort, affects concentration
+- **6 - High**: Major impact on daily functioning
+- **7 - High-Severe**: Very difficult to manage, limited ability to function
+- **8 - Severe**: Extremely difficult, major limitations
+- **9 - Very Severe**: Nearly incapacitating, very limited function
+- **10 - Extreme**: Completely incapacitating, unable to function
+
+### Enhanced Logging Examples
+**Before (Legacy)**: `Fatigue`, `Brain fog`, `Headache`
+**Now (With Severity)**: `Fatigue (severity: 7)`, `Brain fog (severity: 4)`, `Custom Migraine (severity: 9)`
+
+### Multi-Level Dialog Flow
+1. **Symptom Selection**: Choose from list or "Other..." for custom entry
+2. **Custom Input** (if needed): Enter custom symptom name  
+3. **Severity Rating**: Select 1-10 scale for all symptoms
+4. **Completion**: Symptom logged with severity metadata
+
+### Data Benefits
+- **Pattern recognition**: Track severity trends over time
+- **Treatment correlation**: See which interventions help specific severity levels
+- **Capacity planning**: Understand symptom severity impact on daily capacity
+- **Medical communication**: Provide precise symptom data to healthcare providers
 
 ## Testing Coverage
 
-The widget includes comprehensive test coverage with **87 total tests** across 6 test suites ensuring reliability:
+The widget includes comprehensive test coverage with **106 total tests** across 8 test suites ensuring reliability:
 
 ### Test Suites
 1. **Core Business Logic** (17 tests): File parsing, data management, calculations, energy tracking
@@ -343,6 +413,8 @@ The widget includes comprehensive test coverage with **87 total tests** across 6
 4. **Cache Manager** (11 tests): File caching, data loading, cache invalidation
 5. **Button Mapper** (17 tests): Action identification, level validation, pattern matching
 6. **UI Generator** (14 tests): Element creation, state-based rendering, layout management
+7. **Dialog Stack System** (13 tests): **NEW** - Multi-level flow management, stack operations, context preservation
+8. **Symptoms Flow Integration** (6 tests): **NEW** - End-to-end severity tracking, custom input flows, cancellation handling
 
 ### Key Coverage Areas
 - **Core functionality**: Preferences, daily reset, capacity selection
@@ -353,6 +425,10 @@ The widget includes comprehensive test coverage with **87 total tests** across 6
 - **Dialog refresh**: Automatic dialog updates after logging
 - **Required activities**: Parsing required specifications, day-specific requirements
 - **Completion status**: Button color logic, required vs optional tracking
+- **Multi-level dialogs**: **NEW** - Stack operations, context preservation, flow state management
+- **Severity tracking**: **NEW** - 1-10 scale validation, metadata storage, complete flow testing
+- **Custom input flows**: **NEW** - "Other..." handling, custom symptom entry, validation
+- **Cancellation handling**: **NEW** - Multi-level cancel, back navigation, edge case recovery
 - **Visual markers**: Warning icons for incomplete required items
 - **Energy logging**: Time-based color logic, multiple entries, timing validation
 - **Edge cases**: Items with existing brackets, complex naming scenarios

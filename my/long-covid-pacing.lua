@@ -27,6 +27,7 @@ end
 
 -- Create managers
 local dialog_manager = core.create_dialog_manager()
+local dialog_flow_manager = core.create_dialog_flow_manager()
 local cache_manager = core.create_cache_manager()
 local button_mapper = core.create_button_mapper()
 local ui_generator = core.create_ui_generator()
@@ -46,6 +47,10 @@ function load_prefs_data()
     -- Purge old daily logs on every load for performance
     local today = os.date("%Y-%m-%d")
     daily_logs = core.purge_old_daily_logs(daily_logs, today)
+    
+    -- Initialize dialog flow manager
+    dialog_flow_manager:set_data_manager(dialog_manager)
+    dialog_flow_manager:set_daily_logs(daily_logs)
 end
 
 function save_prefs_data()
@@ -303,15 +308,28 @@ function show_decision_criteria(level_idx)
 end
 
 function show_symptom_dialog()
-    dialog_manager:set_dialog_type("symptom")
-    local symptoms = dialog_manager:load_symptoms(function(filename) return files:read(filename) end)
-    local formatted_symptoms = core.format_list_items(symptoms, "symptom", daily_logs, {}, {})
-    dialogs:show_list_dialog({
-        title = "Log Symptom",
-        lines = formatted_symptoms,
-        search = true,
-        zebra = true
-    })
+    local status, dialog_config = dialog_flow_manager:start_flow("symptom")
+    
+    if status == "show_dialog" then
+        show_aio_dialog(dialog_config)
+    elseif status == "error" then
+        ui:show_text("Error starting symptom flow: " .. tostring(dialog_config))
+    end
+end
+
+function show_aio_dialog(dialog_config)
+    if dialog_config.type == "list" then
+        dialogs:show_list_dialog({
+            title = dialog_config.title,
+            lines = dialog_config.data.items,
+            search = true,
+            zebra = true
+        })
+    elseif dialog_config.type == "radio" then
+        dialogs:show_radio_dialog(dialog_config.title, dialog_config.data.options, 0)
+    elseif dialog_config.type == "edit" then
+        dialogs:show_edit_dialog(dialog_config.title, dialog_config.data.prompt, dialog_config.data.default_text or "")
+    end
 end
 
 function show_activity_dialog()
@@ -345,9 +363,15 @@ function show_energy_dialog()
 end
 
 -- Generic logging function that handles all item types
-function log_item(item_type, item_value)
+function log_item(item_type, item_value, metadata)
     local tasker_callback = nil
     local ui_callback = nil
+    
+    -- Handle metadata (for new dialog flows)
+    if metadata and metadata.severity then
+        -- For symptoms with severity, append severity to the logged item
+        item_value = item_value .. " (severity: " .. metadata.severity .. ")"
+    end
     
     if tasker then
         tasker_callback = function(params)
@@ -385,6 +409,28 @@ end
 
 
 function on_dialog_action(result)
+    -- Check if we have an active dialog flow (new system)
+    if dialog_flow_manager:get_current_dialog() then
+        local status, flow_result = dialog_flow_manager:handle_dialog_result(result)
+        
+        if status == "show_dialog" then
+            show_aio_dialog(flow_result)
+        elseif status == "flow_complete" then
+            -- Log the completed item
+            log_item(flow_result.category, flow_result.item, flow_result.metadata)
+            render_widget()
+        elseif status == "flow_cancelled" then
+            render_widget()
+        elseif status == "continue" then
+            -- Dialog system quirk handling - do nothing
+        elseif status == "error" then
+            ui:show_text("Dialog flow error: " .. tostring(flow_result))
+            render_widget()
+        end
+        return true
+    end
+    
+    -- Fall back to legacy dialog system for activities/interventions
     local action, param1, param2, param3, param4 = dialog_manager:handle_dialog_result(
         result, 
         daily_logs, 

@@ -1078,4 +1078,284 @@ function M.create_ui_generator()
     return generator
 end
 
+-- Dialog Stack System for Multi-Level Dialog Flows
+function M.create_dialog_stack(category)
+    local stack = {
+        category = category,
+        dialogs = {},
+        current_context = {}
+    }
+    
+    function stack:push_dialog(dialog_config)
+        table.insert(self.dialogs, dialog_config)
+    end
+    
+    function stack:get_current_dialog()
+        return self.dialogs[#self.dialogs]
+    end
+    
+    function stack:pop_dialog()
+        return table.remove(self.dialogs)
+    end
+    
+    function stack:is_empty()
+        return #self.dialogs == 0
+    end
+    
+    function stack:get_full_context()
+        local context = {}
+        for _, dialog in ipairs(self.dialogs) do
+            if dialog.data then
+                for key, value in pairs(dialog.data) do
+                    context[key] = value
+                end
+            end
+        end
+        return context
+    end
+    
+    function stack:clear()
+        self.dialogs = {}
+        self.current_context = {}
+    end
+    
+    return stack
+end
+
+-- Flow Definitions for Dialog Categories
+M.flow_definitions = {
+    symptom = {
+        main_list = {
+            dialog_type = "list",
+            title = "Select Symptom",
+            get_items = function(manager, daily_logs)
+                local symptoms = manager:load_symptoms()
+                return M.format_list_items(symptoms, "symptom", daily_logs, {}, {})
+            end,
+            next_step = function(selected_item, context)
+                if selected_item == "Other..." then
+                    return "custom_input"
+                else
+                    return "severity"
+                end
+            end
+        },
+        
+        custom_input = {
+            dialog_type = "edit",
+            title = "Custom Symptom",
+            prompt = "Enter symptom name:",
+            default_text = "",
+            next_step = function(custom_name, context)
+                return "severity"
+            end
+        },
+        
+        severity = {
+            dialog_type = "radio",
+            title = "Symptom Severity",
+            get_options = function()
+                return {
+                    "1 - Minimal", "2 - Mild", "3 - Mild-Moderate", "4 - Moderate", "5 - Moderate-High",
+                    "6 - High", "7 - High-Severe", "8 - Severe", "9 - Very Severe", "10 - Extreme"
+                }
+            end,
+            next_step = function(severity_level, context)
+                return "complete"
+            end
+        }
+    }
+}
+
+-- Dialog Flow Manager
+function M.create_dialog_flow_manager()
+    local manager = {
+        current_stack = nil,
+        flow_definitions = M.flow_definitions,
+        data_manager = nil,
+        ignore_next_cancel = false
+    }
+    
+    function manager:set_data_manager(data_mgr)
+        self.data_manager = data_mgr
+    end
+    
+    function manager:set_daily_logs(logs)
+        self.daily_logs = logs
+    end
+    
+    function manager:start_flow(category)
+        self.current_stack = M.create_dialog_stack(category)
+        self.ignore_next_cancel = false
+        
+        local flow_def = self.flow_definitions[category]
+        if not flow_def or not flow_def.main_list then
+            return "error", "Unknown flow category: " .. category
+        end
+        
+        return self:push_next_dialog("main_list")
+    end
+    
+    function manager:push_next_dialog(step_name)
+        if not self.current_stack then
+            return "error", "No active dialog stack"
+        end
+        
+        local flow_def = self.flow_definitions[self.current_stack.category]
+        local step_config = flow_def[step_name]
+        
+        if not step_config then
+            return "error", "Unknown dialog step: " .. step_name
+        end
+        
+        local dialog_config = {
+            type = step_config.dialog_type,
+            name = step_name,
+            title = step_config.title,
+            data = {},
+            step_config = step_config
+        }
+        
+        -- Prepare dialog-specific data
+        if step_config.dialog_type == "list" and step_config.get_items then
+            dialog_config.data.items = step_config.get_items(self.data_manager, self.daily_logs)
+        elseif step_config.dialog_type == "radio" and step_config.get_options then
+            dialog_config.data.options = step_config.get_options()
+        elseif step_config.dialog_type == "edit" then
+            dialog_config.data.prompt = step_config.prompt
+            dialog_config.data.default_text = step_config.default_text or ""
+        end
+        
+        self.current_stack:push_dialog(dialog_config)
+        
+        -- Handle list dialog quirk - they don't auto-close on selection
+        if step_config.dialog_type == "list" then
+            self.ignore_next_cancel = true
+        end
+        
+        return "show_dialog", dialog_config
+    end
+    
+    function manager:handle_dialog_result(result)
+        if not self.current_stack or self.current_stack:is_empty() then
+            return "error", "No active dialog flow"
+        end
+        
+        if result == -1 then
+            return self:handle_cancel()
+        end
+        
+        local current_dialog = self.current_stack:get_current_dialog()
+        if not current_dialog then
+            return "error", "No current dialog"
+        end
+        
+        local step_config = current_dialog.step_config
+        local context = self.current_stack:get_full_context()
+        
+        -- Process the result based on dialog type
+        local processed_result = result
+        local next_step_name = nil
+        
+        if current_dialog.type == "list" and type(result) == "number" then
+            local selected_item = M.extract_item_name(current_dialog.data.items[result])
+            current_dialog.data.selected_item = selected_item
+            processed_result = selected_item
+            -- Clear ignore flag after successful list selection
+            self.ignore_next_cancel = false
+        elseif current_dialog.type == "radio" and type(result) == "number" then
+            local selected_option = current_dialog.data.options[result]
+            current_dialog.data.selected_option = selected_option
+            -- Extract severity number from option like "5 - Moderate-High"
+            if current_dialog.name == "severity" then
+                processed_result = tonumber(selected_option:match("^(%d+)"))
+            else
+                processed_result = selected_option
+            end
+        elseif current_dialog.type == "edit" and type(result) == "string" then
+            if result == "" then
+                return self:handle_cancel()
+            end
+            current_dialog.data.custom_input = result
+            processed_result = result
+        end
+        
+        -- Determine next step
+        if step_config.next_step then
+            next_step_name = step_config.next_step(processed_result, context)
+        end
+        
+        if next_step_name == "complete" then
+            return self:complete_flow()
+        elseif next_step_name then
+            return self:push_next_dialog(next_step_name)
+        else
+            return "error", "No next step defined"
+        end
+    end
+    
+    function manager:handle_cancel()
+        if self.ignore_next_cancel then
+            self.ignore_next_cancel = false
+            return "continue"
+        end
+        
+        if self.current_stack and not self.current_stack:is_empty() then
+            self.current_stack:pop_dialog()
+            if self.current_stack:is_empty() then
+                return self:reset()
+            else
+                local current_dialog = self.current_stack:get_current_dialog()
+                return "show_dialog", current_dialog
+            end
+        end
+        
+        return self:reset()
+    end
+    
+    function manager:complete_flow()
+        if not self.current_stack then
+            return "error", "No active flow to complete"
+        end
+        
+        local category = self.current_stack.category
+        local context = self.current_stack:get_full_context()
+        
+        -- Build the logged item based on the flow
+        local logged_item = nil
+        local metadata = {}
+        
+        if category == "symptom" then
+            -- Prioritize custom input over selected item (for "Other..." flows)
+            logged_item = context.custom_input or context.selected_item
+            if context.selected_option then
+                -- Extract severity level from the option
+                metadata.severity = tonumber(context.selected_option:match("^(%d+)"))
+            end
+        end
+        
+        self:reset()
+        return "flow_complete", {
+            category = category,
+            item = logged_item,
+            metadata = metadata
+        }
+    end
+    
+    function manager:reset()
+        self.current_stack = nil
+        self.ignore_next_cancel = false
+        return "flow_cancelled"
+    end
+    
+    function manager:get_current_dialog()
+        if self.current_stack then
+            return self.current_stack:get_current_dialog()
+        end
+        return nil
+    end
+    
+    return manager
+end
+
 return M
