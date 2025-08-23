@@ -22,7 +22,17 @@ local test_suites = {
     {name = "Cache Manager", file = "test_cache_manager"},
     {name = "Button Mapper", file = "test_button_mapper"},
     {name = "UI Generator", file = "test_ui_generator"},
-    {name = "Day Reset Scenarios", file = "test_day_reset"}
+    {name = "Day Reset Scenarios", file = "test_day_reset"},
+    {name = "Dialog Stack System", file = "test_dialog_stack"},
+    {name = "Symptoms Integration", file = "test_symptoms_integration"},
+    {name = "Flow Completion", file = "test_flow_completion"},
+    {name = "Dialog Flow Simulation", file = "test_dialog_flow_simulation"},
+    {name = "Cancellation State Bug", file = "test_cancellation_state_bug"},
+    {name = "Real Cancel Flow", file = "test_real_cancel_flow"},
+    {name = "Long Covid Widget", file = "test_long_covid_widget"},
+    {name = "Symptom Counts", file = "test_symptom_counts"},
+    {name = "Simple Symptom Counts", file = "test_simple_symptom_counts"},
+    {name = "Custom Symptom Debug", file = "test_custom_symptom_debug"}
 }
 
 -- Track overall results

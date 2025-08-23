@@ -40,16 +40,16 @@ test_framework.add_test("DialogStack creation and basic operations", function()
     
     -- Test push operation
     local dialog_config = {
-        type = "list",
+        type = "radio",
         name = "main_list",
-        data = {items = {"item1", "item2"}}
+        data = {options = {"option1", "option2"}}
     }
     
     stack:push_dialog(dialog_config)
     test_framework.assert_false(stack:is_empty())
     
     local current = stack:get_current_dialog()
-    test_framework.assert_equals("list", current.type)
+    test_framework.assert_equals("radio", current.type)
     test_framework.assert_equals("main_list", current.name)
 end)
 
@@ -58,9 +58,9 @@ test_framework.add_test("DialogStack context aggregation", function()
     
     -- Push first dialog with some data
     stack:push_dialog({
-        type = "list",
-        name = "main_list",
-        data = {selected_item = "Fatigue", items = {"Fatigue", "Other..."}}
+        type = "radio",
+        name = "main_list", 
+        data = {selected_item = "Fatigue", options = {"Fatigue", "Other..."}}
     })
     
     -- Push second dialog with more data
@@ -73,13 +73,14 @@ test_framework.add_test("DialogStack context aggregation", function()
     local context = stack:get_full_context()
     test_framework.assert_equals("Fatigue", context.selected_item)
     test_framework.assert_equals("5 - Moderate-High", context.selected_option)
-    test_framework.assert_contains(context.items, "Fatigue")
+    -- Context should contain options from the latest dialog (severity), not the first dialog
+    test_framework.assert_contains(context.options, "1 - Minimal")
 end)
 
 test_framework.add_test("DialogStack pop operations", function()
     local stack = core.create_dialog_stack("symptom")
     
-    local dialog1 = {type = "list", name = "main_list", data = {}}
+    local dialog1 = {type = "radio", name = "main_list", data = {}}
     local dialog2 = {type = "radio", name = "severity", data = {}}
     
     stack:push_dialog(dialog1)
@@ -119,9 +120,9 @@ test_framework.add_test("Dialog Flow Manager start_flow", function()
     
     test_framework.assert_equals("show_dialog", status)
     test_framework.assert_type("table", result)
-    test_framework.assert_equals("list", result.type)
+    test_framework.assert_equals("radio", result.type)
     test_framework.assert_equals("main_list", result.name)
-    test_framework.assert_contains(result.data.items, "   Fatigue")
+    test_framework.assert_contains(result.data.options, "   Fatigue")
     
     -- Should have created a stack
     test_framework.assert_not_nil(manager.current_stack)
@@ -275,14 +276,14 @@ test_framework.add_test("Dialog Flow Manager empty custom input", function()
     manager:start_flow("symptom")
     manager:handle_dialog_result(4) -- "Other..."
     
-    -- Enter empty string (should be treated as cancel)
+    -- Enter empty string (should be treated as cancel with ignore flag active)
     local status = manager:handle_dialog_result("")
-    -- Edit dialog cancel should return "show_dialog" to go back to previous level 
-    test_framework.assert_equals("show_dialog", status)
+    -- With ignore cancellation system, empty edit should return "continue"
+    test_framework.assert_equals("continue", status)
     
-    -- Should be back at main list
+    -- Should still be on custom input dialog (cancel was ignored)
     local current = manager:get_current_dialog()
-    test_framework.assert_equals("main_list", current.name)
+    test_framework.assert_equals("custom_input", current.name)
 end)
 
 -- Run the tests

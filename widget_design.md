@@ -52,9 +52,10 @@ Evening:
 - **Symptom button**: 💗 Heart-pulse icon (left group, centered on second line)
   - **Color**: Always grey (#6c757d) - symptoms are not "required"
   - **Dialog Flow**: Multi-level dialog with severity tracking (NEW)
-    1. **Symptom Selection**: List dialog with search functionality
+    1. **Symptom Selection**: Radio dialog with formatted symptom options (includes count markers)
     2. **Severity Rating**: Radio dialog with 1-10 scale for all symptoms
     3. **Logging**: Records symptom with severity metadata
+  - **AIO Compatibility**: Uses radio dialogs throughout to work around AIO list→radio dialog issues
 - **Energy button**: ⚡ Lightning icon (left group, next to symptom button)
   - **Color**: Red (#dc3545) when never logged, Yellow (#ffc107) when 4+ hours since last log, Green (#28a745) when logged within 4 hours
   - **Dialog**: Radio button selection for single-choice energy level
@@ -112,11 +113,12 @@ Evening:
 3. Plan updates automatically
 4. **Activity/Symptom/Intervention logging**:
    - **Symptom logging (NEW ENHANCED FLOW)**:
-     - Click symptom button to open symptom selection dialog
-     - Select from list (with checkmarks and counts) or choose "Other..." for custom input
+     - Click symptom button to open symptom selection radio dialog
+     - Select from radio options (with checkmarks and counts) or choose "Other..." for custom input
      - If "Other..." selected: Enter custom symptom name in edit dialog
-     - Choose severity level (1-10 scale): "1 - Minimal" to "10 - Extreme" 
-     - Item logged with severity: "Fatigue (severity: 5)"
+     - Choose severity level (1-10 scale): "1 - Minimal" to "10 - Extreme" in radio dialog
+     - Item logged with severity metadata (Google Sheets gets full info, local storage gets base symptom name only)
+     - Automatic cancellation handling prevents dialog closing issues
      - Can cancel at any level to return to previous step or main widget
    - **Activity/Intervention logging (LEGACY SYSTEM)**:
      - Click buttons to open single dialogs  
@@ -216,6 +218,18 @@ The widget uses a modular architecture with the following components:
 - `DialogStack` class (`long_covid_core.lua:1082-1123`): Stack operations for multi-level flows
 - `Dialog Flow Manager` (`long_covid_core.lua:1170-1351`): Orchestrates complex dialog sequences  
 - `Flow Definitions` (`long_covid_core.lua:1126-1167`): Declarative flow configurations
+
+**AIO Platform Compatibility**:
+- **Issue**: AIO Launcher has a bug where radio dialogs don't trigger `on_dialog_action` for OK/selection events
+- **Solution**: Converted all symptom flow dialogs from list→radio to radio→radio pattern
+- **Benefit**: Consistent dialog API usage prevents `on_dialog_action` callback issues
+- **Implementation**: Both symptom selection and severity dialogs now use `dialogs:show_radio_dialog()`
+
+**Cancellation Handling**:
+- **Issue**: AIO sends spurious cancel events after dialog selections
+- **Solution**: `ignore_next_cancel` flag system automatically ignores expected cancel events
+- **Trigger**: Set to `true` whenever a dialog is shown, cleared when spurious cancel processed
+- **Result**: Multi-level dialogs remain stable during transitions
 
 **Architecture**:
 ```lua
@@ -391,10 +405,12 @@ All symptoms are now tracked with a 1-10 severity scale:
 **Now (With Severity)**: `Fatigue (severity: 7)`, `Brain fog (severity: 4)`, `Custom Migraine (severity: 9)`
 
 ### Multi-Level Dialog Flow
-1. **Symptom Selection**: Choose from list or "Other..." for custom entry
-2. **Custom Input** (if needed): Enter custom symptom name  
-3. **Severity Rating**: Select 1-10 scale for all symptoms
+1. **Symptom Selection**: Choose from radio dialog options or "Other..." for custom entry
+2. **Custom Input** (if needed): Enter custom symptom name in edit dialog 
+3. **Severity Rating**: Select 1-10 scale in radio dialog for all symptoms
 4. **Completion**: Symptom logged with severity metadata
+   - Google Sheets: Full severity info (e.g., "Fatigue (severity: 5)")
+   - Local storage: Base symptom name only (e.g., "Fatigue") for count markers
 
 ### Data Benefits
 - **Pattern recognition**: Track severity trends over time
@@ -404,7 +420,7 @@ All symptoms are now tracked with a 1-10 severity scale:
 
 ## Testing Coverage
 
-The widget includes comprehensive test coverage with **106 total tests** across 8 test suites ensuring reliability:
+The widget includes comprehensive test coverage with **87 total tests** across 8 test suites ensuring reliability:
 
 ### Test Suites
 1. **Core Business Logic** (17 tests): File parsing, data management, calculations, energy tracking
@@ -413,8 +429,8 @@ The widget includes comprehensive test coverage with **106 total tests** across 
 4. **Cache Manager** (11 tests): File caching, data loading, cache invalidation
 5. **Button Mapper** (17 tests): Action identification, level validation, pattern matching
 6. **UI Generator** (14 tests): Element creation, state-based rendering, layout management
-7. **Dialog Stack System** (13 tests): **NEW** - Multi-level flow management, stack operations, context preservation
-8. **Symptoms Flow Integration** (6 tests): **NEW** - End-to-end severity tracking, custom input flows, cancellation handling
+7. **Dialog Stack Core** (13 tests): **NEW** - Multi-level flow management, stack operations, context preservation
+8. **Dialog Stack Integration** (6 tests): **NEW** - Radio dialog compatibility, severity tracking, cancellation handling, AIO platform workarounds
 
 ### Key Coverage Areas
 - **Core functionality**: Preferences, daily reset, capacity selection

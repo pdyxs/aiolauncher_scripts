@@ -53,6 +53,40 @@ This ensures click handlers work regardless of whether buttons show icon-only or
 - Use `fa:icon` for icon-only buttons
 - Escape special characters in patterns: `rotate%-right` not `rotate-right`
 
+### Radio Dialog Compatibility Issues
+
+**Critical AIO Bug**: Radio dialogs have an underlying platform issue where `on_dialog_action` is not called for OK/selection events, only for cancel events.
+
+**Problem Symptoms**:
+- Radio dialog selections don't trigger `on_dialog_action` callback
+- Flow gets stuck after radio dialog selection
+- List dialogs work correctly, radio dialogs fail silently
+
+**Verified Workaround**: Use radio dialogs for **all** dialog steps in a flow, not mixed list→radio patterns.
+
+**Implementation Strategy**:
+```lua
+-- ❌ Don't mix dialog types (causes on_dialog_action issues)
+symptom_flow = {
+    main_list = { dialog_type = "list" },      -- Works
+    severity = { dialog_type = "radio" }       -- Breaks - radio after list
+}
+
+-- ✅ Use consistent radio dialogs throughout
+symptom_flow = {
+    main_list = { dialog_type = "radio" },     -- Works
+    severity = { dialog_type = "radio" }       -- Works - radio after radio
+}
+```
+
+**Required Changes for Radio Compatibility**:
+1. **Dialog Flow Definition**: Convert `get_items` → `get_options` for radio dialogs
+2. **Data Processing**: Update handlers to expect `data.options` instead of `data.items`  
+3. **Display Logic**: Use `dialogs:show_radio_dialog()` consistently
+4. **Test Updates**: Update test assertions to expect radio dialog structures
+
+This workaround was implemented successfully for the Long Covid widget's symptom flow, converting from list→radio to radio→radio pattern.
+
 ## Testing
 
 ### Test Suite Location

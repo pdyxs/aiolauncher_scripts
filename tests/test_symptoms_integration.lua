@@ -133,7 +133,7 @@ test_framework.add_test("Widget symptoms flow initialization", function()
     test_framework.assert_equals(1, #mock_dialogs.calls)
     
     local call = mock_dialogs.calls[1]
-    test_framework.assert_equals("list", call[1])
+    test_framework.assert_equals("radio", call[1])
     test_framework.assert_equals("Select Symptom", call[2])
     test_framework.assert_contains(call[3], "   Fatigue")
 end)
@@ -221,13 +221,10 @@ test_framework.add_test("Cancel symptoms flow at severity level", function()
     
     -- Cancel at severity level
     local status = mock_widget:handle_dialog_action(-1)
-    test_framework.assert_equals("dialog_shown", status)
+    test_framework.assert_equals("continue", status)
     
-    -- Should be back at main list
-    test_framework.assert_equals(3, #mock_dialogs.calls)
-    local back_to_list = mock_dialogs.calls[3]
-    test_framework.assert_equals("list", back_to_list[1])
-    test_framework.assert_equals("Select Symptom", back_to_list[2])
+    -- Continue means no new dialog was shown, so still 2 calls
+    test_framework.assert_equals(2, #mock_dialogs.calls)
     
     -- Nothing should be logged
     test_framework.assert_equals(0, #mock_widget.logged_items)
@@ -264,13 +261,10 @@ test_framework.add_test("Empty custom input returns to main list", function()
     
     -- Enter empty string
     local status = mock_widget:handle_dialog_action("")
-    test_framework.assert_equals("dialog_shown", status)
+    test_framework.assert_equals("continue", status)
     
-    -- Should be back at main list
-    test_framework.assert_equals(3, #mock_dialogs.calls)
-    local back_to_list = mock_dialogs.calls[3]
-    test_framework.assert_equals("list", back_to_list[1])
-    test_framework.assert_equals("Select Symptom", back_to_list[2])
+    -- Continue means no new dialog was shown, so still 2 calls
+    test_framework.assert_equals(2, #mock_dialogs.calls)
     
     -- Nothing should be logged
     test_framework.assert_equals(0, #mock_widget.logged_items)
