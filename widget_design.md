@@ -449,12 +449,12 @@ All symptoms are now tracked with a 1-10 severity scale:
 
 ## Testing Coverage
 
-The widget includes comprehensive test coverage with **100+ total tests** across 12+ test suites ensuring reliability:
+The widget includes comprehensive test coverage with **126 total tests** across 14 test suites ensuring reliability:
 
 ### Test Suites
 1. **Core Business Logic** (17 tests): File parsing, data management, calculations, energy tracking
 2. **Logging Functions** (14 tests): Tasker integration, error handling, callback validation
-3. **Dialog Manager** (14 tests): State management, data loading, result processing
+3. **Dialog Manager** (7 tests): Data loading, caching, and content access
 4. **Cache Manager** (11 tests): File caching, data loading, cache invalidation
 5. **Button Mapper** (17 tests): Action identification, level validation, pattern matching
 6. **UI Generator** (14 tests): Element creation, state-based rendering, layout management
@@ -489,7 +489,7 @@ The widget includes comprehensive test coverage with **100+ total tests** across
 ### Running Tests
 ```bash
 cd tests
-lua run_all_tests.lua  # Run complete test suite (100+ tests)
+lua run_all_tests.lua  # Run complete test suite (126 tests across 14 suites)
 ```
 
 The modular architecture allows for focused testing of each component, with the widget reduced from 680 lines to 428 lines (-37%) while maintaining full functionality through the core module.
