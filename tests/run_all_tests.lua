@@ -28,6 +28,7 @@ local test_suites = {
     {name = "Activities Integration", file = "test_activities_integration"},
     {name = "Interventions Integration", file = "test_interventions_integration"},
     {name = "Activity Logging Persistence", file = "test_activity_logging_persistence"},
+    {name = "Energy Integration", file = "test_energy_integration"},
     {name = "Flow Completion", file = "test_flow_completion"},
     {name = "Dialog Flow Simulation", file = "test_dialog_flow_simulation"},
     {name = "Cancellation State Bug", file = "test_cancellation_state_bug"},

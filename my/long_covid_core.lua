@@ -700,7 +700,6 @@ end
 -- Dialog manager for handling different dialog types
 function M.create_dialog_manager()
     local manager = {
-        current_dialog_type = nil,
         cached_symptoms = nil,
         cached_activities = nil,
         cached_interventions = nil,
@@ -708,17 +707,6 @@ function M.create_dialog_manager()
         cached_required_interventions = nil
     }
     
-    function manager:set_dialog_type(dialog_type)
-        self.current_dialog_type = dialog_type
-    end
-    
-    function manager:get_dialog_type()
-        return self.current_dialog_type
-    end
-    
-    function manager:clear_dialog_type()
-        self.current_dialog_type = nil
-    end
     
     function manager:load_symptoms(file_reader)
         if not self.cached_symptoms then
@@ -834,85 +822,6 @@ function M.create_dialog_manager()
         end
     end
     
-    function manager:handle_dialog_result(result, daily_logs, file_reader, log_callback)
-        if result == -1 then
-            self:clear_dialog_type()
-            return "cancelled"
-        end
-        
-        if type(result) == "number" then
-            if self.current_dialog_type == "symptom" then
-                local symptoms = self:load_symptoms(file_reader)
-                local formatted_symptoms = M.format_list_items(symptoms, "symptom", daily_logs, {}, {})
-                local selected_item = M.extract_item_name(formatted_symptoms[result])
-                
-                if selected_item == "Other..." then
-                    self.current_dialog_type = "symptom_edit"
-                    return "edit_dialog", "Custom Symptom", "Enter symptom name:", ""
-                else
-                    log_callback("symptom", selected_item)
-                    return "logged", selected_item
-                end
-            elseif self.current_dialog_type == "activity" then
-                local activities, required_activities = self:load_activities(file_reader)
-                local formatted_activities = M.format_list_items(activities, "activity", daily_logs, required_activities, {})
-                local selected_item = M.extract_item_name(formatted_activities[result])
-                
-                if selected_item == "Other..." then
-                    self.current_dialog_type = "activity_edit"
-                    return "edit_dialog", "Custom Activity", "Enter activity name:", ""
-                else
-                    log_callback("activity", selected_item)
-                    return "logged", selected_item
-                end
-            elseif self.current_dialog_type == "intervention" then
-                local interventions, required_interventions = self:load_interventions(file_reader)
-                local formatted_interventions = M.format_list_items(interventions, "intervention", daily_logs, {}, required_interventions)
-                local selected_item = M.extract_item_name(formatted_interventions[result])
-                
-                if selected_item == "Other..." then
-                    self.current_dialog_type = "intervention_edit"
-                    return "edit_dialog", "Custom Intervention", "Enter intervention name:", ""
-                else
-                    log_callback("intervention", selected_item)
-                    return "logged", selected_item
-                end
-            elseif self.current_dialog_type == "energy" then
-                local energy_levels = self:get_energy_levels()
-                local selected_text = energy_levels[result]
-                if selected_text then
-                    local energy_level = tonumber(selected_text:match("^(%d+)"))
-                    if energy_level then
-                        log_callback("energy", energy_level)
-                        return "logged", energy_level
-                    end
-                end
-            end
-        elseif type(result) == "string" then
-            if result ~= "" then
-                if self.current_dialog_type == "symptom_edit" then
-                    self.current_dialog_type = "symptom"
-                    log_callback("symptom", result)
-                    return "logged", result
-                elseif self.current_dialog_type == "activity_edit" then
-                    self.current_dialog_type = "activity"
-                    log_callback("activity", result)
-                    return "logged", result
-                elseif self.current_dialog_type == "intervention_edit" then
-                    self.current_dialog_type = "intervention"
-                    log_callback("intervention", result)
-                    return "logged", result
-                end
-            else
-                if self.current_dialog_type:find("_edit$") then
-                    self.current_dialog_type = self.current_dialog_type:gsub("_edit$", "")
-                    return "return_to_list"
-                end
-            end
-        end
-        
-        return "unknown"
-    end
     
     return manager
 end
@@ -1411,6 +1320,24 @@ M.flow_definitions = {
                 return "complete"
             end
         }
+    },
+    
+    energy = {
+        main_list = {
+            dialog_type = "radio",
+            title = "Log Energy Level",
+            get_options = function(manager)
+                -- Energy levels from 1-10 with descriptions
+                return {
+                    "1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
+                    "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
+                    "9 - Excellent", "10 - Peak energy"
+                }
+            end,
+            next_step = function(selected_level, context)
+                return "complete"
+            end
+        }
     }
 }
 
@@ -1616,6 +1543,11 @@ function M.create_dialog_flow_manager()
             -- If an option was selected, combine item and option
             if context.selected_option and not context.custom_input then
                 logged_item = logged_item .. ": " .. context.selected_option
+            end
+        elseif category == "energy" then
+            -- For energy, extract the numeric level from the selected option
+            if context.selected_item then
+                logged_item = tonumber(context.selected_item:match("^(%d+)"))
             end
         end
         

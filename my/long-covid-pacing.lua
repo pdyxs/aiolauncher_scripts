@@ -398,9 +398,18 @@ function show_intervention_dialog()
 end
 
 function show_energy_dialog()
-    dialog_manager:set_dialog_type("energy")
-    local energy_levels = dialog_manager:get_energy_levels()
-    dialogs:show_radio_dialog("Log Energy Level", energy_levels, 0)
+    if dialog_flow_manager then
+        dialog_flow_manager:set_data_manager(dialog_manager)
+        dialog_flow_manager:set_daily_logs(daily_logs)
+        local status, data = dialog_flow_manager:start_flow("energy")
+        if status == "show_dialog" then
+            show_aio_dialog(data)
+        else
+            ui:toast("Error starting energy flow: " .. tostring(data))
+        end
+    else
+        ui:toast("Dialog flow manager not available")
+    end
 end
 
 -- Generic logging function that handles all item types
@@ -444,24 +453,13 @@ function log_item(item_type, item_value, metadata)
     
     if success then
         save_prefs_data()
-        
-        -- Show appropriate dialog or return to widget
-        local dialog_type = dialog_manager:get_dialog_type()
-        if dialog_type == "symptom" or dialog_type == "symptom_edit" then
-            show_symptom_dialog()
-        elseif dialog_type == "activity" or dialog_type == "activity_edit" then
-            show_activity_dialog()
-        elseif dialog_type == "intervention" or dialog_type == "intervention_edit" then
-            show_intervention_dialog()
-        else
-            render_widget()
-        end
+        -- Dialog handling is now managed by the flow system in on_dialog_action
     end
 end
 
 
 function on_dialog_action(result)
-    -- Check if we have an active dialog flow (new system)
+    -- All dialogs now use the new dialog flow system
     if dialog_flow_manager:get_current_dialog() then        
         local status, flow_result = dialog_flow_manager:handle_dialog_result(result)
         
@@ -482,32 +480,8 @@ function on_dialog_action(result)
         return true
     end
     
-    -- Fall back to legacy dialog system for activities/interventions
-    local action, param1, param2, param3, param4 = dialog_manager:handle_dialog_result(
-        result, 
-        daily_logs, 
-        function(filename) return files:read(filename) end, 
-        log_item
-    )
-    
-    if action == "cancelled" then
-        return true
-    elseif action == "edit_dialog" then
-        dialogs:show_edit_dialog(param1, param2, param3)
-        return true
-    elseif action == "logged" then
-        return true
-    elseif action == "return_to_list" then
-        local dialog_type = dialog_manager:get_dialog_type()
-        if dialog_type == "symptom" then
-            show_symptom_dialog()
-        elseif dialog_type == "activity" then
-            show_activity_dialog()
-        elseif dialog_type == "intervention" then
-            show_intervention_dialog()
-        end
-        return true
-    end
-    
+    -- No active dialog flow - should not happen
+    ui:show_text("No active dialog flow")
+    render_widget()
     return true
 end
