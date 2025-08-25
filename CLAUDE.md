@@ -14,7 +14,7 @@ The widget design can be found in widget_design.md. **IMPORTANT**: Follow the do
 
 #### Long Covid data
 
-Long covid planning can be found in the filesystem, under 'Long Covid/plans'. 
+Long covid planning can be found in the filesystem, under `Long Covid/plans/`. (See CLAUDE.local.md for the full machine-specific path.) 
 
 Please read and follow the instructions in the 'project_instructions.md' file in that folder before making changes to those plans.
 

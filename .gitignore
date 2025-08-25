@@ -1,3 +1,6 @@
 # Other temporary files
 *.tmp
 *.bak
+
+# Machine-specific configuration
+CLAUDE.local.md

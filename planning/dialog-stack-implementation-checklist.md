@@ -86,17 +86,21 @@
 
 ## Phase 3: Activities & Interventions
 
-### Activities Flow
-- [ ] Define activities flow with conditional intensity step
-- [ ] Parse activity metadata for intensity options from files
-- [ ] Implement intensity selection dialog
-- [ ] Update activity logging with intensity metadata
+### Activities Flow with Optional Options
+- [ ] Define activities flow with conditional options step
+- [ ] Parse activity metadata for {Options:} from `/mnt/c/Users/pdyxs/Documents/pdyxs/Long Covid/plans/activities.md`
+  - [ ] Detect activities with `{Options: option1, option2, ...}` format
+  - [ ] Parse comma-separated option lists (e.g., "In Office, From Home", "Light, Medium, Heavy")
+- [ ] Implement conditional flow: activity selection → options selection (if {Options:} present)
+- [ ] Update activity logging with selected option metadata (format: `"Activity: Option"`)
 
-### Interventions Flow  
-- [ ] Define interventions flow with optional options step
-- [ ] Parse intervention metadata for available options
-- [ ] Implement options selection dialog
-- [ ] Update intervention logging with options metadata
+### Interventions Flow with Optional Options
+- [ ] Define interventions flow with conditional options step
+- [ ] Parse intervention metadata for {Options:} from `/mnt/c/Users/pdyxs/Documents/pdyxs/Long Covid/plans/interventions.md`
+  - [ ] Detect interventions with `{Options: option1, option2, ...}` format
+  - [ ] Parse comma-separated option lists
+- [ ] Implement conditional flow: intervention selection → options selection (if {Options:} present)
+- [ ] Update intervention logging with selected option metadata
 
 ### Enhanced Flow Features
 - [ ] Implement conditional flow branching
@@ -105,10 +109,13 @@
 - [ ] Add flow state validation
 
 ### Testing Phase 3
-- [ ] Test activities with and without intensity options
+- [ ] Test activities without options (e.g., "Yin Yoga") - should log directly
+- [ ] Test activities with options (e.g., "Work" → "In Office"/"From Home") - should show options dialog
+- [ ] Test activities with options (e.g., "Walk" → "Light"/"Medium"/"Heavy") - should show options dialog
 - [ ] Test interventions with and without option selection
 - [ ] Test all flow combinations and edge cases
-- [ ] Verify data logging includes all metadata correctly
+- [ ] Verify data logging format: activities without options log as "Activity", with options log as "Activity: Option"
+- [ ] Test option parsing handles various comma-separated formats correctly
 
 ## Phase 4: Polish & Documentation
 
