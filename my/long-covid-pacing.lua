@@ -368,27 +368,33 @@ function show_aio_dialog(dialog_config)
 end
 
 function show_activity_dialog()
-    dialog_manager:set_dialog_type("activity")
-    local activities, required_activities = dialog_manager:load_activities(function(filename) return files:read(filename) end)
-    local formatted_activities = core.format_list_items(activities, "activity", daily_logs, required_activities, {})
-    dialogs:show_list_dialog({
-        title = "Log Activity",
-        lines = formatted_activities,
-        search = true,
-        zebra = true
-    })
+    if dialog_flow_manager then
+        dialog_flow_manager:set_data_manager(dialog_manager)
+        dialog_flow_manager:set_daily_logs(daily_logs)
+        local status, data = dialog_flow_manager:start_flow("activity")
+        if status == "show_dialog" then
+            show_aio_dialog(data)
+        else
+            ui:toast("Error starting activity flow: " .. tostring(data))
+        end
+    else
+        ui:toast("Dialog flow manager not available")
+    end
 end
 
 function show_intervention_dialog()
-    dialog_manager:set_dialog_type("intervention")
-    local interventions, required_interventions = dialog_manager:load_interventions(function(filename) return files:read(filename) end)
-    local formatted_interventions = core.format_list_items(interventions, "intervention", daily_logs, {}, required_interventions)
-    dialogs:show_list_dialog({
-        title = "Log Intervention",
-        lines = formatted_interventions,
-        search = true,
-        zebra = true
-    })
+    if dialog_flow_manager then
+        dialog_flow_manager:set_data_manager(dialog_manager)
+        dialog_flow_manager:set_daily_logs(daily_logs)
+        local status, data = dialog_flow_manager:start_flow("intervention")
+        if status == "show_dialog" then
+            show_aio_dialog(data)
+        else
+            ui:toast("Error starting intervention flow: " .. tostring(data))
+        end
+    else
+        ui:toast("Dialog flow manager not available")
+    end
 end
 
 function show_energy_dialog()

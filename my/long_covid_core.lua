@@ -277,15 +277,22 @@ end
 
 function M.parse_activities_file(content)
     if not content then
-        return {
-            "Light walk",
-            "Desk work",
-            "Cooking",
-            "Reading",
-            "Social visit",
-            "Rest/nap",
-            "Other..."
-        }
+        -- Use fallback markdown content and parse it properly
+        local fallback_content = [[# Test Activities
+
+## Work
+- Work {Options: In Office, From Home}
+- Meeting-heavy day
+
+## Physical  
+- Walk {Options: Light, Medium, Heavy}
+- Yin Yoga {Required: Thu}
+- Exercise {Required}
+
+## Daily Living
+- Cooking
+- Reading]]
+        return M.parse_activities_file(fallback_content)
     end
     
     local activities = {}
@@ -295,8 +302,9 @@ function M.parse_activities_file(content)
         if line:match("^%- ") then
             local activity = line:match("^%- (.+)")
             if activity then
-                -- Clean up activity name by removing {Required} markers
+                -- Clean up activity name by removing {Required} and {Options:} markers
                 local clean_activity = activity:match("^(.-)%s*%{Required") or activity
+                clean_activity = clean_activity:match("^(.-)%s*%{Options:") or clean_activity
                 table.insert(activities, clean_activity)
             end
         end
@@ -310,15 +318,21 @@ end
 
 function M.parse_interventions_file(content)
     if not content then
-        return {
-            "Vitamin D",
-            "Vitamin B12",
-            "Magnesium",
-            "Extra rest",
-            "Breathing exercises",
-            "Meditation",
-            "Other..."
-        }
+        -- Use fallback markdown content and parse it properly
+        local fallback_content = [[# Test Interventions
+
+## Medications
+- LDN (4mg) {Required}
+- Claratyne
+
+## Supplements  
+- Salvital {Options: Morning, Evening}
+- Vitamin D
+
+## Treatments
+- Meditation
+- Breathing exercises {Required: Mon,Wed,Fri}]]
+        return M.parse_interventions_file(fallback_content)
     end
     
     local interventions = {}
@@ -328,8 +342,9 @@ function M.parse_interventions_file(content)
         if line:match("^%- ") then
             local intervention = line:match("^%- (.+)")
             if intervention then
-                -- Clean up intervention name by removing {Required} markers
+                -- Clean up intervention name by removing {Required} and {Options:} markers
                 local clean_intervention = intervention:match("^(.-)%s*%{Required") or intervention
+                clean_intervention = clean_intervention:match("^(.-)%s*%{Options:") or clean_intervention
                 table.insert(interventions, clean_intervention)
             end
         end
@@ -339,6 +354,38 @@ function M.parse_interventions_file(content)
     table.insert(interventions, "Other...")
     
     return interventions
+end
+
+-- Parse options from activities/interventions with {Options: ...} syntax
+function M.parse_item_options(content, item_name)
+    if not content or not item_name then
+        return nil
+    end
+    
+    local lines = M.split_lines(content)
+    
+    for _, line in ipairs(lines) do
+        if line:match("^%- ") then
+            local full_line = line:match("^%- (.+)")
+            if full_line then
+                -- Check if this line matches our item name
+                local clean_name = full_line:match("^(.-)%s*%{") or full_line
+                if clean_name == item_name then
+                    -- Look for {Options: ...} pattern
+                    local options_match = full_line:match("%{Options:%s*([^%}]+)%}")
+                    if options_match then
+                        local options = {}
+                        for option in options_match:gmatch("([^,]+)") do
+                            table.insert(options, option:match("^%s*(.-)%s*$")) -- trim whitespace
+                        end
+                        return options
+                    end
+                end
+            end
+        end
+    end
+    
+    return nil
 end
 
 function M.parse_required_activities(content)
@@ -513,7 +560,19 @@ function M.format_list_items(items, item_type, daily_logs, required_activities, 
     
     local formatted = {}
     for _, item in ipairs(items) do
+        -- Count both exact matches and base item matches (for items with options)
         local count = category[item] or 0
+        
+        -- Also check for items that start with this base item (e.g., "Work: From Home" matches "Work")
+        for logged_item, logged_count in pairs(category) do
+            if logged_item ~= item then -- Don't double-count exact matches
+                local base_item = logged_item:match("^(.-):%s*") or logged_item
+                if base_item == item then
+                    count = count + logged_count
+                end
+            end
+        end
+        
         local is_required = required_set[item]
         
         if count and count > 0 then
@@ -535,6 +594,9 @@ function M.format_list_items(items, item_type, daily_logs, required_activities, 
 end
 
 function M.extract_item_name(formatted_item)
+    if not formatted_item then
+        return ""
+    end
     -- First, remove all icons, checkmarks and leading spaces
     local cleaned = formatted_item:gsub("^[✓✅⚠️%s]*", "")
     
@@ -700,6 +762,7 @@ function M.create_dialog_manager()
     function manager:load_activities(file_reader)
         if not self.cached_activities then
             local content = file_reader("activities.md")
+            self.cached_activities_content = content
             self.cached_activities = M.parse_activities_file(content)
         end
         if not self.cached_required_activities then
@@ -712,6 +775,7 @@ function M.create_dialog_manager()
     function manager:load_interventions(file_reader)
         if not self.cached_interventions then
             local content = file_reader("interventions.md")
+            self.cached_interventions_content = content
             self.cached_interventions = M.parse_interventions_file(content)
         end
         if not self.cached_required_interventions then
@@ -725,6 +789,49 @@ function M.create_dialog_manager()
         return {"1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
                 "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
                 "9 - Excellent", "10 - Peak energy"}
+    end
+    
+    function manager:get_activities_content()
+        -- Return cached content, or fallback content if no cached content available
+        if self.cached_activities_content then
+            return self.cached_activities_content
+        else
+            return [[# Test Activities
+
+## Work
+- Work {Options: In Office, From Home}
+- Meeting-heavy day
+
+## Physical  
+- Walk {Options: Light, Medium, Heavy}
+- Yin Yoga {Required: Thu}
+- Exercise {Required}
+
+## Daily Living
+- Cooking
+- Reading]]
+        end
+    end
+    
+    function manager:get_interventions_content()
+        -- Return cached content, or fallback content if no cached content available
+        if self.cached_interventions_content then
+            return self.cached_interventions_content
+        else
+            return [[# Test Interventions
+
+## Medications
+- LDN (4mg) {Required}
+- Claratyne
+
+## Supplements  
+- Salvital {Options: Morning, Evening}
+- Vitamin D
+
+## Treatments
+- Meditation
+- Breathing exercises {Required: Mon,Wed,Fri}]]
+        end
     end
     
     function manager:handle_dialog_result(result, daily_logs, file_reader, log_callback)
@@ -859,6 +966,7 @@ function M.create_cache_manager()
     function manager:load_activities(file_reader)
         if not self.cached_activities then
             local content = file_reader("activities.md")
+            self.cached_activities_content = content
             self.cached_activities = M.parse_activities_file(content)
         end
         if not self.cached_required_activities then
@@ -871,6 +979,7 @@ function M.create_cache_manager()
     function manager:load_interventions(file_reader)
         if not self.cached_interventions then
             local content = file_reader("interventions.md")
+            self.cached_interventions_content = content
             self.cached_interventions = M.parse_interventions_file(content)
         end
         if not self.cached_required_interventions then
@@ -1204,6 +1313,104 @@ M.flow_definitions = {
                 return "complete"
             end
         }
+    },
+    
+    activity = {
+        main_list = {
+            dialog_type = "radio",
+            title = "Log Activity",
+            get_options = function(manager, daily_logs, required_activities, required_interventions)
+                local activities, req_activities = manager:load_activities(function(filename) return files:read(filename) end)
+                return M.format_list_items(activities, "activity", daily_logs, req_activities or required_activities, required_interventions)
+            end,
+            next_step = function(selected_item, context, manager)
+                if selected_item == "Other..." then
+                    return "custom_input"
+                else
+                    -- Check if this item has options
+                    local clean_item = M.extract_item_name(selected_item)
+                    local activities_content = manager:get_activities_content()
+                    local options = M.parse_item_options(activities_content, clean_item)
+                    if options and #options > 0 then
+                        context.selected_item = clean_item
+                        context.available_options = options
+                        return "options"
+                    else
+                        return "complete"
+                    end
+                end
+            end
+        },
+        
+        custom_input = {
+            dialog_type = "edit",
+            title = "Custom Activity",
+            prompt = "Enter activity name:",
+            default_text = "",
+            next_step = function(custom_name, context)
+                return "complete"
+            end
+        },
+        
+        options = {
+            dialog_type = "radio",
+            title = "Select Option",
+            get_options = function(manager, daily_logs, required_activities, required_interventions, context)
+                return context.available_options or {}
+            end,
+            next_step = function(selected_option, context)
+                return "complete"
+            end
+        }
+    },
+    
+    intervention = {
+        main_list = {
+            dialog_type = "radio",
+            title = "Log Intervention",
+            get_options = function(manager, daily_logs, required_activities, required_interventions)
+                local interventions, req_interventions = manager:load_interventions(function(filename) return files:read(filename) end)
+                return M.format_list_items(interventions, "intervention", daily_logs, required_activities, req_interventions or required_interventions)
+            end,
+            next_step = function(selected_item, context, manager)
+                if selected_item == "Other..." then
+                    return "custom_input"
+                else
+                    -- Check if this item has options
+                    local clean_item = M.extract_item_name(selected_item)
+                    local interventions_content = manager:get_interventions_content()
+                    local options = M.parse_item_options(interventions_content, clean_item)
+                    if options and #options > 0 then
+                        context.selected_item = clean_item
+                        context.available_options = options
+                        return "options"
+                    else
+                        return "complete"
+                    end
+                end
+            end
+        },
+        
+        custom_input = {
+            dialog_type = "edit",
+            title = "Custom Intervention",
+            prompt = "Enter intervention name:",
+            default_text = "",
+            next_step = function(custom_name, context)
+                return "complete"
+            end
+        },
+        
+        options = {
+            dialog_type = "radio",
+            title = "Select Option",
+            get_options = function(manager, daily_logs, required_activities, required_interventions, context)
+                return context.available_options or {}
+            end,
+            next_step = function(selected_option, context)
+                return "complete"
+            end
+        }
     }
 }
 
@@ -1257,10 +1464,24 @@ function M.create_dialog_flow_manager()
         }
         
         -- Prepare dialog-specific data
+        local context = self.current_stack:get_full_context()
+        local required_activities = {}
+        local required_interventions = {}
+        
+        -- Load required items if we're dealing with activity or intervention flows
+        if self.current_stack.category == "activity" or self.current_stack.category == "intervention" then
+            if self.data_manager then
+                local _, req_act = self.data_manager:load_activities(function(filename) return files:read(filename) end)
+                local _, req_int = self.data_manager:load_interventions(function(filename) return files:read(filename) end)
+                required_activities = req_act or {}
+                required_interventions = req_int or {}
+            end
+        end
+        
         if step_config.dialog_type == "list" and step_config.get_items then
-            dialog_config.data.items = step_config.get_items(self.data_manager, self.daily_logs)
+            dialog_config.data.items = step_config.get_items(self.data_manager, self.daily_logs, required_activities, required_interventions, context)
         elseif step_config.dialog_type == "radio" and step_config.get_options then
-            dialog_config.data.options = step_config.get_options(self.data_manager, self.daily_logs)
+            dialog_config.data.options = step_config.get_options(self.data_manager, self.daily_logs, required_activities, required_interventions, context)
         elseif step_config.dialog_type == "edit" then
             dialog_config.data.prompt = step_config.prompt
             dialog_config.data.default_text = step_config.default_text or ""
@@ -1301,17 +1522,23 @@ function M.create_dialog_flow_manager()
             processed_result = selected_item
         elseif current_dialog.type == "radio" and type(result) == "number" then
             local selected_option = current_dialog.data.options[result]
-            current_dialog.data.selected_option = selected_option
             
             if current_dialog.name == "severity" then
                 -- Extract severity number from option like "5 - Moderate-High"
+                current_dialog.data.selected_option = selected_option
                 processed_result = tonumber(selected_option:match("^(%d+)"))
             elseif current_dialog.name == "main_list" then
-                -- For symptom selection, extract the item name and store it
+                -- For symptom/activity/intervention selection, extract the item name and store it
                 local selected_item = M.extract_item_name(selected_option)
                 current_dialog.data.selected_item = selected_item
                 processed_result = selected_item
+                -- DON'T set selected_option for main_list - only for actual options dialogs
+            elseif current_dialog.name == "options" then
+                -- For activity/intervention options, store both option and combined result
+                current_dialog.data.selected_option = selected_option
+                processed_result = selected_option
             else
+                current_dialog.data.selected_option = selected_option
                 processed_result = selected_option
             end
         elseif current_dialog.type == "edit" and type(result) == "string" then
@@ -1324,7 +1551,14 @@ function M.create_dialog_flow_manager()
         
         -- Determine next step
         if step_config.next_step then
-            next_step_name = step_config.next_step(processed_result, context)
+            next_step_name = step_config.next_step(processed_result, context, self.data_manager)
+            
+            -- Store context changes back in current dialog data for persistence
+            for key, value in pairs(context) do
+                if key ~= "selected_item" and key ~= "custom_input" and key ~= "selected_option" then
+                    current_dialog.data[key] = value
+                end
+            end
         end
         
         if next_step_name == "complete" then
@@ -1374,6 +1608,14 @@ function M.create_dialog_flow_manager()
             if context.selected_option then
                 -- Extract severity level from the option
                 metadata.severity = tonumber(context.selected_option:match("^(%d+)"))
+            end
+        elseif category == "activity" or category == "intervention" then
+            -- Prioritize custom input over selected item (for "Other..." flows)
+            logged_item = context.custom_input or context.selected_item
+            
+            -- If an option was selected, combine item and option
+            if context.selected_option and not context.custom_input then
+                logged_item = logged_item .. ": " .. context.selected_option
             end
         end
         
