@@ -172,7 +172,7 @@ See `tests/README.md` for detailed testing guidelines and examples.
 When making changes to the Long Covid widget, **ALWAYS** update documentation in this exact order:
 
 1. **Update widget_design.md FIRST** - Before committing any code changes
-2. **Run tests** - Ensure all 87 tests pass after implementation changes
+2. **Run tests** - Ensure all tests pass after implementation changes
 3. **Update CLAUDE.md** - If architectural changes affect development process
 4. **Update tests/README.md** - If test structure or count changes
 
@@ -442,4 +442,3 @@ Completion:   Update widget_design.md with complete feature
 ```
 
 This approach ensures that main documentation always reflects current reality while providing space for planning and development work.
-- can you always use debug toasts for debugging instead of ui toasts?

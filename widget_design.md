@@ -58,16 +58,29 @@ Evening:
   - **AIO Compatibility**: Uses radio dialogs throughout to work around AIO list→radio dialog issues
 - **Energy button**: ⚡ Lightning icon (left group, next to symptom button)
   - **Color**: Red (#dc3545) when never logged, Yellow (#ffc107) when 4+ hours since last log, Green (#28a745) when logged within 4 hours
-  - **Dialog**: Radio button selection for single-choice energy level
+  - **Dialog Flow**: Single-level radio dialog with 10 energy levels (NEW)
+    1. **Energy Selection**: Radio dialog with options "1 - Completely drained" through "10 - Peak energy"
+    2. **Logging**: Records numeric energy level (1-10) with timestamp
 - **Activity button**: 🏃 Running icon (right group, after spacing)
   - **Color**: Red (#dc3545) when required activities incomplete, Green (#28a745) when complete
+  - **Dialog Flow**: Multi-level dialog with optional options support (NEW)
+    1. **Activity Selection**: Radio dialog with formatted activity options (includes count markers and completion status)
+    2. **Options Selection**: If activity has {Options: ...} syntax, shows second radio dialog
+    3. **Custom Input**: "Other..." option provides text input for custom activities
+    4. **Logging**: Records activity name, optionally combined with selected option (e.g., "Work: From Home")
 - **Intervention button**: 💊 Pills icon (right group, next to activity button)
   - **Color**: Red (#dc3545) when required interventions incomplete, Blue (#007bff) when complete
+  - **Dialog Flow**: Multi-level dialog with optional options support (NEW)
+    1. **Intervention Selection**: Radio dialog with formatted intervention options (includes count markers and completion status)
+    2. **Options Selection**: If intervention has {Options: ...} syntax, shows second radio dialog
+    3. **Custom Input**: "Other..." option provides text input for custom interventions
+    4. **Logging**: Records intervention name, optionally combined with selected option (e.g., "Salvital: Evening")
 - **Visibility**: Always visible
 - **Layout**: Two groups on second line - health tracking (left), activities/interventions (right) with spacing between
-- **Functionality**: Opens searchable list dialogs with custom "Other..." option
+- **AIO Compatibility**: All flows use radio dialogs throughout to work around AIO platform issues
 - **Data sources**: Markdown files (activities.md, symptoms.md, interventions.md)
 - **Required items**: Specified in source files using `{Required}` or `{Required: Mon,Wed,Fri}` syntax
+- **Options support**: Activities/interventions can specify options using `{Options: option1, option2, ...}` syntax
 - **Logging**: All entries sent to Google Spreadsheet via AutoSheets
 - **Daily tracking**: Items logged during the day are tracked with counts
 - **Visual differentiation**: Required vs optional items marked differently in dialogs
@@ -120,11 +133,19 @@ Evening:
      - Item logged with severity metadata (Google Sheets gets full info, local storage gets base symptom name only)
      - Automatic cancellation handling prevents dialog closing issues
      - Can cancel at any level to return to previous step or main widget
-   - **Activity/Intervention logging (LEGACY SYSTEM)**:
-     - Click buttons to open single dialogs  
-     - Previously logged items show with checkmarks and counts
-     - Select items to log (counts increment for repeated selections)
-     - Custom items available via "Other..." option
+   - **Energy logging (NEW UNIFIED FLOW)**:
+     - Click energy button to open energy level selection radio dialog
+     - Select from 10 energy levels: "1 - Completely drained" to "10 - Peak energy"
+     - Numeric energy level (1-10) logged with timestamp
+     - Automatic cancellation handling prevents dialog closing issues
+   - **Activity/Intervention logging (NEW UNIFIED FLOW)**:
+     - Click buttons to open activity/intervention selection radio dialog
+     - Previously logged items show with checkmarks and counts (including items logged with options)
+     - Select items to log - if item has {Options:} syntax, second radio dialog appears
+     - Choose specific option (e.g., "Work" → "From Home") or proceed directly for items without options
+     - Custom items available via "Other..." option with text input dialog
+     - Items with options logged as "Item: Option" (e.g., "Work: From Home")
+     - Automatic cancellation handling prevents dialog closing issues
 5. **Visual feedback**: Toast confirmations show successful logging
 6. **Immediate dialog refresh**: Dialog automatically refreshes to show updated counts after logging
 
@@ -147,25 +168,30 @@ Activities and interventions can be marked as required using special syntax:
 - Light walk
 - Physio (full) {Required: Mon,Wed,Fri}
 - Yin Yoga {Required}
+- Walk {Options: Light, Medium, Heavy}
 
 ## Work
-- Work from home
+- Work {Options: In Office, From Home}
+- Meeting-heavy day
 ```
 
 **interventions.md example:**
 ```markdown
 ## Medications
 - LDN (4mg) {Required}
+- LDN (4.5mg) {Options: Morning, Evening}
 - Claratyne
 
 ## Supplements
-- Salvital {Required: Mon,Wed,Fri}
+- Salvital {Required: Mon,Wed,Fri} {Options: Morning, Evening}
 ```
 
 **Syntax:**
 - `{Required}` - Required every day
 - `{Required: Mon,Wed,Fri}` - Required only on specific days (case insensitive)
+- `{Options: option1, option2, option3}` - Provides selectable options for the item
 - Day abbreviations: `sun`, `mon`, `tue`, `wed`, `thu`, `fri`, `sat`
+- Combined syntax: `{Required: Mon,Wed,Fri} {Options: Morning, Evening}` - Both required and has options
 
 ### Internal Storage (AIO Preferences)
 - `daily_logs[date]` - Daily tracking counts for symptoms/activities/interventions
@@ -177,8 +203,9 @@ Activities and interventions can be marked as required using special syntax:
         ["Brain fog (severity: 3)"] = 2,
         ["Custom Headache (severity: 7)"] = 1
       },
-      activities = {["Light walk"] = 1, ["Physio (full)"] = 2},
-      interventions = {["Vitamin D"] = 1, ["Rest"] = 3}
+      activities = {["Light walk"] = 1, ["Physio (full)"] = 2, ["Work: From Home"] = 1, ["Walk: Medium"] = 1},
+      interventions = {["Vitamin D"] = 1, ["Rest"] = 3, ["Salvital: Evening"] = 1},
+      energy_levels = {{level = 7, timestamp = 1640995200, time_display = "14:00"}}
     }
   }
   ```
@@ -207,23 +234,24 @@ The widget uses a modular architecture with the following components:
 - **Main Widget** (`long-covid-pacing.lua`): User interface handling and AIO integration
 - **Core Module** (`long_covid_core.lua`): Business logic and data processing
 - **Managers**: Specialized components for different responsibilities
-  - `dialog_manager`: Handles legacy dialog interactions and data loading (activities/interventions)
-  - `dialog_flow_manager`: **NEW** - Manages multi-level dialog flows with severity tracking (symptoms)
+  - `dialog_manager`: Handles data loading and caching (activities, interventions, symptoms)
+  - `dialog_flow_manager`: Manages unified multi-level dialog flows for all health tracking (symptoms, activities, interventions, energy)
   - `cache_manager`: Manages file caching and data persistence
   - `button_mapper`: Maps button interactions to actions
   - `ui_generator`: Creates UI elements based on state
 
-### Dialog Stack System (NEW)
+### Unified Dialog Flow System
 **Components**:
-- `DialogStack` class (`long_covid_core.lua:1082-1123`): Stack operations for multi-level flows
-- `Dialog Flow Manager` (`long_covid_core.lua:1170-1351`): Orchestrates complex dialog sequences  
-- `Flow Definitions` (`long_covid_core.lua:1126-1167`): Declarative flow configurations
+- `DialogStack` class: Stack operations for multi-level flows
+- `Dialog Flow Manager`: Orchestrates complex dialog sequences for all health tracking
+- `Flow Definitions`: Declarative flow configurations for symptoms, activities, interventions, and energy
+- `Options Parser`: Parses `{Options: ...}` syntax from markdown files
 
 **AIO Platform Compatibility**:
 - **Issue**: AIO Launcher has a bug where radio dialogs don't trigger `on_dialog_action` for OK/selection events
-- **Solution**: Converted all symptom flow dialogs from list→radio to radio→radio pattern
+- **Solution**: All dialog flows use radio dialogs exclusively (no mixed list→radio patterns)
 - **Benefit**: Consistent dialog API usage prevents `on_dialog_action` callback issues
-- **Implementation**: Both symptom selection and severity dialogs now use `dialogs:show_radio_dialog()`
+- **Implementation**: All dialogs (symptoms, activities, interventions, energy) use `dialogs:show_radio_dialog()`
 
 **Cancellation Handling**:
 - **Issue**: AIO sends spurious cancel events after dialog selections
@@ -272,7 +300,8 @@ end
 
 function M.format_list_items(items, item_type, daily_logs, required_activities, required_interventions)
     -- Add checkmarks and counts to logged items
-    -- Visual differentiation for required vs optional items
+    -- Visual differentiation for required vs optional items  
+    -- Handles completion checking for items with options (e.g., "Work: From Home" shows "Work" as completed)
 end
 
 function M.check_daily_reset(last_selection_date, selected_level, daily_capacity_log, daily_logs)
@@ -420,7 +449,7 @@ All symptoms are now tracked with a 1-10 severity scale:
 
 ## Testing Coverage
 
-The widget includes comprehensive test coverage with **87 total tests** across 8 test suites ensuring reliability:
+The widget includes comprehensive test coverage with **100+ total tests** across 12+ test suites ensuring reliability:
 
 ### Test Suites
 1. **Core Business Logic** (17 tests): File parsing, data management, calculations, energy tracking
@@ -429,8 +458,12 @@ The widget includes comprehensive test coverage with **87 total tests** across 8
 4. **Cache Manager** (11 tests): File caching, data loading, cache invalidation
 5. **Button Mapper** (17 tests): Action identification, level validation, pattern matching
 6. **UI Generator** (14 tests): Element creation, state-based rendering, layout management
-7. **Dialog Stack Core** (13 tests): **NEW** - Multi-level flow management, stack operations, context preservation
-8. **Dialog Stack Integration** (6 tests): **NEW** - Radio dialog compatibility, severity tracking, cancellation handling, AIO platform workarounds
+7. **Dialog Stack System** (13 tests): Multi-level flow management, stack operations, context preservation
+8. **Symptoms Integration** (6 tests): Symptom dialog flows with severity tracking
+9. **Activities Integration** (6 tests): Activity dialog flows with options support
+10. **Interventions Integration** (7 tests): Intervention dialog flows with options support
+11. **Activity Logging Persistence** (4 tests): **NEW** - Completion status for items with options
+12. **Energy Integration** (5 tests): **NEW** - Energy level logging with unified dialog system
 
 ### Key Coverage Areas
 - **Core functionality**: Preferences, daily reset, capacity selection
@@ -442,7 +475,11 @@ The widget includes comprehensive test coverage with **87 total tests** across 8
 - **Required activities**: Parsing required specifications, day-specific requirements
 - **Completion status**: Button color logic, required vs optional tracking
 - **Multi-level dialogs**: **NEW** - Stack operations, context preservation, flow state management
-- **Severity tracking**: **NEW** - 1-10 scale validation, metadata storage, complete flow testing
+- **Severity tracking**: 1-10 scale validation, metadata storage, complete flow testing
+- **Options support**: **NEW** - {Options: ...} parsing, conditional flows, option combination logging
+- **Activity logging persistence**: **NEW** - Items with options show as completed when base item is logged
+- **Energy level tracking**: **NEW** - 10-level energy scale, numeric logging, unified flow system
+- **Dialog system migration**: **NEW** - All health tracking uses unified radio dialog flows
 - **Custom input flows**: **NEW** - "Other..." handling, custom symptom entry, validation
 - **Cancellation handling**: **NEW** - Multi-level cancel, back navigation, edge case recovery
 - **Visual markers**: Warning icons for incomplete required items
@@ -452,7 +489,7 @@ The widget includes comprehensive test coverage with **87 total tests** across 8
 ### Running Tests
 ```bash
 cd tests
-lua run_all_tests.lua  # Run complete test suite (87 tests)
+lua run_all_tests.lua  # Run complete test suite (100+ tests)
 ```
 
 The modular architecture allows for focused testing of each component, with the widget reduced from 680 lines to 428 lines (-37%) while maintaining full functionality through the core module.
