@@ -38,8 +38,12 @@ function M.get_current_day_abbrev()
     return day_abbrevs[tonumber(os.date("%w")) + 1]
 end
 
+function M.get_today_date()
+    return os.date("%Y-%m-%d")
+end
+
 function M.check_daily_reset(last_selection_date, selected_level, daily_capacity_log, daily_logs)
-    local today = os.date("%Y-%m-%d")
+    local today = M.get_today_date()
     local changes = {}
     
     if last_selection_date ~= today then
@@ -104,7 +108,7 @@ function M.get_daily_logs(daily_logs, date)
 end
 
 function M.log_item(daily_logs, item_type, item_name)
-    local today = os.date("%Y-%m-%d")
+    local today = M.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     local category
@@ -123,7 +127,7 @@ function M.log_item(daily_logs, item_type, item_name)
 end
 
 function M.log_energy(daily_logs, energy_level)
-    local today = os.date("%Y-%m-%d")
+    local today = M.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     local energy_entry = {
@@ -137,7 +141,7 @@ function M.log_energy(daily_logs, energy_level)
 end
 
 function M.get_energy_button_color(daily_logs)
-    local today = os.date("%Y-%m-%d")
+    local today = M.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     if not logs.energy_levels or #logs.energy_levels == 0 then
@@ -505,7 +509,7 @@ function M.are_all_required_activities_completed(daily_logs, required_activities
         return true
     end
     
-    local today = os.date("%Y-%m-%d")
+    local today = M.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     for _, required_activity in ipairs(required_today) do
@@ -523,7 +527,7 @@ function M.are_all_required_interventions_completed(daily_logs, required_interve
         return true
     end
     
-    local today = os.date("%Y-%m-%d")
+    local today = M.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     for _, required_intervention in ipairs(required_today) do
@@ -536,7 +540,7 @@ function M.are_all_required_interventions_completed(daily_logs, required_interve
 end
 
 function M.format_list_items(items, item_type, daily_logs, required_activities, required_interventions)
-    local today = os.date("%Y-%m-%d")
+    local today = M.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     local category
@@ -611,7 +615,7 @@ function M.save_daily_choice(daily_capacity_log, level_idx)
         return daily_capacity_log
     end
     
-    local today = os.date("%Y-%m-%d")
+    local today = M.get_today_date()
     local level_name = M.levels[level_idx].name
     
     if not daily_capacity_log then
@@ -748,26 +752,20 @@ function M.create_dialog_manager()
     end
     
     function manager:load_activities(file_reader)
-        if not self.cached_activities then
+        if not self.cached_activities or not self.cached_required_activities then
             local content = file_reader("activities.md")
             self.cached_activities_content = content
             self.cached_activities = M.parse_activities_file(content)
-        end
-        if not self.cached_required_activities then
-            local content = file_reader("activities.md")
             self.cached_required_activities = M.parse_required_activities(content)
         end
         return self.cached_activities, self.cached_required_activities
     end
     
     function manager:load_interventions(file_reader)
-        if not self.cached_interventions then
+        if not self.cached_interventions or not self.cached_required_interventions then
             local content = file_reader("interventions.md")
             self.cached_interventions_content = content
             self.cached_interventions = M.parse_interventions_file(content)
-        end
-        if not self.cached_required_interventions then
-            local content = file_reader("interventions.md")
             self.cached_required_interventions = M.parse_required_interventions(content)
         end
         return self.cached_interventions, self.cached_required_interventions
@@ -873,26 +871,20 @@ function M.create_cache_manager()
     end
     
     function manager:load_activities(file_reader)
-        if not self.cached_activities then
+        if not self.cached_activities or not self.cached_required_activities then
             local content = file_reader("activities.md")
             self.cached_activities_content = content
             self.cached_activities = M.parse_activities_file(content)
-        end
-        if not self.cached_required_activities then
-            local content = file_reader("activities.md")
             self.cached_required_activities = M.parse_required_activities(content)
         end
         return self.cached_activities, self.cached_required_activities
     end
     
     function manager:load_interventions(file_reader)
-        if not self.cached_interventions then
+        if not self.cached_interventions or not self.cached_required_interventions then
             local content = file_reader("interventions.md")
             self.cached_interventions_content = content
             self.cached_interventions = M.parse_interventions_file(content)
-        end
-        if not self.cached_required_interventions then
-            local content = file_reader("interventions.md")
             self.cached_required_interventions = M.parse_required_interventions(content)
         end
         return self.cached_interventions, self.cached_required_interventions

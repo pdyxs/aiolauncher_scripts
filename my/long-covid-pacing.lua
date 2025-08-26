@@ -28,27 +28,8 @@ end
 -- Create managers
 local dialog_manager = core.create_dialog_manager()
 
--- Check core module version and function availability
-local core_version = core.VERSION or "unknown"
-local has_dialog_flow_function = core.create_dialog_flow_manager ~= nil
-
-prefs.debug_core_info = "Core version: " .. core_version .. 
-                       " | Has dialog flow function: " .. tostring(has_dialog_flow_function) ..
-                       " | parse_symptoms_file: " .. tostring(core.parse_symptoms_file ~= nil)
-
--- Create dialog flow manager with error handling
-local dialog_flow_manager = nil
-if has_dialog_flow_function then
-    local success, result = pcall(function() return core.create_dialog_flow_manager() end)
-    if success then
-        dialog_flow_manager = result
-        prefs.debug_flow_manager = "created successfully"
-    else
-        prefs.debug_flow_manager = "ERROR calling function: " .. tostring(result)
-    end
-else
-    prefs.debug_flow_manager = "ERROR: Function does not exist - module cache issue"
-end
+-- Create dialog flow manager
+local dialog_flow_manager = core.create_dialog_flow_manager()
 
 local cache_manager = core.create_cache_manager()
 local button_mapper = core.create_button_mapper()
@@ -67,17 +48,12 @@ function load_prefs_data()
     daily_logs = prefs.daily_logs or {}
     
     -- Purge old daily logs on every load for performance
-    local today = os.date("%Y-%m-%d")
+    local today = core.get_today_date()
     daily_logs = core.purge_old_daily_logs(daily_logs, today)
     
     -- Initialize dialog flow manager
-    if dialog_flow_manager then
-        dialog_flow_manager:set_data_manager(dialog_manager)
-        dialog_flow_manager:set_daily_logs(daily_logs)
-        prefs.debug_init = "Dialog flow manager initialized successfully"
-    else
-        prefs.debug_init = "ERROR: dialog_flow_manager is nil - " .. (prefs.debug_flow_manager or "unknown error")
-    end
+    dialog_flow_manager:set_data_manager(dialog_manager)
+    dialog_flow_manager:set_daily_logs(daily_logs)
 end
 
 function save_prefs_data()
@@ -115,7 +91,7 @@ function check_daily_reset()
     
     -- Check if we have a stored selection for today
     if changes.selected_level == 0 then
-        local today = os.date("%Y-%m-%d")
+        local today = core.get_today_date()
         if daily_capacity_log and daily_capacity_log[today] then
             selected_level = daily_capacity_log[today].capacity
         end
@@ -148,7 +124,7 @@ function on_click(idx)
             end
         elseif action_type == "reset" then
             selected_level = 0
-            local today = os.date("%Y-%m-%d")
+            local today = core.get_today_date()
             if daily_capacity_log and daily_capacity_log[today] then
                 daily_capacity_log[today] = nil
             end
@@ -334,22 +310,31 @@ function show_decision_criteria(level_idx)
     my_gui.render()
 end
 
-function show_symptom_dialog()
-    -- Check if dialog flow manager exists
+function show_generic_dialog(flow_type)
     if not dialog_flow_manager then
         ui:show_text("ERROR: Dialog flow manager not available")
         return
     end
     
-    local status, dialog_config = dialog_flow_manager:start_flow("symptom")
+    -- Initialize dialog flow manager for flows that need data
+    if flow_type ~= "symptom" then
+        dialog_flow_manager:set_data_manager(dialog_manager)
+        dialog_flow_manager:set_daily_logs(daily_logs)
+    end
+    
+    local status, dialog_config = dialog_flow_manager:start_flow(flow_type)
     
     if status == "show_dialog" then
         show_aio_dialog(dialog_config)
     elseif status == "error" then
-        ui:show_text("Error starting symptom flow: " .. tostring(dialog_config))
+        ui:show_text("Error starting " .. flow_type .. " flow: " .. tostring(dialog_config))
     else
         ui:show_text("Unexpected status: " .. tostring(status))
     end
+end
+
+function show_symptom_dialog()
+    show_generic_dialog("symptom")
 end
 
 function show_aio_dialog(dialog_config)
@@ -368,48 +353,15 @@ function show_aio_dialog(dialog_config)
 end
 
 function show_activity_dialog()
-    if dialog_flow_manager then
-        dialog_flow_manager:set_data_manager(dialog_manager)
-        dialog_flow_manager:set_daily_logs(daily_logs)
-        local status, data = dialog_flow_manager:start_flow("activity")
-        if status == "show_dialog" then
-            show_aio_dialog(data)
-        else
-            ui:toast("Error starting activity flow: " .. tostring(data))
-        end
-    else
-        ui:toast("Dialog flow manager not available")
-    end
+    show_generic_dialog("activity")
 end
 
 function show_intervention_dialog()
-    if dialog_flow_manager then
-        dialog_flow_manager:set_data_manager(dialog_manager)
-        dialog_flow_manager:set_daily_logs(daily_logs)
-        local status, data = dialog_flow_manager:start_flow("intervention")
-        if status == "show_dialog" then
-            show_aio_dialog(data)
-        else
-            ui:toast("Error starting intervention flow: " .. tostring(data))
-        end
-    else
-        ui:toast("Dialog flow manager not available")
-    end
+    show_generic_dialog("intervention")
 end
 
 function show_energy_dialog()
-    if dialog_flow_manager then
-        dialog_flow_manager:set_data_manager(dialog_manager)
-        dialog_flow_manager:set_daily_logs(daily_logs)
-        local status, data = dialog_flow_manager:start_flow("energy")
-        if status == "show_dialog" then
-            show_aio_dialog(data)
-        else
-            ui:toast("Error starting energy flow: " .. tostring(data))
-        end
-    else
-        ui:toast("Dialog flow manager not available")
-    end
+    show_generic_dialog("energy")
 end
 
 -- Generic logging function that handles all item types
