@@ -17,6 +17,7 @@ print()
 -- Test suites to run (in order)
 local test_suites = {
     {name = "Core Business Logic", file = "test_core_logic"},
+    {name = "Options Completion Logic", file = "test_options_completion"},
     {name = "Logging Functions", file = "test_logging_functions"}, 
     {name = "Dialog Manager", file = "test_dialog_manager"},
     {name = "Cache Manager", file = "test_cache_manager"},

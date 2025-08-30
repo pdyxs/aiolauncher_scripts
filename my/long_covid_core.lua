@@ -513,7 +513,20 @@ function M.are_all_required_activities_completed(daily_logs, required_activities
     local logs = M.get_daily_logs(daily_logs, today)
     
     for _, required_activity in ipairs(required_today) do
-        if not logs.activities[required_activity] or logs.activities[required_activity] == 0 then
+        -- Check exact match first
+        local count = logs.activities[required_activity] or 0
+        
+        -- Also check for items that start with this base item (e.g., "Work: From Home" matches "Work")
+        for logged_item, logged_count in pairs(logs.activities) do
+            if logged_item ~= required_activity then -- Don't double-count exact matches
+                local base_item = logged_item:match("^(.-):%s*") or logged_item
+                if base_item == required_activity then
+                    count = count + logged_count
+                end
+            end
+        end
+        
+        if count == 0 then
             return false
         end
     end
@@ -531,7 +544,20 @@ function M.are_all_required_interventions_completed(daily_logs, required_interve
     local logs = M.get_daily_logs(daily_logs, today)
     
     for _, required_intervention in ipairs(required_today) do
-        if not logs.interventions[required_intervention] or logs.interventions[required_intervention] == 0 then
+        -- Check exact match first
+        local count = logs.interventions[required_intervention] or 0
+        
+        -- Also check for items that start with this base item (e.g., "Salvital: Morning" matches "Salvital")
+        for logged_item, logged_count in pairs(logs.interventions) do
+            if logged_item ~= required_intervention then -- Don't double-count exact matches
+                local base_item = logged_item:match("^(.-):%s*") or logged_item
+                if base_item == required_intervention then
+                    count = count + logged_count
+                end
+            end
+        end
+        
+        if count == 0 then
             return false
         end
     end
