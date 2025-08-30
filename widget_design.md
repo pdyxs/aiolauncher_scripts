@@ -79,7 +79,7 @@ Evening:
 - **Layout**: Two groups on second line - health tracking (left), activities/interventions (right) with spacing between
 - **AIO Compatibility**: All flows use radio dialogs throughout to work around AIO platform issues
 - **Data sources**: Markdown files (activities.md, symptoms.md, interventions.md)
-- **Required items**: Specified in source files using `{Required}` or `{Required: Mon,Wed,Fri}` syntax
+- **Required items**: Specified in source files using `{Required}`, `{Required: Mon,Wed,Fri}`, or `{Required: Weekly}` syntax
 - **Options support**: Activities/interventions can specify options using `{Options: option1, option2, ...}` syntax
 - **Logging**: All entries sent to Google Spreadsheet via AutoSheets
 - **Daily tracking**: Items logged during the day are tracked with counts
@@ -107,7 +107,21 @@ Evening:
 - **Bracket preservation**: Items like "Exercise (15 min)" maintain original brackets when logged
 - **Required item tracking**: Button colors change from red to green/blue when all required items completed
 
-### 5. Widget Title
+### 5. Weekly Required Items
+- **Syntax**: Items marked with `{Required: Weekly}` in activities.md or interventions.md
+- **7-day rolling window**: Checks if item has been logged at least once in the last 7 days
+- **Visual indicators**: 
+  - Red button color when item not logged in last 7 days (overrides daily completion)
+  - Green/blue button color when item has been logged within 7 days
+- **Log retention**: Daily logs are purged but retain 7 days of data for weekly requirement checking
+- **Examples**:
+  - `- Eye mask {Required: Weekly}` - Sleep hygiene item needed once per week
+  - `- Weekly vitamin shot {Required: Weekly}` - Medical intervention needed weekly
+  - `- Deep tissue massage {Required: Weekly}` - Physical therapy requirement
+- **Integration**: Works seamlessly with existing dialog flows and logging systems
+- **Backward compatibility**: Daily and day-specific requirements continue working unchanged
+
+### 6. Widget Title
 - **Format**: "Long Covid Pacing - [Day]"
 - **Dynamic**: Shows current day of week
 
@@ -168,10 +182,12 @@ Activities and interventions can be marked as required using special syntax:
 - Light walk
 - Physio (full) {Required: Mon,Wed,Fri}
 - Yin Yoga {Required}
+- Deep tissue massage {Required: Weekly}
 - Walk {Options: Light, Medium, Heavy}
 
 ## Work
 - Work {Options: In Office, From Home}
+- Weekly check-in call {Required: Weekly}
 - Meeting-heavy day
 ```
 
@@ -184,14 +200,17 @@ Activities and interventions can be marked as required using special syntax:
 
 ## Supplements
 - Salvital {Required: Mon,Wed,Fri} {Options: Morning, Evening}
+- Weekly vitamin shot {Required: Weekly}
+- Eye mask {Required: Weekly}
 ```
 
 **Syntax:**
 - `{Required}` - Required every day
 - `{Required: Mon,Wed,Fri}` - Required only on specific days (case insensitive)
+- `{Required: Weekly}` - Required at least once per week (7-day rolling window)
 - `{Options: option1, option2, option3}` - Provides selectable options for the item
 - Day abbreviations: `sun`, `mon`, `tue`, `wed`, `thu`, `fri`, `sat`
-- Combined syntax: `{Required: Mon,Wed,Fri} {Options: Morning, Evening}` - Both required and has options
+- Combined syntax: `{Required: Weekly} {Options: Light, Full}` - Weekly requirement with options
 
 ### Internal Storage (AIO Preferences)
 - `daily_logs[date]` - Daily tracking counts for symptoms/activities/interventions
@@ -306,6 +325,28 @@ end
 
 function M.check_daily_reset(last_selection_date, selected_level, daily_capacity_log, daily_logs)
     -- Handles daily reset logic and preference management
+end
+
+-- Weekly Required Items Functions
+function M.get_date_days_ago(days_ago)
+    -- Calculates date N days ago from today, handles month/year boundaries
+end
+
+function M.get_last_n_dates(n)
+    -- Returns array of last N calendar dates including today
+end
+
+function M.parse_and_get_weekly_items(content)
+    -- Parses markdown content and extracts items marked with {Required: Weekly}
+end
+
+function M.is_weekly_item_required(item_name, daily_logs)
+    -- Checks if weekly item needs to be logged (not logged in last 7 days)
+    -- Uses 7-day rolling window to determine requirement status
+end
+
+function M.purge_old_daily_logs_weekly(daily_logs, today)
+    -- Purges old logs but retains 7 days of data for weekly requirement checking
 end
 ```
 
@@ -449,7 +490,7 @@ All symptoms are now tracked with a 1-10 severity scale:
 
 ## Testing Coverage
 
-The widget includes comprehensive test coverage with **126 total tests** across 14 test suites ensuring reliability:
+The widget includes comprehensive test coverage with **151 total tests** across 16 test suites ensuring reliability:
 
 ### Test Suites
 1. **Core Business Logic** (17 tests): File parsing, data management, calculations, energy tracking
@@ -462,8 +503,12 @@ The widget includes comprehensive test coverage with **126 total tests** across 
 8. **Symptoms Integration** (6 tests): Symptom dialog flows with severity tracking
 9. **Activities Integration** (6 tests): Activity dialog flows with options support
 10. **Interventions Integration** (7 tests): Intervention dialog flows with options support
-11. **Activity Logging Persistence** (4 tests): **NEW** - Completion status for items with options
-12. **Energy Integration** (5 tests): **NEW** - Energy level logging with unified dialog system
+11. **Activity Logging Persistence** (4 tests): Completion status for items with options
+12. **Energy Integration** (5 tests): Energy level logging with unified dialog system
+13. **Weekly Required Items** (19 tests): **NEW** - Date calculations, 7-day rolling window logic, weekly requirement checking, UI integration
+14. **Day Reset Scenarios** (6 tests): Widget behavior during day transitions and resets
+15. **Options Completion Logic** (6 tests): Complex completion logic for items with options syntax
+16. **Long Covid Widget** (17 tests): Full widget integration tests
 
 ### Key Coverage Areas
 - **Core functionality**: Preferences, daily reset, capacity selection
@@ -484,12 +529,13 @@ The widget includes comprehensive test coverage with **126 total tests** across 
 - **Cancellation handling**: **NEW** - Multi-level cancel, back navigation, edge case recovery
 - **Visual markers**: Warning icons for incomplete required items
 - **Energy logging**: Time-based color logic, multiple entries, timing validation
+- **Weekly requirements**: **NEW** - {Required: Weekly} syntax parsing, 7-day rolling window logic, date calculations across month/year boundaries, weekly requirement status checking, UI integration with button colors
 - **Edge cases**: Items with existing brackets, complex naming scenarios
 
 ### Running Tests
 ```bash
 cd tests
-lua run_all_tests.lua  # Run complete test suite (126 tests across 14 suites)
+lua run_all_tests.lua  # Run complete test suite (151 tests across 16 suites)
 ```
 
 The modular architecture allows for focused testing of each component, with the widget reduced from 680 lines to 428 lines (-37%) while maintaining full functionality through the core module.

@@ -30,6 +30,7 @@ local test_suites = {
     {name = "Interventions Integration", file = "test_interventions_integration"},
     {name = "Activity Logging Persistence", file = "test_activity_logging_persistence"},
     {name = "Energy Integration", file = "test_energy_integration"},
+    {name = "Weekly Required Items", file = "test_weekly_required_items"},
     {name = "Long Covid Widget", file = "test_long_covid_widget"}
 }
 

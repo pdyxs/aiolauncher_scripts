@@ -68,6 +68,7 @@ M.test_activities_content = [[
 - Light walk
 - Physio (full) {Required: Mon,Wed,Fri}
 - Yin Yoga {Required}
+- Eye mask {Required: Weekly}
 
 ## Work
 - Work from home
@@ -76,6 +77,7 @@ M.test_activities_content = [[
 ## Social
 - Video call with family
 - Short visit with friends
+- Weekly check-in call {Required: Weekly}
 ]]
 
 M.test_interventions_content = [[
@@ -87,10 +89,12 @@ M.test_interventions_content = [[
 - Salvital {Required: Mon,Wed,Fri}
 - Vitamin D
 - Magnesium
+- Weekly vitamin shot {Required: Weekly}
 
 ## Lifestyle
 - Meditation
 - Breathing exercises
+- Deep tissue massage {Required: Weekly}
 ]]
 
 M.test_symptoms_content = [[

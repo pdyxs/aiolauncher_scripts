@@ -11,18 +11,19 @@ A systematic workflow for implementing bugs/features in the Long Covid AIO widge
 
 ## Current Process Status
 - ✅ **Implemented**: Full workflow with 6 sub-agents + process-improver
-- ✅ **Working**: Idea exploration → requirements → technical planning → tests → implementation → docs
+- ✅ **Working**: Idea exploration → requirements → technical planning → tests → implementation → docs → device verification
 - ✅ **Recently Fixed**: Test cleanup issues (agents now update run_all_tests.lua properly)
 - ✅ **Recently Added**: Process improvement feedback loop after each implementation
+- ✅ **Recently Enhanced**: Device testing requirement and sequential questioning approach
 
 ## Quick Process Summary
 1. **Requirements**: Create bug/feature/idea file using Obsidian templates with YAML properties
 2. **Sub-Agent Chain**: Use Task tool sub-agents in sequence:
-   - `requirements-analyst` → validates completeness, asks clarifying questions
+   - `requirements-analyst` → validates completeness, asks clarifying questions (ONE at a time)
    - `technical-planner` → creates implementation plan, updates status to "Planning"  
    - `test-developer` → writes failing tests, updates run_all_tests.lua, removes temp tests
-   - `implementation-developer` → implements to pass tests, runs full test suite
-   - `documentation-maintainer` → updates widget_design.md, prompts for process improvements
+   - `implementation-developer` → implements to pass tests, runs full test suite, prompts for device testing
+   - `documentation-maintainer` → updates widget_design.md, confirms device testing, prompts for process improvements
    - `process-improver` → analyzes issues, improves workflow (when needed)
 3. **Tracking**: All progress tracked via Obsidian properties (status, priority, etc.)
 
@@ -35,6 +36,8 @@ A systematic workflow for implementing bugs/features in the Long Covid AIO widge
 - ✅ **Test Integration**: New tests must be added to `run_all_tests.lua`
 - ✅ **Test Cleanup**: Remove temporary/simulation tests after debugging
 - ✅ **Full Validation**: Run `lua run_all_tests.lua` before marking complete
+- ✅ **Device Verification**: MANDATORY testing on actual device after implementation
+- ✅ **Sequential Questioning**: Ask ONE question at a time during exploration/validation phases
 - ✅ **Documentation Sync**: Keep widget_design.md current with implementation
 - ✅ **Process Evolution**: Capture improvements after each implementation
 
@@ -42,6 +45,8 @@ A systematic workflow for implementing bugs/features in the Long Covid AIO widge
 - **Test integration**: Fixed agents to properly update run_all_tests.lua (Dec 2024)
 - **Documentation drift**: Consolidated duplicate workflow docs in CLAUDE.md (Dec 2024)
 - **Process improvement gap**: Added systematic feedback loop and process-improver sub-agent
+- **Device testing oversight**: Added mandatory device verification step after implementation (Dec 2024)
+- **Overwhelming question batches**: Implemented sequential questioning approach for better conversation flow (Dec 2024)
 
 ## File Structure Integration
 ```
@@ -69,5 +74,7 @@ aiolauncher_scripts/
 ## Quick Troubleshooting
 - **Tests not running**: Check if new tests added to run_all_tests.lua
 - **Implementation errors not caught**: Ensure full test suite ran before completion
+- **Widget broken on device**: Ensure device testing was completed before marking implementation complete
+- **Conversation overwhelm**: Use sequential questioning - ask ONE question at a time
 - **Documentation drift**: Run documentation-maintainer sub-agent
 - **Process issues**: Use process-improver sub-agent with specific examples

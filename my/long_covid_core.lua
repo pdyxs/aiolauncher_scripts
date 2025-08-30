@@ -42,6 +42,59 @@ function M.get_today_date()
     return os.date("%Y-%m-%d")
 end
 
+-- Calculate date N days ago from today
+function M.get_date_days_ago(days_ago)
+    -- Input validation
+    if type(days_ago) ~= "number" or days_ago < 0 then
+        return nil
+    end
+    
+    if days_ago == 0 then
+        return os.date("%Y-%m-%d")
+    end
+    
+    -- Get today's date using the (possibly mocked) os.date
+    local today = os.date("%Y-%m-%d")
+    
+    -- Parse today's date
+    local year, month, day = today:match("(%d+)-(%d+)-(%d+)")
+    if not year then
+        return nil
+    end
+    
+    year, month, day = tonumber(year), tonumber(month), tonumber(day)
+    
+    -- Convert to timestamp for easy calculation
+    local today_time = os.time({year = year, month = month, day = day})
+    local seconds_ago = days_ago * 24 * 60 * 60  -- Convert days to seconds
+    local target_time = today_time - seconds_ago
+    
+    -- Format as YYYY-MM-DD
+    return os.date("%Y-%m-%d", target_time)
+end
+
+-- Return array of last N calendar dates including today
+function M.get_last_n_dates(n)
+    -- Input validation
+    if type(n) ~= "number" or n < 0 then
+        return {}
+    end
+    
+    if n == 0 then
+        return {}
+    end
+    
+    local dates = {}
+    for i = 0, n - 1 do
+        local date = M.get_date_days_ago(i)
+        if date then
+            table.insert(dates, date)
+        end
+    end
+    
+    return dates
+end
+
 function M.check_daily_reset(last_selection_date, selected_level, daily_capacity_log, daily_logs)
     local today = M.get_today_date()
     local changes = {}
@@ -356,6 +409,78 @@ function M.parse_interventions_file(content)
     
     -- Always add "Other..." as the last option
     table.insert(interventions, "Other...")
+    
+    return interventions
+end
+
+-- Parse activities with metadata preservation for weekly requirements
+function M.parse_activities(content)
+    if not content then
+        return {}
+    end
+    
+    local activities = {}
+    local lines = M.split_lines(content)
+    
+    for _, line in ipairs(lines) do
+        if line:match("^%- ") then
+            local activity_line = line:match("^%- (.+)")
+            if activity_line then
+                local activity_name = activity_line:match("^(.-)%s*%{") or activity_line
+                
+                local activity = {
+                    name = activity_name,
+                    required = false,
+                    weekly_required = false
+                }
+                
+                -- Check for Required markers
+                if activity_line:match("%{Required:%s*Weekly%}") then
+                    activity.weekly_required = true
+                elseif activity_line:match("%{Required[:%}]") then
+                    activity.required = true
+                end
+                
+                table.insert(activities, activity)
+            end
+        end
+    end
+    
+    return activities
+end
+
+-- Parse interventions with metadata preservation for weekly requirements
+function M.parse_interventions(content)
+    if not content then
+        return {}
+    end
+    
+    local interventions = {}
+    local lines = M.split_lines(content)
+    
+    for _, line in ipairs(lines) do
+        if line:match("^%- ") then
+            local intervention_line = line:match("^%- (.+)")
+            if intervention_line then
+                local intervention_name = intervention_line:match("^(.-)%s*%{") or intervention_line
+                
+                local intervention = {
+                    name = intervention_name,
+                    required = false,
+                    weekly_required = false
+                }
+                
+                -- Check for Required markers
+                if intervention_line:match("%{Required:%s*Weekly%}") then
+                    intervention.weekly_required = true
+                elseif intervention_line:match("%{Required[:%}]") then
+                    intervention.required = true
+                end
+                
+                table.insert(interventions, intervention)
+            end
+        end
+    end
     
     return interventions
 end
@@ -1591,6 +1716,206 @@ function M.create_dialog_flow_manager()
     end
     
     return manager
+end
+
+-- Weekly Required Items Functions
+
+-- Extract items marked with {Required: Weekly} from parsed items
+function M.get_weekly_required_items(parsed_items)
+    local weekly_items = {}
+    
+    if not parsed_items then
+        return weekly_items
+    end
+    
+    for _, item in ipairs(parsed_items) do
+        -- Check if item has weekly_required property or contains "Weekly" in its metadata
+        if type(item) == "table" and item.weekly_required then
+            table.insert(weekly_items, item.name)
+        elseif type(item) == "string" then
+            -- For simple string arrays, we need to parse the content to find weekly items
+            -- This function expects parsed items with metadata
+            -- For now, return empty array for simple strings
+        end
+    end
+    
+    return weekly_items
+end
+
+-- Parse items from content and extract weekly required ones
+function M.parse_and_get_weekly_items(content)
+    if not content then
+        return {}
+    end
+    
+    local weekly_items = {}
+    local lines = M.split_lines(content)
+    
+    for _, line in ipairs(lines) do
+        if line:match("^%- ") then
+            local item_line = line:match("^%- (.+)")
+            if item_line and item_line:match("%{Required:%s*Weekly%}") then
+                local item_name = item_line:match("^(.-)%s*%{Required:")
+                if item_name then
+                    table.insert(weekly_items, item_name)
+                end
+            end
+        end
+    end
+    
+    return weekly_items
+end
+
+-- Override get_weekly_required_items to work with content parsing
+function M.get_weekly_required_items(parsed_items)
+    -- If parsed_items is actually content string, parse it
+    if type(parsed_items) == "string" then
+        return M.parse_and_get_weekly_items(parsed_items)
+    end
+    
+    local weekly_items = {}
+    
+    if not parsed_items then
+        return weekly_items
+    end
+    
+    for _, item in ipairs(parsed_items) do
+        -- Check if item has weekly_required property
+        if type(item) == "table" and item.weekly_required then
+            table.insert(weekly_items, item.name)
+        elseif type(item) == "string" then
+            -- Simple string items won't have weekly metadata
+            -- But we need to check the original content that was used to create these strings
+            -- Since parse_activities just returns simple strings, we can't determine weekly status
+            -- The test needs a different approach - it should pass the content directly
+        end
+    end
+    
+    return weekly_items
+end
+
+-- Purge old daily logs but keep 7 days for weekly requirement checking
+function M.purge_old_daily_logs_weekly(daily_logs, today)
+    if not daily_logs then
+        return {}
+    end
+    
+    local last_7_dates = M.get_last_n_dates(7)
+    local date_set = {}
+    for _, date in ipairs(last_7_dates) do
+        date_set[date] = true
+    end
+    
+    local new_logs = {}
+    for date, logs in pairs(daily_logs) do
+        if date_set[date] then
+            new_logs[date] = logs
+        end
+    end
+    
+    return new_logs
+end
+
+-- Check if weekly item needs to be logged (not logged in last 7 days)
+function M.is_weekly_item_required(item_name, daily_logs)
+    if not item_name or not daily_logs then
+        return true -- Required if no logs
+    end
+    
+    local last_7_dates = M.get_last_n_dates(7)
+    
+    for _, date in ipairs(last_7_dates) do
+        local day_logs = daily_logs[date]
+        if day_logs then
+            -- Check activities
+            if day_logs.activities and day_logs.activities[item_name] and day_logs.activities[item_name] > 0 then
+                return false -- Found in last 7 days
+            end
+            
+            -- Check interventions
+            if day_logs.interventions and day_logs.interventions[item_name] and day_logs.interventions[item_name] > 0 then
+                return false -- Found in last 7 days
+            end
+            
+            -- Check symptoms (though less likely for weekly tracking)
+            if day_logs.symptoms and day_logs.symptoms[item_name] and day_logs.symptoms[item_name] > 0 then
+                return false -- Found in last 7 days
+            end
+        end
+    end
+    
+    return true -- Not found in last 7 days, so required
+end
+
+-- Count number of days in logs
+function M.count_log_days(logs)
+    if not logs then
+        return 0
+    end
+    
+    local count = 0
+    for _ in pairs(logs) do
+        count = count + 1
+    end
+    
+    return count
+end
+
+-- Get button colors for items based on completion status
+function M.get_button_colors(items, category, daily_logs)
+    local colors = {}
+    
+    if not items then
+        return colors
+    end
+    
+    for _, item in ipairs(items) do
+        local item_name = type(item) == "table" and item.name or item
+        
+        -- Default color
+        colors[item_name] = "default"
+        
+        if type(item) == "table" then
+            local today = M.get_today_date()
+            local logs = M.get_daily_logs(daily_logs, today)
+            
+            local category_logs = nil
+            if category == "activities" then
+                category_logs = logs.activities
+            elseif category == "interventions" then
+                category_logs = logs.interventions
+            elseif category == "symptoms" then
+                category_logs = logs.symptoms
+            end
+            
+            local count = category_logs and category_logs[item_name] or 0
+            
+            if item.required or item.weekly_required then
+                if item.weekly_required then
+                    -- Weekly required: red if not logged in last 7 days, green if completed today
+                    if count > 0 then
+                        colors[item_name] = "completed"
+                    elseif M.is_weekly_item_required(item_name, daily_logs) then
+                        colors[item_name] = "required"
+                    else
+                        colors[item_name] = "default"
+                    end
+                elseif item.required then
+                    -- Daily required: check if required today
+                    if M.is_required_today and M.is_required_today(item) then
+                        colors[item_name] = count > 0 and "completed" or "required"
+                    else
+                        colors[item_name] = count > 0 and "completed" or "default"
+                    end
+                end
+            else
+                -- Not required
+                colors[item_name] = count > 0 and "completed" or "default"
+            end
+        end
+    end
+    
+    return colors
 end
 
 
