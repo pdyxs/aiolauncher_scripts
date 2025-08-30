@@ -340,11 +340,13 @@ For well-defined bugs/features using standard templates:
    - Tools: Read, Edit, WebFetch (for research)
    - Purpose: Ask probing questions, help clarify concepts, research feasibility
    - Behavior: Focus on understanding, NOT implementation
+   - **Question Pacing**: Ask ONE question at a time, wait for complete response, then ask follow-ups
 
 2. **`requirements-analyst`** - Validates requirements completeness  
    - Tools: Read, Grep
    - Capabilities: Parse YAML frontmatter properties, validate against templates
    - Purpose: Check completeness, ask clarifying questions about missing details
+   - **Question Pacing**: Ask ONE clarifying question at a time, get complete answer before proceeding
 
 3. **`technical-planner`** - Creates implementation plans
    - Tools: Read, Write, Edit
@@ -390,18 +392,19 @@ For well-defined bugs/features using standard templates:
 
 1. **You**: "I've created bug-003-widget-performance.md using the Bug template"
 2. **`requirements-analyst`**: Reads file, parses YAML properties, validates completeness
-3. **Ask clarifying questions** about any missing details or unclear requirements
+3. **Ask clarifying questions** about any missing details or unclear requirements (ONE at a time)
 4. **`technical-planner`**: Updates `status: Open → Planning`, creates technical plan
 5. **Present plan for approval**, get your feedback and approval
 6. **`test-developer`**: Updates `status: Planning → In Progress`, writes comprehensive tests
 7. **`implementation-developer`**: Implements solution, updates `status: In Progress → Fixed`
-8. **`documentation-maintainer`**: Updates widget_design.md, asks about process improvements
-9. **`process-improver`** (if needed): Analyzes issues, improves workflow, updates process docs
+8. **CRITICAL: Device verification** - User must update widget on device and verify no immediate issues
+9. **`documentation-maintainer`**: Updates widget_design.md, asks about process improvements
+10. **`process-improver`** (if needed): Analyzes issues, improves workflow, updates process docs
 
 **Idea Exploration Example**:
 
 1. **You**: "I have this half-formed idea about predicting energy crashes..."
-2. **`idea-explorer`**: Engages in conversational exploration, asks probing questions
+2. **`idea-explorer`**: Engages in conversational exploration, asks probing questions (ONE at a time)
 3. **Update idea file** with exploration notes throughout discussion
 4. **Graduation decision**: When ready, create formal Feature.md from refined concept
 5. **Switch to standard workflow** using requirements-analyst → technical-planner → etc.
@@ -413,6 +416,8 @@ For well-defined bugs/features using standard templates:
 - **Test-first development** - Write tests before implementation code
 - **Test cleanup and integration** - Remove temporary tests, add permanent tests to run_all_tests.lua
 - **Full test suite validation** - Run `lua run_all_tests.lua` before marking anything complete
+- **Device verification** - MANDATORY device testing after implementation to verify functionality
+- **Sequential questioning** - Ask ONE question at a time during exploration/validation phases
 - **Property-based tracking** - Use Obsidian properties for status management  
 - **Documentation maintenance** - Keep all docs current with implementation changes
 - **Flexible idea exploration** - Low-barrier entry for half-formed concepts
@@ -433,7 +438,11 @@ Your role is to:
 4. Update the idea file with exploration notes during our discussion
 5. Help determine when the idea is refined enough to graduate to a formal Feature.md
 
-Focus on understanding the concept deeply, NOT on implementation details.
+IMPORTANT QUESTIONING APPROACH:
+- Ask ONE probing question at a time
+- Wait for the user's complete response before asking follow-ups
+- Build on previous answers to deepen understanding
+- Focus on understanding the concept deeply, NOT on implementation details
 ```
 
 #### 2. Requirements-Analyst Sub-Agent
@@ -447,6 +456,11 @@ Your role is to:
 4. Identify any missing details or unclear requirements
 5. Ask specific clarifying questions about gaps or ambiguities
 6. Ensure the [bug/feature] is ready for technical planning
+
+IMPORTANT QUESTIONING APPROACH:
+- Ask ONE clarifying question at a time about missing or unclear details
+- Wait for the user's complete answer before asking the next question
+- Address all gaps systematically, but sequentially rather than in batch
 ```
 
 #### 3. Technical-Planner Sub-Agent
@@ -489,6 +503,7 @@ Your role is to:
 5. CRITICAL: Run the full test suite (lua run_all_tests.lua) to ensure no regressions
 6. Fix any issues found by the comprehensive test suite
 7. Update status to "Completed/Fixed" ONLY when ALL tests pass including run_all_tests.lua
+8. MANDATORY: Prompt user to update widget on device and verify no immediate issues before marking complete
 ```
 
 #### 6. Documentation-Maintainer Sub-Agent
@@ -501,8 +516,9 @@ Your role is to:
 3. Update test coverage numbers (count actual tests)
 4. Verify all documentation is accurate and current
 5. Run validation commands to check for outdated references
-6. IMPORTANT: Ask the user if they encountered any process issues or have improvement ideas
-7. If improvements are identified, recommend using the process-improver sub-agent
+6. IMPORTANT: Confirm device testing was completed successfully
+7. Ask the user if they encountered any process issues or have improvement ideas
+8. If improvements are identified, recommend using the process-improver sub-agent
 ```
 
 #### 7. Process-Improver Sub-Agent
