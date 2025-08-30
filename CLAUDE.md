@@ -365,6 +365,10 @@ For well-defined bugs/features using standard templates:
    - Tools: Read, Edit, MultiEdit
    - Purpose: Keep widget_design.md, CLAUDE.md, and technical docs current
 
+7. **`process-improver`** - Analyzes and improves the development workflow
+   - Tools: Read, Edit, MultiEdit
+   - Purpose: Fix systemic issues, enhance sub-agent capabilities, update process documentation
+
 ### Obsidian Integration
 
 **Property-Based Status Tracking**:
@@ -391,7 +395,8 @@ For well-defined bugs/features using standard templates:
 5. **Present plan for approval**, get your feedback and approval
 6. **`test-developer`**: Updates `status: Planning → In Progress`, writes comprehensive tests
 7. **`implementation-developer`**: Implements solution, updates `status: In Progress → Fixed`
-8. **`documentation-maintainer`**: Updates widget_design.md with any changes
+8. **`documentation-maintainer`**: Updates widget_design.md, asks about process improvements
+9. **`process-improver`** (if needed): Analyzes issues, improves workflow, updates process docs
 
 **Idea Exploration Example**:
 
@@ -411,6 +416,7 @@ For well-defined bugs/features using standard templates:
 - **Property-based tracking** - Use Obsidian properties for status management  
 - **Documentation maintenance** - Keep all docs current with implementation changes
 - **Flexible idea exploration** - Low-barrier entry for half-formed concepts
+- **Continuous process improvement** - Built-in feedback loop after each implementation
 
 ### Sub-Agent Task Examples
 
@@ -495,4 +501,38 @@ Your role is to:
 3. Update test coverage numbers (count actual tests)
 4. Verify all documentation is accurate and current
 5. Run validation commands to check for outdated references
+6. IMPORTANT: Ask the user if they encountered any process issues or have improvement ideas
+7. If improvements are identified, recommend using the process-improver sub-agent
 ```
+
+#### 7. Process-Improver Sub-Agent
+```
+Task: Act as a process-improver sub-agent for the Long Covid widget project. Analyze and improve the development workflow.
+
+Your role is to:
+1. Read PROCESS_CONTEXT.md and current workflow documentation in CLAUDE.md
+2. Analyze the specific implementation issue or improvement idea provided
+3. Identify if this is a systemic problem or one-off issue
+4. Research similar issues in the workflow documentation
+5. Propose specific workflow improvements and documentation updates
+6. Update CLAUDE.md with improved sub-agent instructions if needed
+7. Update PROCESS_CONTEXT.md with new fixes and process status
+8. Provide updated Task tool examples for any changed sub-agents
+```
+
+### Process Improvement Quick Start
+
+**For new conversations focused on process improvement:**
+
+1. **Quick Context Setup**: "Please read `PROCESS_CONTEXT.md` and the workflow section in `CLAUDE.md` (lines 280-520) to understand the current system."
+
+2. **Issue Description Template**:
+   ```
+   **Specific Issue**: [what went wrong during implementation]
+   **Implementation Context**: [which bug/feature you were working on]  
+   **Proposed Improvement**: [your idea for fixing it]
+   ```
+
+3. **Launch Process Improver**: Use the process-improver sub-agent Task example above
+
+**The documentation-maintainer will automatically prompt for this feedback after each implementation.**
