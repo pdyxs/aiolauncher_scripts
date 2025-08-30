@@ -142,6 +142,16 @@ tests/test_[feature]_simulation.lua    # For simulating device behavior
 tests/test_[bug]_reproduction.lua      # For reproducing specific bugs
 ```
 
+**CRITICAL: Test Cleanup Process**
+When creating temporary test harnesses or simulation files:
+1. **Temporary tests** (simulation, reproduction, debugging) must be REMOVED after use
+2. **Permanent tests** (actual feature/bug tests) must be ADDED to `run_all_tests.lua`
+3. **Always run `lua run_all_tests.lua`** to verify integration before marking complete
+
+**Test File Categories:**
+- ✅ **Keep & Add to run_all_tests.lua**: `test_[feature_name].lua`, `test_[component].lua`
+- ❌ **Remove after debugging**: `test_[bug]_reproduction.lua`, `test_[feature]_simulation.lua`
+
 This approach transforms frustrating device debugging sessions into efficient local development cycles.
 
 ### Test Coverage Requirements
@@ -396,6 +406,8 @@ For well-defined bugs/features using standard templates:
 - **Requirements completeness** - Always validate before implementation
 - **Technical planning approval** - Get user sign-off on approach before coding
 - **Test-first development** - Write tests before implementation code
+- **Test cleanup and integration** - Remove temporary tests, add permanent tests to run_all_tests.lua
+- **Full test suite validation** - Run `lua run_all_tests.lua` before marking anything complete
 - **Property-based tracking** - Use Obsidian properties for status management  
 - **Documentation maintenance** - Keep all docs current with implementation changes
 - **Flexible idea exploration** - Low-barrier entry for half-formed concepts
@@ -454,7 +466,9 @@ Your role is to:
 3. Write comprehensive tests covering all scenarios (see Test Coverage Requirements above)
 4. Follow existing test framework patterns and TDD process
 5. Tests should FAIL initially (RED phase of TDD cycle)
-6. Run tests to ensure framework is working
+6. CRITICAL: Update run_all_tests.lua to include new permanent tests
+7. CRITICAL: Remove any temporary/simulation test files that were created for debugging
+8. Run updated test suite to verify framework integration
 ```
 
 #### 5. Implementation-Developer Sub-Agent
@@ -466,7 +480,9 @@ Your role is to:
 2. Implement minimum code needed to make tests pass (GREEN phase of TDD cycle)  
 3. Follow existing code patterns and AIO Launcher guidelines (see Development Guidelines above)
 4. Run tests continuously during development
-5. Update status to "Completed/Fixed" when all tests pass
+5. CRITICAL: Run the full test suite (lua run_all_tests.lua) to ensure no regressions
+6. Fix any issues found by the comprehensive test suite
+7. Update status to "Completed/Fixed" ONLY when ALL tests pass including run_all_tests.lua
 ```
 
 #### 6. Documentation-Maintainer Sub-Agent
