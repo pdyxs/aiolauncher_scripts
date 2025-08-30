@@ -102,13 +102,15 @@ lua test_long_covid_widget.lua
 
 ### Test-Driven Development Process
 
-**IMPORTANT**: When adding new functionality to any widget, follow this process:
+**IMPORTANT**: When adding new functionality to any widget, follow this TDD process:
 
-1. **Write tests first** - Create comprehensive tests for the new functionality before implementing it
-2. **Update existing tests** - Modify existing tests if your changes affect current behavior
-3. **Implement functionality** - Write the actual feature implementation
-4. **Verify all tests pass** - Run the full test suite to ensure nothing is broken
-5. **Refactor if needed** - Improve code while keeping tests passing
+1. **Write failing tests first** - Create comprehensive tests for the new functionality (RED phase)
+2. **Implement minimum code** to make tests pass (GREEN phase)  
+3. **Refactor and improve** code while keeping tests passing (REFACTOR phase)
+4. **Update existing tests** if your changes affect current behavior
+5. **Verify all tests pass** - Run the full test suite to ensure nothing is broken
+
+This RED-GREEN-REFACTOR cycle ensures reliable, well-tested implementations.
 
 ### Debugging On-Device Issues with Test Harnesses
 
@@ -276,169 +278,205 @@ grep -n "\.lua\|\.md" widget_design.md | head -10
 
 This ensures documentation stays **current, accurate, and useful** as the project evolves.
 
-## Feature Lifecycle Documentation Framework
 
-**CRITICAL PRINCIPLE**: Keep planning, development, and final documentation completely separate to prevent documentation debt and confusion.
+## Bug/Feature Development Workflow
 
-### 🎯 Phase 1: Planning (Keep SEPARATE from main docs)
+### Requirements Structure
 
-**Objective**: Explore and define requirements without polluting current state documentation.
+**Project Requirements Location**: See CLAUDE.local.md for machine-specific path to `Long Covid/project/`
 
-#### What to DO during planning:
-- ✅ **Create temporary planning documents** in a `planning/` folder or dev notes
-- ✅ **Use clear "DRAFT" or "PLANNING" markers** on all exploratory content
-- ✅ **Focus on requirements and user goals**, not implementation details
-- ✅ **Document decision criteria** for choosing between approaches
-- ✅ **Keep planning documents outside main documentation files**
-
-#### What NOT to do during planning:
-- ❌ **Add future features to widget_design.md** - This creates confusion about current state
-- ❌ **Mix speculative content with current documentation** - Readers can't tell what exists now
-- ❌ **Commit "will implement" language** to main docs - Only document what exists
-- ❌ **Update main documentation** until feature is implemented and tested
-
-#### Planning Document Structure:
+**Directory Structure**:
 ```
-planning/                           # Temporary folder (gitignore if desired)
-├── feature-name-requirements.md    # User needs, success criteria
-├── feature-name-ui-exploration.md  # UI/UX design options  
-├── feature-name-technical-plan.md  # Implementation approaches
-└── feature-name-decision-log.md    # Decisions made and rationale
+Long Covid/project/
+├── ideas/                   # Half-formed concepts for exploration
+│   ├── idea-001-sleep-correlation.md
+│   ├── idea-002-energy-predictions.md
+├── features/               # Refined, ready-to-implement features  
+│   ├── feature-001-sleep-tracking.md
+│   └── feature-002-export-data.md
+└── bugs/                   # Bug reports
+    ├── bug-001-login-failure.md
+    └── bug-002-widget-crash.md
 ```
 
-**Example Planning Content:**
-```markdown
-# DRAFT - Sleep Quality Tracking Feature Planning
+**Templates**: Use Obsidian templates from Templates path (see CLAUDE.local.md):
+- `Bug.md` - For bug reports with properties (name, status, severity, etc.)
+- `Feature.md` - For implementation-ready features with acceptance criteria
+- `Idea.md` - For half-formed concepts requiring exploration
 
-## User Requirements
-- [ ] Users want to log sleep quality on 1-10 scale
-- [ ] Sleep data should correlate with energy levels
-- [ ] Sleep tracking should be optional, not required
+### Development Pathways
 
-## UI Design Options
-Option A: Add sleep button to health tracking row
-Option B: Include in energy dialog as compound input
-Option C: Separate sleep-focused dialog
+#### **Pathway A: Idea Exploration**
+For half-formed concepts requiring conversation and refinement:
 
-## Decision: Choosing Option A because...
+1. **Create Idea file** using Idea.md template
+2. **Conversational exploration** with `idea-explorer` sub-agent
+3. **Update exploration notes** in the idea file during discussion
+4. **Graduate to Feature** when concept is refined and ready
+
+#### **Pathway B: Direct Implementation**
+For well-defined bugs/features using standard templates:
+
+1. **Requirements validation** with `requirements-analyst` sub-agent
+2. **Technical planning** with `technical-planner` sub-agent  
+3. **Test-first development** following TDD process (see Testing section above)
+4. **Documentation updates** with `documentation-maintainer` sub-agent
+
+### Sub-Agent Architecture
+
+#### Core Development Sub-Agents
+
+1. **`idea-explorer`** - Conversational idea refinement
+   - Tools: Read, Edit, WebFetch (for research)
+   - Purpose: Ask probing questions, help clarify concepts, research feasibility
+   - Behavior: Focus on understanding, NOT implementation
+
+2. **`requirements-analyst`** - Validates requirements completeness  
+   - Tools: Read, Grep
+   - Capabilities: Parse YAML frontmatter properties, validate against templates
+   - Purpose: Check completeness, ask clarifying questions about missing details
+
+3. **`technical-planner`** - Creates implementation plans
+   - Tools: Read, Write, Edit
+   - Capabilities: Update status properties during planning process
+   - Purpose: Design technical architecture, create test strategies, update status
+
+4. **`test-developer`** - Writes comprehensive tests
+   - Tools: Read, Write, Edit, Bash
+   - Capabilities: Update progress properties when writing tests
+   - Purpose: Create test suites, mock frameworks, ensure coverage
+
+5. **`implementation-developer`** - Builds features following TDD
+   - Tools: Read, Write, Edit, MultiEdit, Bash  
+   - Capabilities: Update completion status properties
+   - Purpose: Implement code to pass tests, refactor, optimize
+
+6. **`documentation-maintainer`** - Updates project documentation
+   - Tools: Read, Edit, MultiEdit
+   - Purpose: Keep widget_design.md, CLAUDE.md, and technical docs current
+
+### Obsidian Integration
+
+**Property-Based Status Tracking**:
+- **Ideas**: `Exploring → Refined → Abandoned`
+- **Features**: `Requested → Planning → In Progress → Completed`  
+- **Bugs**: `Open → Investigating → Fixed`
+
+**Priority/Severity Levels**: `Critical/High/Medium/Low`
+
+**Obsidian Benefits**:
+- Property-based filtering and queries
+- Template consistency via Obsidian template system
+- Visual progress tracking in properties view
+- Search and organization using Obsidian's tools
+
+### Implementation Process
+
+**Standard Workflow Example**:
+
+1. **You**: "I've created bug-003-widget-performance.md using the Bug template"
+2. **`requirements-analyst`**: Reads file, parses YAML properties, validates completeness
+3. **Ask clarifying questions** about any missing details or unclear requirements
+4. **`technical-planner`**: Updates `status: Open → Planning`, creates technical plan
+5. **Present plan for approval**, get your feedback and approval
+6. **`test-developer`**: Updates `status: Planning → In Progress`, writes comprehensive tests
+7. **`implementation-developer`**: Implements solution, updates `status: In Progress → Fixed`
+8. **`documentation-maintainer`**: Updates widget_design.md with any changes
+
+**Idea Exploration Example**:
+
+1. **You**: "I have this half-formed idea about predicting energy crashes..."
+2. **`idea-explorer`**: Engages in conversational exploration, asks probing questions
+3. **Update idea file** with exploration notes throughout discussion
+4. **Graduation decision**: When ready, create formal Feature.md from refined concept
+5. **Switch to standard workflow** using requirements-analyst → technical-planner → etc.
+
+### Key Principles
+
+- **Requirements completeness** - Always validate before implementation
+- **Technical planning approval** - Get user sign-off on approach before coding
+- **Test-first development** - Write tests before implementation code
+- **Property-based tracking** - Use Obsidian properties for status management  
+- **Documentation maintenance** - Keep all docs current with implementation changes
+- **Flexible idea exploration** - Low-barrier entry for half-formed concepts
+
+### Sub-Agent Task Examples
+
+**Using the Task tool with general-purpose agent for each sub-agent role:**
+
+#### 1. Idea-Explorer Sub-Agent
+```
+Task: Act as an idea-explorer sub-agent for the Long Covid widget project. I have a half-formed idea about [concept].
+
+Your role is to:
+1. Read the existing idea file at [path]
+2. Ask probing questions to help clarify the concept and understand user needs
+3. Research feasibility using existing widget capabilities and AIO Launcher constraints
+4. Update the idea file with exploration notes during our discussion
+5. Help determine when the idea is refined enough to graduate to a formal Feature.md
+
+Focus on understanding the concept deeply, NOT on implementation details.
 ```
 
-### 🔨 Phase 2: Development (Test-Driven Documentation)
-
-**Objective**: Implement features with tests as executable specification, keeping main docs unchanged.
-
-#### Development Documentation Strategy:
-- ✅ **Write tests FIRST** - Tests serve as living specification of intended behavior
-- ✅ **Update tests incrementally** as you implement each piece
-- ✅ **Use detailed code comments** for complex implementation decisions
-- ✅ **Create draft documentation** in development folders if needed for large features
-
-#### Development Documentation Structure:
+#### 2. Requirements-Analyst Sub-Agent
 ```
-tests/
-├── test_sleep_tracking.lua         # Executable specification
-├── test_sleep_energy_correlation.lua  # Integration testing
-└── test_ui_sleep_integration.lua   # UI behavior specification
+Task: Act as a requirements-analyst sub-agent for the Long Covid widget project. Validate [bug/feature file].
 
-dev_notes/                          # Temporary implementation notes
-└── sleep-feature-implementation.md # Development progress, blockers, decisions
+Your role is to:
+1. Read the [bug/feature] file at [path]
+2. Parse the YAML frontmatter properties and validate against template
+3. Check for completeness of all required sections
+4. Identify any missing details or unclear requirements
+5. Ask specific clarifying questions about gaps or ambiguities
+6. Ensure the [bug/feature] is ready for technical planning
 ```
 
-**Key Development Principles:**
-1. **Tests define the feature** - If it's not tested, it's not done
-2. **Code comments explain WHY** - Use comments for implementation decisions
-3. **Main docs stay current** - Don't update widget_design.md until feature is complete
-4. **Development notes are temporary** - Clean up dev notes when feature is done
+#### 3. Technical-Planner Sub-Agent
+```
+Task: Act as a technical-planner sub-agent for the Long Covid widget project. Create implementation plan for [feature/bug].
 
-### ✅ Phase 3: Completion (Documentation as Definition of Done)
-
-**Objective**: Feature is NOT complete until all documentation is updated to reflect new current state.
-
-#### Documentation Completion Checklist:
-
-**1. Verify Implementation Completeness**
-```bash
-cd tests && lua run_all_tests.lua  # All tests must pass
+Your role is to:
+1. Read the validated [feature/bug] file at [path]
+2. Update the status property to "Planning"
+3. Read existing widget code and test structure
+4. Design technical architecture that integrates with existing components
+5. Create test strategy following TDD process (see Testing section above)
+6. Present implementation plan for user approval before proceeding
 ```
 
-**2. Update Main Documentation (in order)**
-- ✅ **Update widget_design.md** - Add complete feature documentation
-  - Update UI layouts with new elements
-  - Update interaction flows with new behaviors  
-  - Update technical implementation with new components
-  - Update test coverage numbers
-- ✅ **Update CLAUDE.md** - If development process or guidelines changed
-- ✅ **Update tests/README.md** - If test structure or organization changed
+#### 4. Test-Developer Sub-Agent
+```
+Task: Act as a test-developer sub-agent for the Long Covid widget project. Write comprehensive tests for [feature/bug].
 
-**3. Clean Up Temporary Documentation**
-- ✅ **Remove or archive planning documents** - Move to `archive/` or delete
-- ✅ **Remove development notes** - Implementation details are now in code/tests
-- ✅ **Remove "DRAFT" or "TODO" markers** from any remaining docs
-
-**4. Verify Documentation Quality**
-- ✅ **Accuracy**: Does documentation match actual implementation?
-- ✅ **Completeness**: Are all user-visible features documented?
-- ✅ **Clarity**: Can someone new understand the feature from docs?
-- ✅ **Integration**: Does new content fit well with existing documentation?
-
-#### Example Completion Process:
-
-```markdown
-# Before marking feature complete:
-
-## 1. Implementation Verification
-- [x] All new tests pass (15 new tests added)
-- [x] All existing tests still pass (87 total tests)
-- [x] Feature works in actual AIO launcher environment
-
-## 2. Documentation Updates
-- [x] widget_design.md: Added "Sleep Quality Tracking" section
-- [x] widget_design.md: Updated "Health & Activity Logging" with sleep button
-- [x] widget_design.md: Updated "Testing Coverage" (87 → 102 tests)
-- [x] tests/README.md: Updated test count and added sleep tracking suite
-
-## 3. Cleanup
-- [x] Deleted planning/sleep-quality-tracking-*.md files
-- [x] Removed dev_notes/sleep-implementation.md
-- [x] Verified no "TODO" or "DRAFT" content in main docs
-
-## 4. Quality Check
-- [x] New user can understand sleep tracking from widget_design.md
-- [x] Documentation matches actual UI behavior
-- [x] All file references are accurate
+Your role is to:
+1. Read the technical plan for [feature/bug]
+2. Update status to "In Progress"
+3. Write comprehensive tests covering all scenarios (see Test Coverage Requirements above)
+4. Follow existing test framework patterns and TDD process
+5. Tests should FAIL initially (RED phase of TDD cycle)
+6. Run tests to ensure framework is working
 ```
 
-### 🚫 Common Anti-Patterns to Avoid
-
-#### Planning Phase Mistakes:
-- ❌ Adding "Coming Soon: Sleep Tracking" to widget_design.md
-- ❌ Documenting UI that doesn't exist yet
-- ❌ Mixing planning content with current state docs
-
-#### Development Phase Mistakes:
-- ❌ Updating main docs before feature is complete
-- ❌ Leaving TODO comments in widget_design.md
-- ❌ Committing half-implemented documentation
-
-#### Completion Phase Mistakes:
-- ❌ Marking feature "done" without updating docs
-- ❌ Leaving planning documents in the repo
-- ❌ Forgetting to update test coverage numbers
-
-### 📋 Quick Reference Workflow
-
+#### 5. Implementation-Developer Sub-Agent
 ```
-Planning:     Create planning/feature-name-*.md files
-              DO NOT touch main documentation
+Task: Act as an implementation-developer sub-agent for the Long Covid widget project. Implement [feature/bug] to make all tests pass.
 
-Development:  Write tests first
-              Keep main docs unchanged
-              Use dev_notes/ for temporary content
-
-Completion:   Update widget_design.md with complete feature
-              Update other docs if needed
-              Clean up planning/ and dev_notes/
-              Verify all tests pass
+Your role is to:
+1. Read the failing test suite for [feature/bug]
+2. Implement minimum code needed to make tests pass (GREEN phase of TDD cycle)  
+3. Follow existing code patterns and AIO Launcher guidelines (see Development Guidelines above)
+4. Run tests continuously during development
+5. Update status to "Completed/Fixed" when all tests pass
 ```
 
-This approach ensures that main documentation always reflects current reality while providing space for planning and development work.
+#### 6. Documentation-Maintainer Sub-Agent
+```
+Task: Act as a documentation-maintainer sub-agent for the Long Covid widget project. Update documentation for completed [feature/bug].
+
+Your role is to:
+1. Read the completed implementation and test suite
+2. Update widget_design.md following Documentation Maintenance Guidelines
+3. Update test coverage numbers (count actual tests)
+4. Verify all documentation is accurate and current
+5. Run validation commands to check for outdated references
+```
