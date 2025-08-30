@@ -138,14 +138,14 @@ test.add_test("Activity data caching with required items", function()
     test.assert_equals(activities1, activities2, "Should return cached activities")
     test.assert_equals(required1, required2, "Should return cached required activities")
     
-    -- Verify file was read once for both activities and required
+    -- Verify file was read only once (efficient parsing of both activities and required from same content)
     local activities_calls = 0
     for _, call in ipairs(file_calls) do
         if call == "activities.md" then
             activities_calls = activities_calls + 1
         end
     end
-    test.assert_equals(2, activities_calls, "Should read activities file twice (once for each parse)")
+    test.assert_equals(1, activities_calls, "Should read activities file once and parse both activities and required items")
     
     -- Third load should not read file again
     file_calls = {}
