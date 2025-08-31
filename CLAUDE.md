@@ -328,9 +328,12 @@ For half-formed concepts requiring conversation and refinement:
 For well-defined bugs/features using standard templates:
 
 1. **Requirements validation** with `requirements-analyst` sub-agent
-2. **Technical planning** with `technical-planner` sub-agent  
-3. **Test-first development** following TDD process (see Testing section above)
-4. **Documentation updates** with `documentation-maintainer` sub-agent
+2. **Architecture discovery** with `architecture-mapper` sub-agent (for complex features)
+3. **Optional refactoring** with `refactoring-specialist` sub-agent (if technical debt identified)
+4. **Technical planning** with `technical-planner` sub-agent  
+5. **Integration testing** with `integration-tester` sub-agent
+6. **Test-first development** following TDD process (see Testing section above)
+7. **Documentation updates** with `documentation-maintainer` sub-agent
 
 ### Sub-Agent Architecture
 
@@ -348,26 +351,42 @@ For well-defined bugs/features using standard templates:
    - Purpose: Check completeness, ask clarifying questions about missing details
    - **Question Pacing**: Ask ONE clarifying question at a time, get complete answer before proceeding
 
-3. **`technical-planner`** - Creates implementation plans
+3. **`architecture-mapper`** - Maps existing code architecture for complex features
+   - Tools: Read, Grep, Glob
+   - Purpose: Trace actual code paths, identify integration points, document parsing systems
+   - Capabilities: Map legacy vs new systems, flag compatibility issues, create integration guides
+   - **When to Use**: Complex features that modify existing UI flows or core logic
+
+4. **`technical-planner`** - Creates implementation plans
    - Tools: Read, Write, Edit
-   - Capabilities: Update status properties during planning process
+   - Capabilities: Update status properties during planning process, must map actual widget integration points
    - Purpose: Design technical architecture, create test strategies, update status
 
-4. **`test-developer`** - Writes comprehensive tests
+5. **`integration-tester`** - Creates end-to-end integration tests
+   - Tools: Read, Write, Edit, Bash
+   - Purpose: Test actual widget flows, verify production parsing systems, simulate device behavior
+   - **Critical**: Must test with same code paths the widget uses, not isolated unit tests
+
+6. **`test-developer`** - Writes comprehensive tests
    - Tools: Read, Write, Edit, Bash
    - Capabilities: Update progress properties when writing tests
    - Purpose: Create test suites, mock frameworks, ensure coverage
 
-5. **`implementation-developer`** - Builds features following TDD
+7. **`implementation-developer`** - Builds features following TDD
    - Tools: Read, Write, Edit, MultiEdit, Bash  
    - Capabilities: Update completion status properties
    - Purpose: Implement code to pass tests, refactor, optimize
 
-6. **`documentation-maintainer`** - Updates project documentation
+8. **`documentation-maintainer`** - Updates project documentation
    - Tools: Read, Edit, MultiEdit
    - Purpose: Keep widget_design.md, CLAUDE.md, and technical docs current
 
-7. **`process-improver`** - Analyzes and improves the development workflow
+9. **`refactoring-specialist`** - Identifies and executes code simplification opportunities
+   - Tools: Read, Write, Edit, MultiEdit, Bash
+   - Purpose: Analyze technical debt, propose consolidation of duplicate code paths, execute refactoring
+   - **When to Use**: When architecture-mapper or technical-planner identifies complex/duplicate code related to new feature
+
+10. **`process-improver`** - Analyzes and improves the development workflow
    - Tools: Read, Edit, MultiEdit
    - Purpose: Fix systemic issues, enhance sub-agent capabilities, update process documentation
 
@@ -390,16 +409,22 @@ For well-defined bugs/features using standard templates:
 
 **Standard Workflow Example**:
 
-1. **You**: "I've created bug-003-widget-performance.md using the Bug template"
+1. **You**: "I've created feature-002-weekly-requirements.md using the Feature template"
 2. **`requirements-analyst`**: Reads file, parses YAML properties, validates completeness
 3. **Ask clarifying questions** about any missing details or unclear requirements (ONE at a time)
-4. **`technical-planner`**: Updates `status: Open → Planning`, creates technical plan
-5. **Present plan for approval**, get your feedback and approval
-6. **`test-developer`**: Updates `status: Planning → In Progress`, writes comprehensive tests
-7. **`implementation-developer`**: Implements solution, updates `status: In Progress → Fixed`
-8. **CRITICAL: Device verification** - User must update widget on device and verify no immediate issues
-9. **`documentation-maintainer`**: Updates widget_design.md, asks about process improvements
-10. **`process-improver`** (if needed): Analyzes issues, improves workflow, updates process docs
+4. **`architecture-mapper`** (for complex features): Maps existing code paths, identifies integration points
+5. **OPTIONAL REFACTORING DECISION**: If architecture-mapper identifies duplicate/complex code paths:
+   - **`refactoring-specialist`**: Proposes code simplification options
+   - **User approval required** for refactoring before feature implementation
+   - **If approved**: Separate refactoring implementation with full testing
+6. **`technical-planner`**: Updates `status: Requested → Planning`, creates detailed technical plan with specific integration points
+7. **Present plan for approval**, get your feedback and approval
+8. **`integration-tester`**: Creates end-to-end tests using actual widget flow, updates `status: Planning → In Progress`
+9. **`test-developer`**: Writes comprehensive unit tests following TDD process
+10. **`implementation-developer`**: Implements solution to pass all tests (using simplified code paths if refactoring occurred)
+11. **CRITICAL: Device verification** - User must update widget on device and verify no immediate issues
+12. **`documentation-maintainer`**: Updates widget_design.md, asks about process improvements, updates `status: In Progress → Completed`
+13. **`process-improver`** (if needed): Analyzes issues, improves workflow, updates process docs
 
 **Idea Exploration Example**:
 
@@ -412,6 +437,8 @@ For well-defined bugs/features using standard templates:
 ### Key Principles
 
 - **Requirements completeness** - Always validate before implementation
+- **Code path simplification** - Prefer editing existing pathways over creating new ones
+- **Proactive refactoring** - Address technical debt BEFORE implementing new features
 - **Technical planning approval** - Get user sign-off on approach before coding
 - **Test-first development** - Write tests before implementation code
 - **Test cleanup and integration** - Remove temporary tests, add permanent tests to run_all_tests.lua
@@ -463,20 +490,84 @@ IMPORTANT QUESTIONING APPROACH:
 - Address all gaps systematically, but sequentially rather than in batch
 ```
 
-#### 3. Technical-Planner Sub-Agent
+#### 3. Architecture-Mapper Sub-Agent
+```
+Task: Act as an architecture-mapper sub-agent for the Long Covid widget project. Map existing code architecture for [complex feature].
+
+Your role is to:
+1. Read the validated [feature/bug] file at [path] to understand requirements
+2. Trace the actual widget code flow that will be affected by this feature
+3. Identify ALL integration points - every function that needs modification
+4. Document existing parsing systems and which ones are used in production
+5. Map legacy vs new code patterns and flag potential compatibility issues
+6. Create detailed integration guide showing exact code paths
+7. Provide findings to technical-planner for implementation planning
+
+CRITICAL FOCUS AREAS:
+- Follow button color logic from UI to core functions
+- Identify which parsing functions the widget actually uses (not just tests)
+- Document function signatures and parameter requirements
+- Flag technical debt or dual systems that could cause integration issues
+
+REFACTORING ASSESSMENT:
+- Identify duplicate code pathways that could be consolidated
+- Flag overly complex functions that could be simplified
+- Assess if existing code paths can be extended vs creating new ones
+- If significant technical debt is found, recommend refactoring-specialist consultation
+
+IMPORTANT: If you find duplicate/complex code paths related to the new feature, explicitly recommend refactoring as a separate step before implementation.
+
+Only use for complex features that modify existing UI flows or core logic.
+```
+
+#### 4. Technical-Planner Sub-Agent
 ```
 Task: Act as a technical-planner sub-agent for the Long Covid widget project. Create implementation plan for [feature/bug].
 
 Your role is to:
 1. Read the validated [feature/bug] file at [path]
-2. Update the status property to "Planning"
-3. Read existing widget code and test structure
-4. Design technical architecture that integrates with existing components
-5. Create test strategy following TDD process (see Testing section above)
-6. Present implementation plan for user approval before proceeding
+2. Read architecture-mapper findings (if available) to understand integration points
+3. Update the status property to "Planning"
+4. Create DETAILED implementation plan specifying exactly which functions to modify
+5. Map out all call sites that need updates (include function signatures)
+6. Create test strategy following TDD process (see Testing section above)
+7. Present implementation plan with specific integration details for user approval
+
+CRITICAL REQUIREMENTS:
+- Plan must be specific enough that implementation becomes mechanical, not exploratory
+- PREFER extending existing code paths over creating entirely new ones
+- Include exact function names, parameter changes, and call site updates
+- Address any legacy vs new system compatibility issues identified by architecture-mapper
+- If refactoring occurred, plan implementation using the simplified code structure
+- If no architecture-mapper was used, perform basic integration point discovery yourself
+
+CODE PATH PREFERENCE:
+- Always assess if existing functions can be extended rather than creating new ones
+- Consolidate similar logic rather than duplicating patterns
+- Use the simplest approach that maintains code clarity and testability
 ```
 
-#### 4. Test-Developer Sub-Agent
+#### 5. Integration-Tester Sub-Agent
+```
+Task: Act as an integration-tester sub-agent for the Long Covid widget project. Create end-to-end integration tests for [feature/bug].
+
+Your role is to:
+1. Read the technical plan and architecture findings for [feature/bug]
+2. Create tests that simulate the EXACT widget flow that users experience
+3. Test with the SAME parsing systems the widget uses in production (not just test parsing)
+4. Simulate device behavior as closely as possible with proper date mocking
+5. Verify all integration points work correctly BEFORE unit test development
+6. Update status to "In Progress" when integration tests are complete
+
+CRITICAL TESTING APPROACH:
+- Use same code paths as the actual widget (trace from UI buttons to core functions)
+- Test with production parsing functions (e.g., parse_required_interventions, not just parse_interventions)
+- Create device simulation tests that catch integration bugs early
+- Focus on end-to-end flows, not isolated unit logic
+- Tests should FAIL initially, proving they catch real integration issues
+```
+
+#### 6. Test-Developer Sub-Agent
 ```
 Task: Act as a test-developer sub-agent for the Long Covid widget project. Write comprehensive tests for [feature/bug].
 
@@ -491,7 +582,7 @@ Your role is to:
 8. Run updated test suite to verify framework integration
 ```
 
-#### 5. Implementation-Developer Sub-Agent
+#### 7. Implementation-Developer Sub-Agent
 ```
 Task: Act as an implementation-developer sub-agent for the Long Covid widget project. Implement [feature/bug] to make all tests pass.
 
@@ -506,7 +597,7 @@ Your role is to:
 8. MANDATORY: Prompt user to update widget on device and verify no immediate issues before marking complete
 ```
 
-#### 6. Documentation-Maintainer Sub-Agent
+#### 8. Documentation-Maintainer Sub-Agent
 ```
 Task: Act as a documentation-maintainer sub-agent for the Long Covid widget project. Update documentation for completed [feature/bug].
 
@@ -521,7 +612,7 @@ Your role is to:
 8. If improvements are identified, recommend using the process-improver sub-agent
 ```
 
-#### 7. Process-Improver Sub-Agent
+#### 9. Process-Improver Sub-Agent
 ```
 Task: Act as a process-improver sub-agent for the Long Covid widget project. Analyze and improve the development workflow.
 
@@ -534,6 +625,36 @@ Your role is to:
 6. Update CLAUDE.md with improved sub-agent instructions if needed
 7. Update PROCESS_CONTEXT.md with new fixes and process status
 8. Provide updated Task tool examples for any changed sub-agents
+```
+
+#### 10. Refactoring-Specialist Sub-Agent
+```
+Task: Act as a refactoring-specialist sub-agent for the Long Covid widget project. Analyze and simplify complex/duplicate code paths before implementing [feature/bug].
+
+Your role is to:
+1. Read the architecture-mapper findings that identified technical debt
+2. Analyze the specific duplicate/complex code paths flagged
+3. Propose consolidation options that would simplify the codebase
+4. Create refactoring plan that maintains existing functionality
+5. Present refactoring options with pros/cons to user for approval
+6. If approved: Execute refactoring as separate implementation cycle
+7. Write tests to verify refactored code maintains existing behavior
+8. Run full test suite to ensure no regressions before feature implementation
+
+REFACTORING PRINCIPLES:
+- Prefer extending existing code paths over creating new ones
+- Consolidate duplicate logic into shared functions
+- Simplify complex functions while maintaining behavior
+- Remove dead code and unused pathways
+- Update all call sites consistently
+
+CRITICAL REQUIREMENTS:
+- Refactoring must be completed and fully tested BEFORE feature implementation
+- All existing functionality must be preserved exactly
+- Must provide clear migration path from old to new code structure
+- Changes must be reviewable and understandable
+
+This is a SEPARATE implementation cycle with its own testing and device verification.
 ```
 
 ### Process Improvement Quick Start
