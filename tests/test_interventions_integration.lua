@@ -104,8 +104,8 @@ local function run_interventions_integration_tests()
         -- Start flow and select intervention
         flow_manager:start_flow("intervention")
         
-        -- Simulate selecting "Meditation" (no options) - index 5 in fallback data
-        local status, result = flow_manager:handle_dialog_result(5) -- Meditation is index 5
+        -- Simulate selecting "Meditation" (no options) - index 6 in fallback data
+        local status, result = flow_manager:handle_dialog_result(6) -- Meditation is index 6
         assert_equals(status, "flow_complete", "Should complete flow directly")
         assert_equals(result.category, "intervention", "Should be intervention category")
         assert_equals(result.item, "Meditation", "Should log correct item")
@@ -145,7 +145,7 @@ local function run_interventions_integration_tests()
         
         -- Start flow and select "Other..." (index 7 in fallback data)
         flow_manager:start_flow("intervention")
-        local status, data = flow_manager:handle_dialog_result(7) -- "Other..." is index 7
+        local status, data = flow_manager:handle_dialog_result(9) -- "Other..." is index 9
         
         assert_equals(status, "show_dialog", "Should show custom input dialog")
         assert_equals(data.type, "edit", "Should be edit dialog")
@@ -183,7 +183,7 @@ local function run_interventions_integration_tests()
         
         -- Start flow and select "Other..." (index 7) 
         flow_manager:start_flow("intervention")
-        flow_manager:handle_dialog_result(7) -- "Other..." is index 7
+        flow_manager:handle_dialog_result(9) -- "Other..." is index 9
         
         -- Enter empty text (should be handled like cancel - AIO quirk returns continue)
         local status = flow_manager:handle_dialog_result("")

@@ -332,10 +332,13 @@ function M.parse_symptoms_file(content)
     return symptoms
 end
 
-function M.parse_activities_file(content)
+--- Consolidated parsing infrastructure with metadata-first design
+function M.parse_items_with_metadata(content, item_type)
+    -- Handle fallback content
     if not content then
-        -- Use fallback markdown content and parse it properly
-        local fallback_content = [[# Test Activities
+        local fallback_content
+        if item_type == "activities" then
+            fallback_content = [[# Test Activities
 
 ## Work
 - Work {Options: In Office, From Home}
@@ -345,38 +348,13 @@ function M.parse_activities_file(content)
 - Walk {Options: Light, Medium, Heavy}
 - Yin Yoga {Required: Thu}
 - Exercise {Required}
+- Eye mask {Required: Weekly}
 
 ## Daily Living
 - Cooking
 - Reading]]
-        return M.parse_activities_file(fallback_content)
-    end
-    
-    local activities = {}
-    local lines = M.split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local activity = line:match("^%- (.+)")
-            if activity then
-                -- Clean up activity name by removing {Required} and {Options:} markers
-                local clean_activity = activity:match("^(.-)%s*%{Required") or activity
-                clean_activity = clean_activity:match("^(.-)%s*%{Options:") or clean_activity
-                table.insert(activities, clean_activity)
-            end
-        end
-    end
-    
-    -- Always add "Other..." as the last option
-    table.insert(activities, "Other...")
-    
-    return activities
-end
-
-function M.parse_interventions_file(content)
-    if not content then
-        -- Use fallback markdown content and parse it properly
-        local fallback_content = [[# Test Interventions
+        elseif item_type == "interventions" then
+            fallback_content = [[# Test Interventions
 
 ## Medications
 - LDN (4mg) {Required}
@@ -385,104 +363,120 @@ function M.parse_interventions_file(content)
 ## Supplements  
 - Salvital {Options: Morning, Evening}
 - Vitamin D
+- Weekly vitamin shot {Required: Weekly}
 
 ## Treatments
 - Meditation
-- Breathing exercises {Required: Mon,Wed,Fri}]]
-        return M.parse_interventions_file(fallback_content)
+- Breathing exercises {Required: Mon,Wed,Fri}
+- Deep tissue massage {Required: Weekly}]]
+        else
+            return { items = {}, metadata = {}, display_names = {} }
+        end
+        return M.parse_items_with_metadata(fallback_content, item_type)
     end
     
-    local interventions = {}
+    local items = {}
+    local metadata = {}
+    local display_names = {}
     local lines = M.split_lines(content)
     
     for _, line in ipairs(lines) do
         if line:match("^%- ") then
-            local intervention = line:match("^%- (.+)")
-            if intervention then
-                -- Clean up intervention name by removing {Required} and {Options:} markers
-                local clean_intervention = intervention:match("^(.-)%s*%{Required") or intervention
-                clean_intervention = clean_intervention:match("^(.-)%s*%{Options:") or clean_intervention
-                table.insert(interventions, clean_intervention)
+            local item_line = line:match("^%- (.+)")
+            if item_line then
+                -- Extract clean item name (removing all markup)
+                local clean_name = item_line:match("^(.-)%s*%{") or item_line
+                clean_name = clean_name:gsub("^%s+", ""):gsub("%s+$", "")  -- Strip whitespace
+                
+                -- Create metadata object
+                local item_metadata = {
+                    name = clean_name,
+                    required = false,
+                    weekly_required = false,
+                    has_options = false,
+                    days = nil
+                }
+                
+                -- Parse {Required} variants
+                if item_line:match("%{Required%}") then
+                    item_metadata.required = true
+                elseif item_line:match("%{Required:%s*Weekly%}") then
+                    item_metadata.weekly_required = true
+                elseif item_line:match("%{Required:%s*([^%}]+)%}") then
+                    local days_match = item_line:match("%{Required:%s*([^%}]+)%}")
+                    if days_match and days_match ~= "Weekly" then
+                        item_metadata.required = true
+                        item_metadata.days = {}
+                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
+                            table.insert(item_metadata.days, day_abbrev:lower())
+                        end
+                    end
+                end
+                
+                -- Parse {Options:} 
+                if item_line:match("%{Options:") then
+                    item_metadata.has_options = true
+                end
+                
+                table.insert(items, clean_name)
+                table.insert(metadata, item_metadata)
+                table.insert(display_names, clean_name)
             end
         end
     end
     
-    -- Always add "Other..." as the last option
-    table.insert(interventions, "Other...")
+    -- Always add "Other..." as the last option for display
+    table.insert(display_names, "Other...")
     
-    return interventions
+    return {
+        items = items,
+        metadata = metadata,
+        display_names = display_names
+    }
+end
+
+-- Shared dialog processing utilities
+function M.parse_radio_result(options, selected_index)
+    if not options or not selected_index then
+        return nil
+    end
+    
+    if selected_index < 1 or selected_index > #options then
+        return nil
+    end
+    
+    return options[selected_index]
+end
+
+function M.handle_other_selection(custom_input)
+    -- Simple pass-through for now, could add validation/processing later
+    return custom_input
+end
+
+function M.parse_activities_file(content)
+    -- Use new consolidated parsing infrastructure
+    local result = M.parse_items_with_metadata(content, "activities")
+    return result.display_names
+end
+
+function M.parse_interventions_file(content)
+    -- Use new consolidated parsing infrastructure
+    local result = M.parse_items_with_metadata(content, "interventions")
+    return result.display_names
 end
 
 -- Parse activities with metadata preservation for weekly requirements
 function M.parse_activities(content)
-    if not content then
-        return {}
-    end
-    
-    local activities = {}
-    local lines = M.split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local activity_line = line:match("^%- (.+)")
-            if activity_line then
-                local activity_name = activity_line:match("^(.-)%s*%{") or activity_line
-                
-                local activity = {
-                    name = activity_name,
-                    required = false,
-                    weekly_required = false
-                }
-                
-                -- Check for Required markers
-                if activity_line:match("%{Required:%s*Weekly%}") then
-                    activity.weekly_required = true
-                elseif activity_line:match("%{Required[:%}]") then
-                    activity.required = true
-                end
-                
-                table.insert(activities, activity)
-            end
-        end
-    end
-    
-    return activities
+    -- Use consolidated parsing infrastructure
+    local result = M.parse_items_with_metadata(content, "activities")
+    return result.metadata  -- Return metadata objects for backward compatibility
 end
 
 -- Parse interventions with metadata preservation for weekly requirements
 function M.parse_interventions(content)
-    if not content then
-        return {}
-    end
-    
-    local interventions = {}
-    local lines = M.split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local intervention_line = line:match("^%- (.+)")
-            if intervention_line then
-                local intervention_name = intervention_line:match("^(.-)%s*%{") or intervention_line
-                
-                local intervention = {
-                    name = intervention_name,
-                    required = false,
-                    weekly_required = false
-                }
-                
-                -- Check for Required markers
-                if intervention_line:match("%{Required:%s*Weekly%}") then
-                    intervention.weekly_required = true
-                elseif intervention_line:match("%{Required[:%}]") then
-                    intervention.required = true
-                end
-                
-                table.insert(interventions, intervention)
-            end
-        end
-    end
-    
-    return interventions
+    -- Use consolidated parsing infrastructure
+    local result = M.parse_items_with_metadata(content, "interventions")
+    return result.metadata  -- Return metadata objects for backward compatibility
 end
 
 -- Parse options from activities/interventions with {Options: ...} syntax

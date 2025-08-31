@@ -143,7 +143,7 @@ local function run_activities_integration_tests()
         
         -- Start flow and select "Other..." (should be last option - index 8 in fallback data)
         flow_manager:start_flow("activity") 
-        local status, data = flow_manager:handle_dialog_result(8) -- "Other..." is index 8
+        local status, data = flow_manager:handle_dialog_result(9) -- "Other..." is index 9
         
         assert_equals(status, "show_dialog", "Should show custom input dialog")
         assert_equals(data.type, "edit", "Should be edit dialog")
