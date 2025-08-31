@@ -188,9 +188,38 @@ function M.mock_os_date(fixed_date)
         if format == "%Y-%m-%d" and not time then
             return fixed_date or "2023-01-01"
         elseif format == "%w" and not time then
-            -- Return day of week (0=Sunday, 1=Monday, etc.)
-            -- For "2023-01-01" (Sunday), return "0"
-            return "0"
+            -- Calculate day of week for the fixed date
+            local target_date = fixed_date or "2023-01-01"
+            local year, month, day = target_date:match("(%d+)-(%d+)-(%d+)")
+            if year and month and day then
+                -- Create a time table and use os.time to get timestamp
+                local time_table = {
+                    year = tonumber(year),
+                    month = tonumber(month),
+                    day = tonumber(day),
+                    hour = 12  -- Use noon to avoid timezone issues
+                }
+                local timestamp = os.time(time_table)
+                return original_date("%w", timestamp)
+            else
+                return "0"  -- Fallback to Sunday
+            end
+        elseif format == "%A" and not time then
+            -- Return full day name
+            local target_date = fixed_date or "2023-01-01"
+            local year, month, day = target_date:match("(%d+)-(%d+)-(%d+)")
+            if year and month and day then
+                local time_table = {
+                    year = tonumber(year),
+                    month = tonumber(month),
+                    day = tonumber(day),
+                    hour = 12
+                }
+                local timestamp = os.time(time_table)
+                return original_date("%A", timestamp)
+            else
+                return "Sunday"
+            end
         end
         return original_date(format, time)
     end

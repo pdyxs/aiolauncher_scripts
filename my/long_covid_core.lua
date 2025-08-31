@@ -608,7 +608,8 @@ function M.is_required_today(required_info, daily_logs)
     
     -- Handle daily requirements (existing logic)
     if not required_info.days then
-        return true  -- Daily required (no specific days)
+        -- If no days specified, it's daily required unless explicitly set to false
+        return required_info.required ~= false
     end
     
     -- Handle specific day requirements (existing logic)
@@ -622,90 +623,78 @@ function M.is_required_today(required_info, daily_logs)
     return false
 end
 
-function M.get_required_activities_for_today(required_activities, daily_logs)
+-- ===================================================================
+-- CONSOLIDATED COMPLETION LOGIC (Phase 2 Refactoring)
+-- ===================================================================
+
+-- Generic function to get required items for today (replaces both activity/intervention variants)
+function M.get_required_items_for_today(required_items, daily_logs)
     local today_required = {}
     
-    for _, required_info in ipairs(required_activities) do
+    for _, required_info in ipairs(required_items) do
         if M.is_required_today(required_info, daily_logs) then
             table.insert(today_required, required_info.name)
         end
     end
     
     return today_required
+end
+
+-- Generic function to check if all required items are completed (replaces both activity/intervention variants)
+function M.are_all_required_items_completed(daily_logs, required_items, item_category)
+    local required_today = M.get_required_items_for_today(required_items, daily_logs)
+    if #required_today == 0 then
+        return true
+    end
+    
+    local today = M.get_today_date()
+    local logs = M.get_daily_logs(daily_logs, today)
+    local category_logs = logs[item_category] or {}
+    
+    for _, required_item in ipairs(required_today) do
+        -- Check exact match first
+        local count = category_logs[required_item] or 0
+        
+        -- Also check for items that start with this base item (e.g., "Work: From Home" matches "Work")
+        for logged_item, logged_count in pairs(category_logs) do
+            if logged_item ~= required_item then -- Don't double-count exact matches
+                local base_item = logged_item:match("^(.-):%s*") or logged_item
+                if base_item == required_item then
+                    count = count + logged_count
+                end
+            end
+        end
+        
+        if count == 0 then
+            return false
+        end
+    end
+    
+    return true
+end
+
+-- ===================================================================
+-- LEGACY COMPLETION FUNCTIONS (maintained for backward compatibility)
+-- ===================================================================
+
+function M.get_required_activities_for_today(required_activities, daily_logs)
+    -- Use consolidated logic
+    return M.get_required_items_for_today(required_activities, daily_logs)
 end
 
 function M.get_required_interventions_for_today(required_interventions, daily_logs)
-    local today_required = {}
-    
-    for _, required_info in ipairs(required_interventions) do
-        if M.is_required_today(required_info, daily_logs) then
-            table.insert(today_required, required_info.name)
-        end
-    end
-    
-    return today_required
+    -- Use consolidated logic  
+    return M.get_required_items_for_today(required_interventions, daily_logs)
 end
 
 function M.are_all_required_activities_completed(daily_logs, required_activities)
-    local required_today = M.get_required_activities_for_today(required_activities, daily_logs)
-    if #required_today == 0 then
-        return true
-    end
-    
-    local today = M.get_today_date()
-    local logs = M.get_daily_logs(daily_logs, today)
-    
-    for _, required_activity in ipairs(required_today) do
-        -- Check exact match first
-        local count = logs.activities[required_activity] or 0
-        
-        -- Also check for items that start with this base item (e.g., "Work: From Home" matches "Work")
-        for logged_item, logged_count in pairs(logs.activities) do
-            if logged_item ~= required_activity then -- Don't double-count exact matches
-                local base_item = logged_item:match("^(.-):%s*") or logged_item
-                if base_item == required_activity then
-                    count = count + logged_count
-                end
-            end
-        end
-        
-        if count == 0 then
-            return false
-        end
-    end
-    
-    return true
+    -- Use consolidated logic
+    return M.are_all_required_items_completed(daily_logs, required_activities, "activities")
 end
 
 function M.are_all_required_interventions_completed(daily_logs, required_interventions)
-    local required_today = M.get_required_interventions_for_today(required_interventions, daily_logs)
-    if #required_today == 0 then
-        return true
-    end
-    
-    local today = M.get_today_date()
-    local logs = M.get_daily_logs(daily_logs, today)
-    
-    for _, required_intervention in ipairs(required_today) do
-        -- Check exact match first
-        local count = logs.interventions[required_intervention] or 0
-        
-        -- Also check for items that start with this base item (e.g., "Salvital: Morning" matches "Salvital")
-        for logged_item, logged_count in pairs(logs.interventions) do
-            if logged_item ~= required_intervention then -- Don't double-count exact matches
-                local base_item = logged_item:match("^(.-):%s*") or logged_item
-                if base_item == required_intervention then
-                    count = count + logged_count
-                end
-            end
-        end
-        
-        if count == 0 then
-            return false
-        end
-    end
-    
-    return true
+    -- Use consolidated logic
+    return M.are_all_required_items_completed(daily_logs, required_interventions, "interventions")
 end
 
 function M.format_list_items(items, item_type, daily_logs, required_activities, required_interventions)

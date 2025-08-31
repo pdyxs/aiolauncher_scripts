@@ -32,6 +32,7 @@ local test_suites = {
     {name = "Energy Integration", file = "test_energy_integration"},
     {name = "Weekly Required Items", file = "test_weekly_required_items"},
     {name = "Consolidated Parsing Infrastructure", file = "test_consolidated_parsing"},
+    {name = "Consolidated Completion Logic", file = "test_consolidated_completion"},
     {name = "Long Covid Widget", file = "test_long_covid_widget"}
 }
 
