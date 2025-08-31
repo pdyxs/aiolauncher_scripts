@@ -95,9 +95,14 @@ test.add_test("Parse weekly required items from activities content", function()
     local weekly_items = core.get_weekly_required_items(parsed_activities)
     
     test.assert_equals(3, #weekly_items, "Should find 3 weekly required items")
-    test.assert_contains(weekly_items, "Eye mask", "Should include Eye mask")
-    test.assert_contains(weekly_items, "Supplements", "Should include Supplements")
-    test.assert_contains(weekly_items, "Office work", "Should include Office work")
+    -- Check that weekly_items contains objects with correct names
+    local names = {}
+    for _, item in ipairs(weekly_items) do
+        table.insert(names, item.name)
+    end
+    test.assert_contains(names, "Eye mask", "Should include Eye mask")
+    test.assert_contains(names, "Supplements", "Should include Supplements") 
+    test.assert_contains(names, "Office work", "Should include Office work")
 end)
 
 test.add_test("Parse weekly required items from interventions content", function()
@@ -118,8 +123,13 @@ test.add_test("Parse weekly required items from interventions content", function
     local weekly_items = core.get_weekly_required_items(parsed_interventions)
     
     test.assert_equals(2, #weekly_items, "Should find 2 weekly required items")
-    test.assert_contains(weekly_items, "Ice bath", "Should include Ice bath")
-    test.assert_contains(weekly_items, "Vitamin D", "Should include Vitamin D")
+    -- Check that weekly_items contains objects with correct names
+    local names = {}
+    for _, item in ipairs(weekly_items) do
+        table.insert(names, item.name)
+    end
+    test.assert_contains(names, "Ice bath", "Should include Ice bath")
+    test.assert_contains(names, "Vitamin D", "Should include Vitamin D")
 end)
 
 test.add_test("Weekly syntax works with Options syntax", function()
@@ -136,9 +146,14 @@ test.add_test("Weekly syntax works with Options syntax", function()
     local weekly_items = core.get_weekly_required_items(parsed_items)
     
     test.assert_equals(3, #weekly_items, "Should find 3 weekly required items")
-    test.assert_contains(weekly_items, "Stretching", "Should parse weekly + options")
-    test.assert_contains(weekly_items, "Exercise", "Should parse options + weekly")
-    test.assert_contains(weekly_items, "Meal prep", "Should parse simple weekly")
+    -- Check that weekly_items contains objects with correct names
+    local names = {}
+    for _, item in ipairs(weekly_items) do
+        table.insert(names, item.name)
+    end
+    test.assert_contains(names, "Stretching", "Should parse weekly + options")
+    test.assert_contains(names, "Exercise", "Should parse options + weekly")
+    test.assert_contains(names, "Meal prep", "Should parse simple weekly")
 end)
 
 -- Test: 7-day log retention logic
@@ -330,7 +345,12 @@ test.add_test("Handle malformed weekly syntax gracefully", function()
     
     -- Should handle gracefully and find valid ones
     test.assert_true(#weekly_items >= 1, "Should find at least valid weekly items")
-    test.assert_contains(weekly_items, "Good item", "Should parse correctly formatted item")
+    -- Check that weekly_items contains objects with correct names
+    local names = {}
+    for _, item in ipairs(weekly_items) do
+        table.insert(names, item.name)
+    end
+    test.assert_contains(names, "Good item", "Should parse correctly formatted item")
 end)
 
 test.add_test("Weekly requirement checking with empty or nil logs", function()

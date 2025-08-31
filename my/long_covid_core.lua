@@ -589,11 +589,35 @@ function M.parse_required_interventions(content)
     return required_interventions
 end
 
-function M.is_required_today(required_info)
-    if not required_info.days then
-        return true
+function M.is_required_today(required_info, daily_logs)
+    -- Handle weekly requirements (new format: weekly_required=true)
+    if required_info.weekly_required then
+        -- Weekly items are only required when not logged in last 7 days
+        if daily_logs then
+            return M.is_weekly_item_required(required_info.name, daily_logs)
+        else
+            -- If no logs available, assume required (safe default)
+            return true
+        end
     end
     
+    -- Handle weekly requirements (old format: days=["weekly"])
+    if required_info.days and #required_info.days == 1 and required_info.days[1] == "weekly" then
+        -- Weekly items are only required when not logged in last 7 days
+        if daily_logs then
+            return M.is_weekly_item_required(required_info.name, daily_logs)
+        else
+            -- If no logs available, assume required (safe default)
+            return true
+        end
+    end
+    
+    -- Handle daily requirements (existing logic)
+    if not required_info.days then
+        return true  -- Daily required (no specific days)
+    end
+    
+    -- Handle specific day requirements (existing logic)
     local today_abbrev = M.get_current_day_abbrev()
     for _, day in ipairs(required_info.days) do
         if day == today_abbrev then
@@ -604,11 +628,11 @@ function M.is_required_today(required_info)
     return false
 end
 
-function M.get_required_activities_for_today(required_activities)
+function M.get_required_activities_for_today(required_activities, daily_logs)
     local today_required = {}
     
     for _, required_info in ipairs(required_activities) do
-        if M.is_required_today(required_info) then
+        if M.is_required_today(required_info, daily_logs) then
             table.insert(today_required, required_info.name)
         end
     end
@@ -616,11 +640,11 @@ function M.get_required_activities_for_today(required_activities)
     return today_required
 end
 
-function M.get_required_interventions_for_today(required_interventions)
+function M.get_required_interventions_for_today(required_interventions, daily_logs)
     local today_required = {}
     
     for _, required_info in ipairs(required_interventions) do
-        if M.is_required_today(required_info) then
+        if M.is_required_today(required_info, daily_logs) then
             table.insert(today_required, required_info.name)
         end
     end
@@ -629,7 +653,7 @@ function M.get_required_interventions_for_today(required_interventions)
 end
 
 function M.are_all_required_activities_completed(daily_logs, required_activities)
-    local required_today = M.get_required_activities_for_today(required_activities)
+    local required_today = M.get_required_activities_for_today(required_activities, daily_logs)
     if #required_today == 0 then
         return true
     end
@@ -660,7 +684,7 @@ function M.are_all_required_activities_completed(daily_logs, required_activities
 end
 
 function M.are_all_required_interventions_completed(daily_logs, required_interventions)
-    local required_today = M.get_required_interventions_for_today(required_interventions)
+    local required_today = M.get_required_interventions_for_today(required_interventions, daily_logs)
     if #required_today == 0 then
         return true
     end
@@ -700,10 +724,10 @@ function M.format_list_items(items, item_type, daily_logs, required_activities, 
         category = logs.symptoms
     elseif item_type == "activity" then
         category = logs.activities
-        required_items = M.get_required_activities_for_today(required_activities or {})
+        required_items = M.get_required_activities_for_today(required_activities or {}, daily_logs)
     elseif item_type == "intervention" then
         category = logs.interventions
-        required_items = M.get_required_interventions_for_today(required_interventions or {})
+        required_items = M.get_required_interventions_for_today(required_interventions or {}, daily_logs)
     else
         return items
     end
@@ -1731,7 +1755,7 @@ function M.get_weekly_required_items(parsed_items)
     for _, item in ipairs(parsed_items) do
         -- Check if item has weekly_required property or contains "Weekly" in its metadata
         if type(item) == "table" and item.weekly_required then
-            table.insert(weekly_items, item.name)
+            table.insert(weekly_items, item)
         elseif type(item) == "string" then
             -- For simple string arrays, we need to parse the content to find weekly items
             -- This function expects parsed items with metadata
@@ -1782,7 +1806,7 @@ function M.get_weekly_required_items(parsed_items)
     for _, item in ipairs(parsed_items) do
         -- Check if item has weekly_required property
         if type(item) == "table" and item.weekly_required then
-            table.insert(weekly_items, item.name)
+            table.insert(weekly_items, item)
         elseif type(item) == "string" then
             -- Simple string items won't have weekly metadata
             -- But we need to check the original content that was used to create these strings
@@ -1902,7 +1926,7 @@ function M.get_button_colors(items, category, daily_logs)
                     end
                 elseif item.required then
                     -- Daily required: check if required today
-                    if M.is_required_today and M.is_required_today(item) then
+                    if M.is_required_today and M.is_required_today(item, daily_logs) then
                         colors[item_name] = count > 0 and "completed" or "required"
                     else
                         colors[item_name] = count > 0 and "completed" or "default"
