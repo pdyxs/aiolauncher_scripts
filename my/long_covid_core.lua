@@ -698,25 +698,49 @@ function M.are_all_required_interventions_completed(daily_logs, required_interve
 end
 
 function M.format_list_items(items, item_type, daily_logs, required_activities, required_interventions)
+    -- Delegate to simplified version using configuration-driven behavior
+    local required_items = nil
+    if item_type == "activity" then
+        required_items = required_activities
+    elseif item_type == "intervention" then
+        required_items = required_interventions
+    end
+    
+    return M.format_list_items_simplified(items, item_type, daily_logs, required_items)
+end
+
+-- ===================================================================
+-- SIMPLIFIED FORMATTING (Phase 3 Refactoring)
+-- ===================================================================
+
+-- Configuration-driven formatting with simplified parameters
+function M.format_list_items_simplified(items, item_type, daily_logs, required_items)
     local today = M.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
-    local category
-    local required_items = {}
-    if item_type == "symptom" then
-        category = logs.symptoms
-    elseif item_type == "activity" then
-        category = logs.activities
-        required_items = M.get_required_activities_for_today(required_activities or {}, daily_logs)
-    elseif item_type == "intervention" then
-        category = logs.interventions
-        required_items = M.get_required_interventions_for_today(required_interventions or {}, daily_logs)
-    else
-        return items
+    -- Configuration mapping for item categories
+    local item_config = {
+        symptom = { category_key = "symptoms", supports_requirements = false },
+        activity = { category_key = "activities", supports_requirements = true },
+        intervention = { category_key = "interventions", supports_requirements = true }
+    }
+    
+    local config = item_config[item_type]
+    if not config then
+        return items  -- Unknown item type, return as-is
     end
     
+    local category = logs[config.category_key] or {}
+    local required_today = {}
+    
+    -- Get required items for today if this item type supports requirements
+    if config.supports_requirements and required_items then
+        required_today = M.get_required_items_for_today(required_items, daily_logs)
+    end
+    
+    -- Create set for quick lookup
     local required_set = {}
-    for _, req_item in ipairs(required_items) do
+    for _, req_item in ipairs(required_today) do
         required_set[req_item] = true
     end
     
@@ -754,6 +778,10 @@ function M.format_list_items(items, item_type, daily_logs, required_activities, 
     
     return formatted
 end
+
+-- ===================================================================
+-- LEGACY FORMATTING FUNCTION (maintained for backward compatibility)
+-- ===================================================================
 
 function M.extract_item_name(formatted_item)
     if not formatted_item then
@@ -1134,16 +1162,34 @@ function M.create_ui_generator()
         return ui_elements
     end
     
-    function generator:create_health_tracking_buttons(daily_logs, required_activities, required_interventions)
-        local activity_color = "#dc3545" -- Default red
-        local intervention_color = "#dc3545" -- Default red
+    -- Simplified health tracking buttons with configuration-driven approach
+    function generator:create_health_tracking_buttons_simplified(daily_logs, required_items_config)
+        -- Configuration for button colors based on completion status
+        local button_config = {
+            activities = {
+                icon = "fa:running",
+                completed_color = "#28a745",  -- Green when completed
+                incomplete_color = "#dc3545"  -- Red when incomplete
+            },
+            interventions = {
+                icon = "fa:pills", 
+                completed_color = "#007bff",  -- Blue when completed
+                incomplete_color = "#dc3545"  -- Red when incomplete
+            }
+        }
         
-        if required_activities then
-            activity_color = M.are_all_required_activities_completed(daily_logs, required_activities) and "#28a745" or "#dc3545"
-        end
+        local colors = {}
         
-        if required_interventions then
-            intervention_color = M.are_all_required_interventions_completed(daily_logs, required_interventions) and "#007bff" or "#dc3545"
+        -- Calculate colors using consolidated completion logic
+        for item_type, items in pairs(required_items_config or {}) do
+            local config = button_config[item_type]
+            if config and items then
+                local completed = M.are_all_required_items_completed(daily_logs, items, item_type)
+                colors[item_type] = completed and config.completed_color or config.incomplete_color
+            else
+                -- Default to red if no requirements or unknown type
+                colors[item_type] = "#dc3545"
+            end
         end
         
         local energy_color = M.get_energy_button_color(daily_logs)
@@ -1152,9 +1198,23 @@ function M.create_ui_generator()
             {"button", "fa:heart-pulse", {color = "#6c757d", gravity = "center_h"}},
             {"button", "fa:bolt-lightning", {color = energy_color, gravity = "anchor_prev"}},
             {"spacer", 3},
-            {"button", "fa:running", {color = activity_color, gravity = "anchor_prev"}},
-            {"button", "fa:pills", {color = intervention_color, gravity = "anchor_prev"}}
+            {"button", button_config.activities.icon, {color = colors.activities or "#dc3545", gravity = "anchor_prev"}},
+            {"button", button_config.interventions.icon, {color = colors.interventions or "#dc3545", gravity = "anchor_prev"}}
         }
+    end
+    
+    -- Legacy function for backward compatibility
+    function generator:create_health_tracking_buttons(daily_logs, required_activities, required_interventions)
+        -- Delegate to simplified version using configuration approach
+        local required_items_config = {}
+        if required_activities then
+            required_items_config.activities = required_activities
+        end
+        if required_interventions then
+            required_items_config.interventions = required_interventions
+        end
+        
+        return generator:create_health_tracking_buttons_simplified(daily_logs, required_items_config)
     end
     
     function generator:create_no_selection_content()

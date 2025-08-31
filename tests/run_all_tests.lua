@@ -33,6 +33,7 @@ local test_suites = {
     {name = "Weekly Required Items", file = "test_weekly_required_items"},
     {name = "Consolidated Parsing Infrastructure", file = "test_consolidated_parsing"},
     {name = "Consolidated Completion Logic", file = "test_consolidated_completion"},
+    {name = "Simplified Formatting", file = "test_simplified_formatting"},
     {name = "Long Covid Widget", file = "test_long_covid_widget"}
 }
 
