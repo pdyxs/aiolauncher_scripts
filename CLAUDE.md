@@ -450,6 +450,53 @@ For well-defined bugs/features using standard templates:
 - **Flexible idea exploration** - Low-barrier entry for half-formed concepts
 - **Continuous process improvement** - Built-in feedback loop after each implementation
 
+### Widget Architecture Principles
+
+These principles guide code organization and prevent duplication/complexity:
+
+#### **Core Architectural Principles**
+
+1. **Item Type Feature Parity Principle**
+   - **Rule**: Any feature implemented for one trackable item type (activities/interventions) should be available for both
+   - **Examples**: If activities support `{Options}`, interventions must support `{Options}`. If interventions support `{Required: Weekly}`, activities must support it
+   - **Exception**: Symptoms have distinct medical tracking requirements (severity) and follow different patterns appropriately
+
+2. **Metadata-First Design Principle** 
+   - **Rule**: Always preserve full metadata during parsing. Strip metadata only at presentation/display time
+   - **Benefits**: Single source of truth, no dual parsing systems, enables future features without breaking changes
+   - **Implementation**: Parse once with full metadata, format for display as needed
+
+3. **Configuration-Driven Behavior Principle**
+   - **Rule**: Item type differences should be driven by declarative configuration, not scattered code branches
+   - **Implementation**: Define item type capabilities in configuration objects rather than hard-coded if/else logic
+   - **Benefits**: Easier to add new item types, consistent behavior patterns, centralized capability management
+
+4. **Shared Infrastructure, Type-Specific Logic Principle**
+   - **Rule**: Extract common infrastructure (dialog mechanics, formatting, error handling) while preserving meaningful business logic differences
+   - **Good Sharing**: Dialog processing utilities, context management, result formatting
+   - **Keep Separate**: Flow requirements (symptoms need severity, activities may have options), completion logic differences
+   - **Anti-Pattern**: Forcing all item types into identical patterns when they have different real-world requirements
+
+5. **Predictable Function Naming Convention**
+   - **Data Access**: `get_items(type)` → full metadata, `get_display_names(type)` → UI-ready names
+   - **Business Logic**: `is_item_completed()`, `get_item_status()` → consistent naming patterns
+   - **Internal Functions**: Private functions prefixed with underscore (`_parse_content()`)
+
+#### **Code Organization Guidelines**
+
+- **Single Responsibility**: One function per clearly defined purpose
+- **Consistent Parameter Order**: Context/data objects before primitive parameters
+- **Fail Fast**: Validate inputs early and provide clear error messages  
+- **Test-Friendly**: Design for easy mocking and isolated testing
+
+#### **Refactoring Decision Framework**
+
+When considering changes:
+1. **Can existing code paths be extended** instead of creating new ones?
+2. **Is this adding appropriate type-specific logic** or unnecessary duplication?
+3. **Will this maintain feature parity** where it should exist (activities/interventions)?
+4. **Does this follow the metadata-first principle** or create new parsing pathways?
+
 ### Sub-Agent Task Examples
 
 **Using the Task tool with general-purpose agent for each sub-agent role:**
