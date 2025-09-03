@@ -135,5 +135,9 @@ test.add_test("Shared dialog infrastructure - handle other selection", function(
     test.assert_equals("Custom Input", result, "Should return the custom input")
 end)
 
-print("Consolidated Parsing Infrastructure Test Suite loaded - " .. #test.tests .. " tests")
-
+-- Individual runner pattern
+if ... == nil then
+    test.run_tests("Consolidated Parsing Infrastructure")
+    local success = test.print_final_results()
+    os.exit(success and 0 or 1)
+end

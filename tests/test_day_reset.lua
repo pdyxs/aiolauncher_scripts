@@ -305,18 +305,9 @@ test_framework.add_test("Cache clearing with uninitialized managers", function()
     test_framework.assert_true(success, "Cache clearing should handle nil managers: " .. tostring(error_msg))
 end)
 
--- Run the day reset test suite
-print("🔄 Day Reset Test Suite")
-print("Testing widget behavior during day transitions and resets...")
-
-local all_passed = test_framework.run_tests("Day Reset Scenarios")
-test_framework.print_final_results()
-
-if all_passed then
-    print("\n✅ Day reset handling is working correctly!")
-    print("The widget should now handle day transitions without 'function arguments expected' errors.")
-else
-    print("\n❌ Some day reset tests failed.")
-    print("Review the failures above to identify day reset issues.")
-    os.exit(1)
+-- Run tests if this file is executed directly
+if ... == nil then
+    local all_passed = test_framework.run_tests("Day Reset Scenarios")
+    local success = test_framework.print_final_results()
+    os.exit(success and 0 or 1)
 end

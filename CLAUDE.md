@@ -105,12 +105,16 @@ lua test_long_covid_widget.lua
 **IMPORTANT**: When adding new functionality to any widget, follow this TDD process:
 
 1. **Write failing tests first** - Create comprehensive tests for the new functionality (RED phase)
+   - **MUST use standard test framework**: `local test = require "test_framework"`
+   - **MUST include individual runner pattern** for standalone execution
+   - **NO custom test runners or output formatting**
 2. **Implement minimum code** to make tests pass (GREEN phase)  
 3. **Refactor and improve** code while keeping tests passing (REFACTOR phase)
 4. **Update existing tests** if your changes affect current behavior
 5. **Verify all tests pass** - Run the full test suite to ensure nothing is broken
+6. **Add new permanent tests to `run_all_tests.lua`** - Ensure integration with main test runner
 
-This RED-GREEN-REFACTOR cycle ensures reliable, well-tested implementations.
+This RED-GREEN-REFACTOR cycle ensures reliable, well-tested implementations with consistent output formatting.
 
 ### Debugging On-Device Issues with Test Harnesses
 
@@ -165,13 +169,42 @@ All widget functionality should have tests covering:
 - **Data parsing** - File parsing and data transformation
 - **Business logic** - Widget-specific rules and constraints
 
-### Test Structure
+### Test Structure and Output Standards
 
-Tests use a lightweight framework with:
-- Mock AIO Launcher APIs (prefs, ui, files, gui, tasker)
-- Assertion helpers (assert_equals, assert_true, assert_contains)
-- Setup/teardown for isolated test execution
-- Comprehensive error reporting with line numbers
+Tests use a **standardized framework** with consistent output formatting:
+
+#### Framework Requirements
+- **Standard import**: `local test = require "test_framework"`
+- **Standard test registration**: `test.add_test("name", function() ... end)`
+- **Standard assertions**: `test.assert_equals()`, `test.assert_true()`, `test.assert_contains()`
+- **Individual runner**: All test files must include the individual runner pattern
+- **Mock AIO APIs**: Comprehensive mocks for prefs, ui, files, gui, tasker
+- **Isolated execution**: Each test runs independently with clean state
+
+#### Standardized Output Format
+**CRITICAL**: All tests must produce consistent, clean output:
+
+**run_all_tests.lua output:**
+- ✅ Success: "✅ Suite Name - PASSED (X tests)"
+- ❌ Failure: "❌ Suite Name - FAILED" with specific error details only
+- **No verbose decorative output** or unnecessary console logs
+
+**Individual test file output:**
+- ✓ Success: Individual test success indicators  
+- ❌ Failure: Failed test details with error messages
+- **Console logs suppressed** unless tests fail
+
+#### Required Individual Runner Pattern
+**ALL test files MUST end with:**
+```lua
+if ... == nil then
+    test.run_tests("Suite Name")
+    local success = test.print_final_results()
+    os.exit(success and 0 or 1)
+end
+```
+
+**NEVER create custom test runners, output formatting, or assertion functions.** This prevents output inconsistencies and maintains clean, readable test results.
 
 See `tests/README.md` for detailed testing guidelines and examples.
 

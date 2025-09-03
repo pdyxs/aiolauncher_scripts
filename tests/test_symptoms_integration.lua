@@ -9,7 +9,6 @@ package.path = package.path .. ";../my/?.lua"
 
 -- Import dependencies
 local core = require "long_covid_core"
-local test_framework = require "test_framework"
 
 -- Mock AIO environment
 local mock_dialogs = {
@@ -122,23 +121,26 @@ function mock_widget:log_item(item_type, item_value, metadata)
     })
 end
 
+-- Import the test framework
+local test = require "test_framework"
+
 -- Integration tests
-test_framework.add_test("Widget symptoms flow initialization", function()
+test.add_test("Widget symptoms flow initialization", function()
     mock_widget:setup()
     mock_dialogs:reset()
     
     local status = mock_widget:start_symptom_flow()
     
-    test_framework.assert_equals("dialog_shown", status)
-    test_framework.assert_equals(1, #mock_dialogs.calls)
+    test.assert_equals("dialog_shown", status)
+    test.assert_equals(1, #mock_dialogs.calls)
     
     local call = mock_dialogs.calls[1]
-    test_framework.assert_equals("radio", call[1])
-    test_framework.assert_equals("Select Symptom", call[2])
-    test_framework.assert_contains(call[3], "   Fatigue")
+    test.assert_equals("radio", call[1])
+    test.assert_equals("Select Symptom", call[2])
+    test.assert_contains(call[3], "   Fatigue")
 end)
 
-test_framework.add_test("Complete symptoms flow - direct selection", function()
+test.add_test("Complete symptoms flow - direct selection", function()
     mock_widget:setup()
     mock_dialogs:reset()
     mock_widget.logged_items = {}
@@ -148,28 +150,28 @@ test_framework.add_test("Complete symptoms flow - direct selection", function()
     
     -- Select "Fatigue" (index 1)
     local status = mock_widget:handle_dialog_action(1)
-    test_framework.assert_equals("dialog_shown", status)
+    test.assert_equals("dialog_shown", status)
     
     -- Should now show severity dialog
-    test_framework.assert_equals(2, #mock_dialogs.calls)
+    test.assert_equals(2, #mock_dialogs.calls)
     local severity_call = mock_dialogs.calls[2]
-    test_framework.assert_equals("radio", severity_call[1])
-    test_framework.assert_equals("Symptom Severity", severity_call[2])
-    test_framework.assert_contains(severity_call[3], "5 - Moderate-High")
+    test.assert_equals("radio", severity_call[1])
+    test.assert_equals("Symptom Severity", severity_call[2])
+    test.assert_contains(severity_call[3], "5 - Moderate-High")
     
     -- Select severity level 5
     status = mock_widget:handle_dialog_action(5)
-    test_framework.assert_equals("flow_complete", status)
+    test.assert_equals("flow_complete", status)
     
     -- Check that item was logged with severity
-    test_framework.assert_equals(1, #mock_widget.logged_items)
+    test.assert_equals(1, #mock_widget.logged_items)
     local logged = mock_widget.logged_items[1]
-    test_framework.assert_equals("symptom", logged.type)
-    test_framework.assert_equals("Fatigue (severity: 5)", logged.value)
-    test_framework.assert_equals(5, logged.metadata.severity)
+    test.assert_equals("symptom", logged.type)
+    test.assert_equals("Fatigue (severity: 5)", logged.value)
+    test.assert_equals(5, logged.metadata.severity)
 end)
 
-test_framework.add_test("Complete symptoms flow - custom input", function()
+test.add_test("Complete symptoms flow - custom input", function()
     mock_widget:setup()
     mock_dialogs:reset()
     mock_widget.logged_items = {}
@@ -179,38 +181,38 @@ test_framework.add_test("Complete symptoms flow - custom input", function()
     
     -- Select "Other..." (index 8)
     local status = mock_widget:handle_dialog_action(8)
-    test_framework.assert_equals("dialog_shown", status)
+    test.assert_equals("dialog_shown", status)
     
     -- Should now show custom input dialog
-    test_framework.assert_equals(2, #mock_dialogs.calls)
+    test.assert_equals(2, #mock_dialogs.calls)
     local edit_call = mock_dialogs.calls[2]
-    test_framework.assert_equals("edit", edit_call[1])
-    test_framework.assert_equals("Custom Symptom", edit_call[2])
-    test_framework.assert_equals("Enter symptom name:", edit_call[3])
+    test.assert_equals("edit", edit_call[1])
+    test.assert_equals("Custom Symptom", edit_call[2])
+    test.assert_equals("Enter symptom name:", edit_call[3])
     
     -- Enter custom symptom
     status = mock_widget:handle_dialog_action("Custom Fatigue")
-    test_framework.assert_equals("dialog_shown", status)
+    test.assert_equals("dialog_shown", status)
     
     -- Should now show severity dialog
-    test_framework.assert_equals(3, #mock_dialogs.calls)
+    test.assert_equals(3, #mock_dialogs.calls)
     local severity_call = mock_dialogs.calls[3]
-    test_framework.assert_equals("radio", severity_call[1])
-    test_framework.assert_equals("Symptom Severity", severity_call[2])
+    test.assert_equals("radio", severity_call[1])
+    test.assert_equals("Symptom Severity", severity_call[2])
     
     -- Select severity level 3
     status = mock_widget:handle_dialog_action(3)
-    test_framework.assert_equals("flow_complete", status)
+    test.assert_equals("flow_complete", status)
     
     -- Check that custom item was logged with severity
-    test_framework.assert_equals(1, #mock_widget.logged_items)
+    test.assert_equals(1, #mock_widget.logged_items)
     local logged = mock_widget.logged_items[1]
-    test_framework.assert_equals("symptom", logged.type)
-    test_framework.assert_equals("Custom Fatigue (severity: 3)", logged.value)
-    test_framework.assert_equals(3, logged.metadata.severity)
+    test.assert_equals("symptom", logged.type)
+    test.assert_equals("Custom Fatigue (severity: 3)", logged.value)
+    test.assert_equals(3, logged.metadata.severity)
 end)
 
-test_framework.add_test("Cancel symptoms flow at severity level", function()
+test.add_test("Cancel symptoms flow at severity level", function()
     mock_widget:setup()
     mock_dialogs:reset()
     mock_widget.logged_items = {}
@@ -221,16 +223,16 @@ test_framework.add_test("Cancel symptoms flow at severity level", function()
     
     -- Cancel at severity level
     local status = mock_widget:handle_dialog_action(-1)
-    test_framework.assert_equals("continue", status)
+    test.assert_equals("continue", status)
     
     -- Continue means no new dialog was shown, so still 2 calls
-    test_framework.assert_equals(2, #mock_dialogs.calls)
+    test.assert_equals(2, #mock_dialogs.calls)
     
     -- Nothing should be logged
-    test_framework.assert_equals(0, #mock_widget.logged_items)
+    test.assert_equals(0, #mock_widget.logged_items)
 end)
 
-test_framework.add_test("Cancel symptoms flow completely", function()
+test.add_test("Cancel symptoms flow completely", function()
     mock_widget:setup()
     mock_dialogs:reset()
     mock_widget.logged_items = {}
@@ -240,17 +242,17 @@ test_framework.add_test("Cancel symptoms flow completely", function()
     
     -- First cancel (list dialog quirk)
     local status = mock_widget:handle_dialog_action(-1)
-    test_framework.assert_equals("continue", status)
+    test.assert_equals("continue", status)
     
     -- Second cancel (actual cancel)
     status = mock_widget:handle_dialog_action(-1)
-    test_framework.assert_equals("flow_cancelled", status)
+    test.assert_equals("flow_cancelled", status)
     
     -- Nothing should be logged
-    test_framework.assert_equals(0, #mock_widget.logged_items)
+    test.assert_equals(0, #mock_widget.logged_items)
 end)
 
-test_framework.add_test("Empty custom input returns to main list", function()
+test.add_test("Empty custom input returns to main list", function()
     mock_widget:setup()
     mock_dialogs:reset()
     mock_widget.logged_items = {}
@@ -261,22 +263,18 @@ test_framework.add_test("Empty custom input returns to main list", function()
     
     -- Enter empty string
     local status = mock_widget:handle_dialog_action("")
-    test_framework.assert_equals("continue", status)
+    test.assert_equals("continue", status)
     
     -- Continue means no new dialog was shown, so still 2 calls
-    test_framework.assert_equals(2, #mock_dialogs.calls)
+    test.assert_equals(2, #mock_dialogs.calls)
     
     -- Nothing should be logged
-    test_framework.assert_equals(0, #mock_widget.logged_items)
+    test.assert_equals(0, #mock_widget.logged_items)
 end)
 
--- Run the integration tests
-local success = test_framework.run_tests("Symptoms Dialog Flow Integration Tests")
-
-if success then
-    print("\nSymptoms dialog flow integration is working correctly!")
-    print("The new dialog stack system is ready for use.")
-else
-    print("\nSome integration tests failed. Please review the implementation.")
-    os.exit(1)
+-- Individual runner pattern
+if ... == nil then
+    test.run_tests("Symptoms Dialog Flow Integration")
+    local success = test.print_final_results()
+    os.exit(success and 0 or 1)
 end

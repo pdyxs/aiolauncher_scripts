@@ -94,4 +94,9 @@ test.add_test("Content access methods", function()
     test.assert_true(#interventions_content > 0, "Interventions content should not be empty")
 end)
 
--- Tests are automatically run when file is loaded by run_all_tests.lua
+-- Run tests if this file is executed directly
+if ... == nil then
+    test.run_tests("Dialog Manager")
+    local success = test.print_final_results()
+    os.exit(success and 0 or 1)
+end

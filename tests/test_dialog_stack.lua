@@ -286,12 +286,9 @@ test_framework.add_test("Dialog Flow Manager empty custom input", function()
     test_framework.assert_equals("custom_input", current.name)
 end)
 
--- Run the tests
-local success = test_framework.run_tests("Dialog Stack System Tests")
-
-if success then
-    print("\nDialog Stack System implementation is working correctly!")
-else
-    print("\nSome Dialog Stack System tests failed. Please review the implementation.")
-    os.exit(1)
+-- Run tests if this file is executed directly
+if ... == nil then
+    local success = test_framework.run_tests("Dialog Stack System Tests")
+    local final_success = test_framework.print_final_results()
+    os.exit(final_success and 0 or 1)
 end

@@ -267,4 +267,9 @@ end)
 
 -- Legacy compatibility tests for health tracking buttons removed - only one implementation now exists
 
-print("Simplified Formatting Test Suite loaded - " .. #test.tests .. " tests")
+-- Individual runner pattern
+if ... == nil then
+    test.run_tests("Simplified Formatting")
+    local success = test.print_final_results()
+    os.exit(success and 0 or 1)
+end

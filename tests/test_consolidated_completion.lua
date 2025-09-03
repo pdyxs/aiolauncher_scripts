@@ -198,4 +198,9 @@ test.add_test("Feature parity - both item types handle options", function()
     os.date = original_date
 end)
 
-print("Consolidated Completion Logic Test Suite loaded - " .. #test.tests .. " tests")
+-- Individual runner pattern
+if ... == nil then
+    test.run_tests("Consolidated Completion Logic")
+    local success = test.print_final_results()
+    os.exit(success and 0 or 1)
+end

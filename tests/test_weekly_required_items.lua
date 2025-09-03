@@ -397,4 +397,9 @@ test.add_test("Feature scenario - Eye mask weekly requirement", function()
     os.date = original_date
 end)
 
-print("Weekly Required Items Test Suite loaded - " .. #test.tests .. " tests")
+-- Individual runner pattern
+if ... == nil then
+    test.run_tests("Weekly Required Items")
+    local success = test.print_final_results()
+    os.exit(success and 0 or 1)
+end

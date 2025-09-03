@@ -139,4 +139,9 @@ test.add_test("Options completion - day-specific requirements", function()
     os.date = original_date
 end)
 
-return test
+-- Run tests if this file is executed directly
+if ... == nil then
+    test.run_tests("Options Completion Logic")
+    local success = test.print_final_results()
+    os.exit(success and 0 or 1)
+end

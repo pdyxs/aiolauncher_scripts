@@ -6,6 +6,22 @@ This directory contains test suites for AIO Launcher scripts in this project.
 
 Tests are written in Lua and can be run locally without AIO Launcher dependencies.
 
+### Test Output Format
+
+All tests use a **standardized output format** for clean, consistent results:
+
+**When run from `run_all_tests.lua`:**
+- ✅ **Success**: Single line "✅ Suite Name - PASSED (X tests)"
+- ❌ **Failure**: "❌ Suite Name - FAILED" with specific failed test details only
+- **Final summary**: Test and suite counts with execution time
+
+**When run individually:**
+- ✓ **Success**: Individual test success indicators
+- ❌ **Failure**: Failed test details with error messages
+- **Summary**: Clean pass/fail summary
+
+**Key principle**: Console logs and debug output are suppressed unless tests fail, making it easy to identify issues.
+
 ### Long Covid Widget Tests
 
 #### Comprehensive Test Suite (Recommended)
@@ -80,23 +96,47 @@ When adding new functionality to widgets:
 3. **Ensure coverage** - Test both happy path and error cases
 4. **Run tests** - Verify all tests pass before committing changes
 
-Example test structure:
+### Required Test File Structure
+
+**ALL test files MUST follow this standardized pattern:**
+
 ```lua
-add_test("Test description", function()
-    setup_widget_env()
-    
+-- Import the standard test framework
+local test = require "test_framework"
+
+-- Add tests using the standard framework
+test.add_test("Test description", function()
     -- Setup test data
-    test_files["example.md"] = "test content"
+    local expected = "expected_value"
     
     -- Execute functionality
     local result = test_function()
     
-    -- Verify results
-    assert_equals(expected, result, "Should return expected value")
-    assert_true(condition, "Should meet condition")
-    assert_contains(result_array, "expected_item", "Should contain expected item")
+    -- Use standard assertions
+    test.assert_equals(expected, result, "Should return expected value")
+    test.assert_true(condition, "Should meet condition")
+    test.assert_contains(result_array, "expected_item", "Should contain expected item")
 end)
+
+-- REQUIRED: Individual test runner (allows file to run standalone)
+if ... == nil then
+    test.run_tests("Suite Name")
+    local success = test.print_final_results()
+    os.exit(success and 0 or 1)
+end
 ```
+
+### Standard Test Framework Requirements
+
+**CRITICAL**: Do NOT create custom test runners, assertion functions, or output formatting. All tests must use:
+
+- **Import**: `local test = require "test_framework"`
+- **Add tests**: `test.add_test("name", function() ... end)`
+- **Assertions**: `test.assert_equals()`, `test.assert_true()`, `test.assert_contains()`, etc.
+- **Individual runner**: The `if ... == nil then` pattern shown above
+- **No custom output**: No `print()` statements for test results or decorative formatting
+
+This ensures consistent output formatting across all test files and prevents regression to mixed output patterns.
 
 ## Test Best Practices
 
