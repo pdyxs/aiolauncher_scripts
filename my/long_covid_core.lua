@@ -453,31 +453,7 @@ function M.handle_other_selection(custom_input)
     return custom_input
 end
 
-function M.parse_activities_file(content)
-    -- Use new consolidated parsing infrastructure
-    local result = M.parse_items_with_metadata(content, "activities")
-    return result.display_names
-end
-
-function M.parse_interventions_file(content)
-    -- Use new consolidated parsing infrastructure
-    local result = M.parse_items_with_metadata(content, "interventions")
-    return result.display_names
-end
-
--- Parse activities with metadata preservation for weekly requirements
-function M.parse_activities(content)
-    -- Use consolidated parsing infrastructure
-    local result = M.parse_items_with_metadata(content, "activities")
-    return result.metadata  -- Return metadata objects for backward compatibility
-end
-
--- Parse interventions with metadata preservation for weekly requirements
-function M.parse_interventions(content)
-    -- Use consolidated parsing infrastructure
-    local result = M.parse_items_with_metadata(content, "interventions")
-    return result.metadata  -- Return metadata objects for backward compatibility
-end
+-- Legacy parsing functions removed - use parse_items_with_metadata() directly
 
 -- Parse options from activities/interventions with {Options: ...} syntax
 function M.parse_item_options(content, item_name)
@@ -511,77 +487,7 @@ function M.parse_item_options(content, item_name)
     return nil
 end
 
-function M.parse_required_activities(content)
-    if not content then
-        return {}
-    end
-    
-    local required_activities = {}
-    local lines = M.split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local activity_line = line:match("^%- (.+)")
-            if activity_line and activity_line:match("%{Required") then
-                local activity_name = activity_line:match("^(.-)%s*%{Required")
-                if activity_name then
-                    local required_info = {
-                        name = activity_name,
-                        days = nil
-                    }
-                    
-                    local days_match = activity_line:match("%{Required:%s*([^%}]+)%}")
-                    if days_match then
-                        required_info.days = {}
-                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
-                            table.insert(required_info.days, day_abbrev:lower())
-                        end
-                    end
-                    
-                    table.insert(required_activities, required_info)
-                end
-            end
-        end
-    end
-    
-    return required_activities
-end
-
-function M.parse_required_interventions(content)
-    if not content then
-        return {}
-    end
-    
-    local required_interventions = {}
-    local lines = M.split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local intervention_line = line:match("^%- (.+)")
-            if intervention_line and intervention_line:match("%{Required") then
-                local intervention_name = intervention_line:match("^(.-)%s*%{Required")
-                if intervention_name then
-                    local required_info = {
-                        name = intervention_name,
-                        days = nil
-                    }
-                    
-                    local days_match = intervention_line:match("%{Required:%s*([^%}]+)%}")
-                    if days_match then
-                        required_info.days = {}
-                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
-                            table.insert(required_info.days, day_abbrev:lower())
-                        end
-                    end
-                    
-                    table.insert(required_interventions, required_info)
-                end
-            end
-        end
-    end
-    
-    return required_interventions
-end
+-- Legacy parsing functions removed - use parse_items_with_metadata() directly
 
 function M.is_required_today(required_info, daily_logs)
     -- Handle weekly requirements (new format: weekly_required=true)
@@ -677,44 +583,14 @@ end
 -- LEGACY COMPLETION FUNCTIONS (maintained for backward compatibility)
 -- ===================================================================
 
-function M.get_required_activities_for_today(required_activities, daily_logs)
-    -- Use consolidated logic
-    return M.get_required_items_for_today(required_activities, daily_logs)
-end
-
-function M.get_required_interventions_for_today(required_interventions, daily_logs)
-    -- Use consolidated logic  
-    return M.get_required_items_for_today(required_interventions, daily_logs)
-end
-
-function M.are_all_required_activities_completed(daily_logs, required_activities)
-    -- Use consolidated logic
-    return M.are_all_required_items_completed(daily_logs, required_activities, "activities")
-end
-
-function M.are_all_required_interventions_completed(daily_logs, required_interventions)
-    -- Use consolidated logic
-    return M.are_all_required_items_completed(daily_logs, required_interventions, "interventions")
-end
-
-function M.format_list_items(items, item_type, daily_logs, required_activities, required_interventions)
-    -- Delegate to simplified version using configuration-driven behavior
-    local required_items = nil
-    if item_type == "activity" then
-        required_items = required_activities
-    elseif item_type == "intervention" then
-        required_items = required_interventions
-    end
-    
-    return M.format_list_items_simplified(items, item_type, daily_logs, required_items)
-end
+-- Legacy completion and formatting functions removed - use consolidated versions directly
 
 -- ===================================================================
--- SIMPLIFIED FORMATTING (Phase 3 Refactoring)
+-- CONSOLIDATED FORMATTING FUNCTIONS
 -- ===================================================================
 
 -- Configuration-driven formatting with simplified parameters
-function M.format_list_items_simplified(items, item_type, daily_logs, required_items)
+function M.format_list_items(items, item_type, daily_logs, required_items)
     local today = M.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
@@ -941,8 +817,9 @@ function M.create_dialog_manager()
         if not self.cached_activities or not self.cached_required_activities then
             local content = file_reader("activities.md")
             self.cached_activities_content = content
-            self.cached_activities = M.parse_activities_file(content)
-            self.cached_required_activities = M.parse_required_activities(content)
+            local parsed = M.parse_items_with_metadata(content, "activities")
+            self.cached_activities = parsed.display_names
+            self.cached_required_activities = parsed.metadata
         end
         return self.cached_activities, self.cached_required_activities
     end
@@ -951,8 +828,9 @@ function M.create_dialog_manager()
         if not self.cached_interventions or not self.cached_required_interventions then
             local content = file_reader("interventions.md")
             self.cached_interventions_content = content
-            self.cached_interventions = M.parse_interventions_file(content)
-            self.cached_required_interventions = M.parse_required_interventions(content)
+            local parsed = M.parse_items_with_metadata(content, "interventions")
+            self.cached_interventions = parsed.display_names
+            self.cached_required_interventions = parsed.metadata
         end
         return self.cached_interventions, self.cached_required_interventions
     end
@@ -1060,8 +938,9 @@ function M.create_cache_manager()
         if not self.cached_activities or not self.cached_required_activities then
             local content = file_reader("activities.md")
             self.cached_activities_content = content
-            self.cached_activities = M.parse_activities_file(content)
-            self.cached_required_activities = M.parse_required_activities(content)
+            local parsed = M.parse_items_with_metadata(content, "activities")
+            self.cached_activities = parsed.display_names
+            self.cached_required_activities = parsed.metadata
         end
         return self.cached_activities, self.cached_required_activities
     end
@@ -1070,8 +949,9 @@ function M.create_cache_manager()
         if not self.cached_interventions or not self.cached_required_interventions then
             local content = file_reader("interventions.md")
             self.cached_interventions_content = content
-            self.cached_interventions = M.parse_interventions_file(content)
-            self.cached_required_interventions = M.parse_required_interventions(content)
+            local parsed = M.parse_items_with_metadata(content, "interventions")
+            self.cached_interventions = parsed.display_names
+            self.cached_required_interventions = parsed.metadata
         end
         return self.cached_interventions, self.cached_required_interventions
     end
@@ -1162,8 +1042,8 @@ function M.create_ui_generator()
         return ui_elements
     end
     
-    -- Simplified health tracking buttons with configuration-driven approach
-    function generator:create_health_tracking_buttons_simplified(daily_logs, required_items_config)
+    -- Health tracking buttons with configuration-driven approach
+    function generator:create_health_tracking_buttons(daily_logs, required_items_config)
         -- Configuration for button colors based on completion status
         local button_config = {
             activities = {
@@ -1203,19 +1083,7 @@ function M.create_ui_generator()
         }
     end
     
-    -- Legacy function for backward compatibility
-    function generator:create_health_tracking_buttons(daily_logs, required_activities, required_interventions)
-        -- Delegate to simplified version using configuration approach
-        local required_items_config = {}
-        if required_activities then
-            required_items_config.activities = required_activities
-        end
-        if required_interventions then
-            required_items_config.interventions = required_interventions
-        end
-        
-        return generator:create_health_tracking_buttons_simplified(daily_logs, required_items_config)
-    end
+    -- Legacy function removed - use create_health_tracking_buttons() directly
     
     function generator:create_no_selection_content()
         return {
@@ -1398,7 +1266,7 @@ M.flow_definitions = {
             title = "Select Symptom", 
             get_options = function(manager, daily_logs)
                 local symptoms = manager:load_symptoms(function(filename) return files:read(filename) end)
-                return M.format_list_items(symptoms, "symptom", daily_logs, {}, {})
+                return M.format_list_items(symptoms, "symptom", daily_logs, nil)
             end,
             next_step = function(selected_item, context)
                 if selected_item == "Other..." then
@@ -1440,7 +1308,7 @@ M.flow_definitions = {
             title = "Log Activity",
             get_options = function(manager, daily_logs, required_activities, required_interventions)
                 local activities, req_activities = manager:load_activities(function(filename) return files:read(filename) end)
-                return M.format_list_items(activities, "activity", daily_logs, req_activities or required_activities, required_interventions)
+                return M.format_list_items(activities, "activity", daily_logs, req_activities or required_activities)
             end,
             next_step = function(selected_item, context, manager)
                 if selected_item == "Other..." then
@@ -1489,7 +1357,7 @@ M.flow_definitions = {
             title = "Log Intervention",
             get_options = function(manager, daily_logs, required_activities, required_interventions)
                 local interventions, req_interventions = manager:load_interventions(function(filename) return files:read(filename) end)
-                return M.format_list_items(interventions, "intervention", daily_logs, required_activities, req_interventions or required_interventions)
+                return M.format_list_items(interventions, "intervention", daily_logs, req_interventions or required_interventions)
             end,
             next_step = function(selected_item, context, manager)
                 if selected_item == "Other..." then

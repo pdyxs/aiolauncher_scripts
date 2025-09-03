@@ -91,7 +91,7 @@ test.add_test("Parse weekly required items from activities content", function()
 - Office work {Required: Weekly}
 ]]
     
-    local parsed_activities = core.parse_activities(activities_content)
+    local parsed_activities = core.parse_items_with_metadata(activities_content, "activities").metadata
     local weekly_items = core.get_weekly_required_items(parsed_activities)
     
     test.assert_equals(3, #weekly_items, "Should find 3 weekly required items")
@@ -119,7 +119,7 @@ test.add_test("Parse weekly required items from interventions content", function
 - B-complex daily {Required}
 ]]
     
-    local parsed_interventions = core.parse_interventions(interventions_content)
+    local parsed_interventions = core.parse_items_with_metadata(interventions_content, "interventions").metadata
     local weekly_items = core.get_weekly_required_items(parsed_interventions)
     
     test.assert_equals(2, #weekly_items, "Should find 2 weekly required items")
@@ -142,7 +142,7 @@ test.add_test("Weekly syntax works with Options syntax", function()
 - Meal prep {Required: Weekly}
 ]]
     
-    local parsed_items = core.parse_activities(content)
+    local parsed_items = core.parse_items_with_metadata(content, "activities").metadata
     local weekly_items = core.get_weekly_required_items(parsed_items)
     
     test.assert_equals(3, #weekly_items, "Should find 3 weekly required items")
@@ -340,7 +340,7 @@ test.add_test("Handle malformed weekly syntax gracefully", function()
 - Empty item {Required: Weekly}
 ]]
     
-    local parsed_items = core.parse_activities(content)
+    local parsed_items = core.parse_items_with_metadata(content, "activities").metadata
     local weekly_items = core.get_weekly_required_items(parsed_items)
     
     -- Should handle gracefully and find valid ones

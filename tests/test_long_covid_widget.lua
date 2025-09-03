@@ -270,7 +270,15 @@ add_test("Energy button color logic", function()
 end)
 
 add_test("Parse required activities", function()
-    local required = core.parse_required_activities(test_activities_content)
+    local parsed = core.parse_items_with_metadata(test_activities_content, "activities")
+    local required = {}
+    
+    -- Filter to just required items for this test
+    for _, meta in ipairs(parsed.metadata) do
+        if meta.required then
+            table.insert(required, meta)
+        end
+    end
     
     assert_equals(2, #required, "Should find 2 required activities")
     assert_equals("Physio (full)", required[1].name, "Should parse activity name correctly")
@@ -282,7 +290,15 @@ add_test("Parse required activities", function()
 end)
 
 add_test("Parse required interventions", function()
-    local required = core.parse_required_interventions(test_interventions_content)
+    local parsed = core.parse_items_with_metadata(test_interventions_content, "interventions")
+    local required = {}
+    
+    -- Filter to just required items for this test
+    for _, meta in ipairs(parsed.metadata) do
+        if meta.required then
+            table.insert(required, meta)
+        end
+    end
     
     assert_equals(2, #required, "Should find 2 required interventions")
     assert_equals("LDN (4mg)", required[1].name, "Should parse intervention name correctly")
@@ -291,10 +307,10 @@ end)
 
 add_test("Required items completion status", function()
     local daily_logs = {}
-    local required_activities = core.parse_required_activities(test_activities_content)
+    local required_activities = core.parse_items_with_metadata(test_activities_content, "activities").metadata
     
     -- Initially no activities logged - should be incomplete
-    assert_true(not core.are_all_required_activities_completed(daily_logs, required_activities), 
+    assert_true(not core.are_all_required_items_completed(daily_logs, required_activities, "activities"), 
                 "Should be incomplete when nothing logged")
     
     -- Log one required activity
@@ -305,7 +321,7 @@ add_test("Required items completion status", function()
     core.get_current_day_abbrev = function() return "tue" end -- Tuesday - only Yin Yoga required
     
     -- Should now be complete
-    assert_true(core.are_all_required_activities_completed(daily_logs, required_activities), 
+    assert_true(core.are_all_required_items_completed(daily_logs, required_activities, "activities"), 
                 "Should be complete after logging all required activities for today")
     
     -- Restore original function
@@ -314,10 +330,10 @@ end)
 
 add_test("Format list items with required markers", function()
     local daily_logs = {}
-    local required_activities = core.parse_required_activities(test_activities_content)
+    local required_activities = core.parse_items_with_metadata(test_activities_content, "activities").metadata
     local activities = {"Physio (full)", "Light walk", "Yin Yoga"}
     
-    local formatted = core.format_list_items(activities, "activity", daily_logs, required_activities, {})
+    local formatted = core.format_list_items(activities, "activity", daily_logs, required_activities)
     
     -- Check that required items have warning icons (depends on current day)
     local found_warning = false
@@ -331,7 +347,7 @@ add_test("Format list items with required markers", function()
     
     -- Log a required activity
     core.log_item(daily_logs, "activity", "Yin Yoga")
-    formatted = core.format_list_items(activities, "activity", daily_logs, required_activities, {})
+    formatted = core.format_list_items(activities, "activity", daily_logs, required_activities)
     
     local found_completed = false
     for _, item in ipairs(formatted) do
@@ -376,11 +392,11 @@ add_test("File parsing with nil content", function()
     assert_true(#symptoms > 0, "Should return default symptoms for nil content")
     assert_contains(symptoms, "Other...", "Should include Other... option")
     
-    local activities = core.parse_activities_file(nil)
+    local activities = core.parse_items_with_metadata(nil, "activities").display_names
     assert_true(#activities > 0, "Should return default activities for nil content")
     assert_contains(activities, "Other...", "Should include Other... option")
     
-    local interventions = core.parse_interventions_file(nil)
+    local interventions = core.parse_items_with_metadata(nil, "interventions").display_names
     assert_true(#interventions > 0, "Should return default interventions for nil content")
     assert_contains(interventions, "Other...", "Should include Other... option")
 end)

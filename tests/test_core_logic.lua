@@ -164,7 +164,7 @@ test.add_test("Energy button color logic", function()
 end)
 
 test.add_test("Parse required activities", function()
-    local required = core.parse_required_activities(data.test_activities_content)
+    local required = core.parse_items_with_metadata(data.test_activities_content, "activities").metadata
     
     test.assert_type("table", required, "Should return table")
     test.assert_true(#required >= 1, "Should have required activities")
@@ -188,7 +188,7 @@ test.add_test("Parse required activities", function()
 end)
 
 test.add_test("Parse required interventions", function()
-    local required = core.parse_required_interventions(data.test_interventions_content)
+    local required = core.parse_items_with_metadata(data.test_interventions_content, "interventions").metadata
     
     test.assert_type("table", required, "Should return table")
     test.assert_true(#required >= 1, "Should have required interventions")
@@ -213,11 +213,11 @@ test.add_test("Required items completion status", function()
     os.date = mock_date
     
     -- Test activities completion
-    local activities_complete = core.are_all_required_activities_completed(daily_logs, required_activities)
+    local activities_complete = core.are_all_required_items_completed(daily_logs, required_activities, "activities")
     test.assert_true(activities_complete, "Should complete required activities")
     
     -- Test interventions completion
-    local interventions_complete = core.are_all_required_interventions_completed(daily_logs, required_interventions)
+    local interventions_complete = core.are_all_required_items_completed(daily_logs, required_interventions, "interventions")
     test.assert_true(interventions_complete, "Should complete required interventions")
     
     os.date = original_date
@@ -231,7 +231,7 @@ test.add_test("Format list items with required markers", function()
     local mock_date, original_date = data.mock_os_date("2023-01-01")
     os.date = mock_date
     
-    local formatted = core.format_list_items(activities, "activity", daily_logs, required_activities, {})
+    local formatted = core.format_list_items(activities, "activity", daily_logs, required_activities)
     
     test.assert_type("table", formatted, "Should return table")
     test.assert_equals(#activities, #formatted, "Should have same number of items")
@@ -287,11 +287,11 @@ test.add_test("File parsing with nil content", function()
     test.assert_type("table", symptoms, "Should return table for nil symptoms")
     test.assert_true(#symptoms > 0, "Should have default symptoms")
     
-    local activities = core.parse_activities_file(nil)
+    local activities = core.parse_items_with_metadata(nil, "activities").display_names
     test.assert_type("table", activities, "Should return table for nil activities")
     test.assert_true(#activities > 0, "Should have default activities")
     
-    local interventions = core.parse_interventions_file(nil)
+    local interventions = core.parse_items_with_metadata(nil, "interventions").display_names
     test.assert_type("table", interventions, "Should return table for nil interventions")
     test.assert_true(#interventions > 0, "Should have default interventions")
 end)

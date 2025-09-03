@@ -29,24 +29,24 @@ local interventions_with_options_content = [[# Test Interventions
 ]]
 
 test.add_test("Options completion - activity with options logged", function()
-    local required_activities = core.parse_required_activities(activities_with_options_content)
+    local required_activities = core.parse_items_with_metadata(activities_with_options_content, "activities").metadata
     local daily_logs = {}
     
     -- Log activity with option (this was the bug scenario)
     core.log_item_with_tasker(daily_logs, "activity", "Yin Yoga: Morning", nil, function(msg) end)
     
-    local activities_complete = core.are_all_required_activities_completed(daily_logs, required_activities)
+    local activities_complete = core.are_all_required_items_completed(daily_logs, required_activities, "activities")
     test.assert_true(activities_complete, "Should complete required activity when logged with option")
 end)
 
 test.add_test("Options completion - intervention with options logged", function()
-    local required_interventions = core.parse_required_interventions(interventions_with_options_content)
+    local required_interventions = core.parse_items_with_metadata(interventions_with_options_content, "interventions").metadata
     local daily_logs = {}
     
     -- Log intervention with option
     core.log_item_with_tasker(daily_logs, "intervention", "Salvital: Evening", nil, function(msg) end)
     
-    local interventions_complete = core.are_all_required_interventions_completed(daily_logs, required_interventions)
+    local interventions_complete = core.are_all_required_items_completed(daily_logs, required_interventions, "interventions")
     test.assert_true(interventions_complete, "Should complete required intervention when logged with option")
 end)
 
@@ -62,8 +62,8 @@ test.add_test("Options completion - mixed exact and option logging", function()
 - Salvital {Required} {Options: Morning, Evening}
 ]]
     
-    local required_activities = core.parse_required_activities(activities_content)
-    local required_interventions = core.parse_required_interventions(interventions_content)
+    local required_activities = core.parse_items_with_metadata(activities_content, "activities").metadata
+    local required_interventions = core.parse_items_with_metadata(interventions_content, "interventions").metadata
     local daily_logs = {}
     
     -- Log one item with exact match, one with option
@@ -71,22 +71,22 @@ test.add_test("Options completion - mixed exact and option logging", function()
     core.log_item_with_tasker(daily_logs, "activity", "Yin Yoga: Evening", nil, function(msg) end)  -- with option
     core.log_item_with_tasker(daily_logs, "intervention", "Salvital: Morning", nil, function(msg) end) -- with option
     
-    local activities_complete = core.are_all_required_activities_completed(daily_logs, required_activities)
-    local interventions_complete = core.are_all_required_interventions_completed(daily_logs, required_interventions)
+    local activities_complete = core.are_all_required_items_completed(daily_logs, required_activities, "activities")
+    local interventions_complete = core.are_all_required_items_completed(daily_logs, required_interventions, "interventions")
     
     test.assert_true(activities_complete, "Should handle mixed exact match and option logging for activities")
     test.assert_true(interventions_complete, "Should handle intervention logged with option")
 end)
 
 test.add_test("Options completion - multiple options for same base item", function()
-    local required_activities = core.parse_required_activities(activities_with_options_content)
+    local required_activities = core.parse_items_with_metadata(activities_with_options_content, "activities").metadata
     local daily_logs = {}
     
     -- Log same base item with multiple options
     core.log_item_with_tasker(daily_logs, "activity", "Yin Yoga: Morning", nil, function(msg) end)
     core.log_item_with_tasker(daily_logs, "activity", "Yin Yoga: Evening", nil, function(msg) end)
     
-    local activities_complete = core.are_all_required_activities_completed(daily_logs, required_activities)
+    local activities_complete = core.are_all_required_items_completed(daily_logs, required_activities, "activities")
     test.assert_true(activities_complete, "Should handle multiple options of same required item")
     
     -- Verify counts are summed correctly
@@ -103,13 +103,13 @@ test.add_test("Options completion - partial completion still incomplete", functi
 - Task B {Required} {Options: Option1, Option2}
 ]]
     
-    local required_activities = core.parse_required_activities(activities_content)
+    local required_activities = core.parse_items_with_metadata(activities_content, "activities").metadata
     local daily_logs = {}
     
     -- Only complete one of two required tasks
     core.log_item_with_tasker(daily_logs, "activity", "Task B: Option1", nil, function(msg) end)
     
-    local activities_complete = core.are_all_required_activities_completed(daily_logs, required_activities)
+    local activities_complete = core.are_all_required_items_completed(daily_logs, required_activities, "activities")
     test.assert_false(activities_complete, "Should not be complete when only some required items are logged")
 end)
 
@@ -126,14 +126,14 @@ test.add_test("Options completion - day-specific requirements", function()
         end
     end
     
-    local required_activities = core.parse_required_activities(activities_with_options_content)
+    local required_activities = core.parse_items_with_metadata(activities_with_options_content, "activities").metadata
     local daily_logs = {}
     
     -- Work is required on Mon,Wed,Fri - we're testing Wednesday
     core.log_item_with_tasker(daily_logs, "activity", "Work: From Home", nil, function(msg) end)
     core.log_item_with_tasker(daily_logs, "activity", "Yin Yoga: Morning", nil, function(msg) end)
     
-    local activities_complete = core.are_all_required_activities_completed(daily_logs, required_activities)
+    local activities_complete = core.are_all_required_items_completed(daily_logs, required_activities, "activities")
     test.assert_true(activities_complete, "Should complete day-specific required items with options")
     
     os.date = original_date

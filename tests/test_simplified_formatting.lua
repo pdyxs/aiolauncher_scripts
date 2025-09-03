@@ -23,7 +23,7 @@ test.add_test("Simplified formatting - symptoms have no requirements", function(
         }
     }
     
-    local result = core.format_list_items_simplified(symptoms, "symptom", daily_logs, nil)
+    local result = core.format_list_items(symptoms, "symptom", daily_logs, nil)
     
     test.assert_equals(3, #result, "Should return 3 formatted items")
     test.assert_contains(result, "✓ Fatigue (2)", "Should show completed symptom with count")
@@ -53,7 +53,7 @@ test.add_test("Simplified formatting - activities with requirements", function()
         }
     }
     
-    local result = core.format_list_items_simplified(activities, "activity", daily_logs, required_activities)
+    local result = core.format_list_items(activities, "activity", daily_logs, required_activities)
     
     test.assert_equals(3, #result, "Should return 3 formatted items")
     test.assert_contains(result, "✅ Work (1)", "Should show completed required activity with ✅")
@@ -84,7 +84,7 @@ test.add_test("Simplified formatting - interventions with requirements", functio
         }
     }
     
-    local result = core.format_list_items_simplified(interventions, "intervention", daily_logs, required_interventions)
+    local result = core.format_list_items(interventions, "intervention", daily_logs, required_interventions)
     
     test.assert_equals(3, #result, "Should return 3 formatted items")
     test.assert_contains(result, "✅ LDN (4mg) (1)", "Should show completed required intervention with ✅")
@@ -113,7 +113,7 @@ test.add_test("Simplified formatting - handles option variants", function()
         }
     }
     
-    local result = core.format_list_items_simplified(activities, "activity", daily_logs, required_activities)
+    local result = core.format_list_items(activities, "activity", daily_logs, required_activities)
     
     test.assert_equals(2, #result, "Should return 2 formatted items")
     test.assert_contains(result, "✅ Work (1)", "Should count option variant for Work")
@@ -141,7 +141,7 @@ test.add_test("Simplified formatting - multiple option variants", function()
         }
     }
     
-    local result = core.format_list_items_simplified(activities, "activity", daily_logs, required_activities)
+    local result = core.format_list_items(activities, "activity", daily_logs, required_activities)
     
     test.assert_equals(1, #result, "Should return 1 formatted item")
     test.assert_contains(result, "✅ Work (4)", "Should sum all variants: 1 + 2 + 1 = 4")
@@ -154,90 +154,13 @@ test.add_test("Simplified formatting - unknown item type fallback", function()
     local items = {"Unknown1", "Unknown2"}
     local daily_logs = {}
     
-    local result = core.format_list_items_simplified(items, "unknown_type", daily_logs, nil)
+    local result = core.format_list_items(items, "unknown_type", daily_logs, nil)
     
     -- Should return items as-is for unknown types
     test.assert_equals(items, result, "Should return original items for unknown type")
 end)
 
--- Test: Backward compatibility - legacy function works identically  
-test.add_test("Legacy function compatibility - symptoms", function()
-    local mock_date, original_date = data.mock_os_date("2023-08-30")
-    os.date = mock_date
-    
-    local symptoms = {"Fatigue", "Brain fog"}
-    local daily_logs = {
-        ["2023-08-30"] = {
-            symptoms = {["Fatigue"] = 1}
-        }
-    }
-    
-    -- Test legacy function
-    local legacy_result = core.format_list_items(symptoms, "symptom", daily_logs, {}, {})
-    
-    -- Test simplified function
-    local simplified_result = core.format_list_items_simplified(symptoms, "symptom", daily_logs, nil)
-    
-    test.assert_equals(#legacy_result, #simplified_result, "Should return same number of items")
-    test.assert_equals(legacy_result[1], simplified_result[1], "Should format Fatigue identically")
-    test.assert_equals(legacy_result[2], simplified_result[2], "Should format Brain fog identically")
-    
-    os.date = original_date
-end)
-
-test.add_test("Legacy function compatibility - activities", function()
-    local mock_date, original_date = data.mock_os_date("2023-08-30")
-    os.date = mock_date
-    
-    local activities = {"Work", "Exercise"}
-    local required_activities = {
-        {name = "Work", required = true}
-    }
-    local daily_logs = {
-        ["2023-08-30"] = {
-            activities = {["Work"] = 1}
-        }
-    }
-    
-    -- Test legacy function
-    local legacy_result = core.format_list_items(activities, "activity", daily_logs, required_activities, {})
-    
-    -- Test simplified function
-    local simplified_result = core.format_list_items_simplified(activities, "activity", daily_logs, required_activities)
-    
-    test.assert_equals(#legacy_result, #simplified_result, "Should return same number of items")
-    test.assert_equals(legacy_result[1], simplified_result[1], "Should format Work identically")
-    test.assert_equals(legacy_result[2], simplified_result[2], "Should format Exercise identically")
-    
-    os.date = original_date
-end)
-
-test.add_test("Legacy function compatibility - interventions", function()
-    local mock_date, original_date = data.mock_os_date("2023-08-30")
-    os.date = mock_date
-    
-    local interventions = {"LDN (4mg)", "Meditation"}
-    local required_interventions = {
-        {name = "LDN (4mg)", required = true}
-    }
-    local daily_logs = {
-        ["2023-08-30"] = {
-            interventions = {["Meditation"] = 1}
-        }
-    }
-    
-    -- Test legacy function
-    local legacy_result = core.format_list_items(interventions, "intervention", daily_logs, {}, required_interventions)
-    
-    -- Test simplified function
-    local simplified_result = core.format_list_items_simplified(interventions, "intervention", daily_logs, required_interventions)
-    
-    test.assert_equals(#legacy_result, #simplified_result, "Should return same number of items")
-    test.assert_equals(legacy_result[1], simplified_result[1], "Should format LDN identically")
-    test.assert_equals(legacy_result[2], simplified_result[2], "Should format Meditation identically")
-    
-    os.date = original_date
-end)
+-- Legacy compatibility tests removed - only one implementation now exists
 
 -- Test: Configuration-driven design principles
 test.add_test("Configuration-driven design - item type configurations", function()
@@ -254,17 +177,17 @@ test.add_test("Configuration-driven design - item type configurations", function
     }
     
     -- Test symptom configuration (no requirements support)
-    local symptom_result = core.format_list_items_simplified({"Fatigue"}, "symptom", daily_logs, {})
+    local symptom_result = core.format_list_items({"Fatigue"}, "symptom", daily_logs, {})
     test.assert_contains(symptom_result, "✓ Fatigue (1)", "Symptoms should use ✓ (never required)")
     
     -- Test activity configuration (requirements support)
     local required_activities = {{name = "Work", required = true}}
-    local activity_result = core.format_list_items_simplified({"Work"}, "activity", daily_logs, required_activities)
+    local activity_result = core.format_list_items({"Work"}, "activity", daily_logs, required_activities)
     test.assert_contains(activity_result, "✅ Work (1)", "Required activities should use ✅")
     
     -- Test intervention configuration (requirements support)
     local required_interventions = {{name = "LDN (4mg)", required = true}}
-    local intervention_result = core.format_list_items_simplified({"LDN (4mg)"}, "intervention", daily_logs, required_interventions)
+    local intervention_result = core.format_list_items({"LDN (4mg)"}, "intervention", daily_logs, required_interventions)
     test.assert_contains(intervention_result, "✅ LDN (4mg) (1)", "Required interventions should use ✅")
     
     os.date = original_date
@@ -289,7 +212,7 @@ test.add_test("Simplified health tracking buttons - all completed", function()
     }
     
     local ui_generator = core.create_ui_generator()
-    local buttons = ui_generator:create_health_tracking_buttons_simplified(daily_logs, required_items_config)
+    local buttons = ui_generator:create_health_tracking_buttons(daily_logs, required_items_config)
     
     -- Find the activity and intervention buttons
     local activity_button = buttons[4] -- fa:running button
@@ -318,7 +241,7 @@ test.add_test("Simplified health tracking buttons - incomplete requirements", fu
     }
     
     local ui_generator = core.create_ui_generator()
-    local buttons = ui_generator:create_health_tracking_buttons_simplified(daily_logs, required_items_config)
+    local buttons = ui_generator:create_health_tracking_buttons(daily_logs, required_items_config)
     
     local activity_button = buttons[4] 
     local intervention_button = buttons[5]
@@ -331,7 +254,7 @@ end)
 
 test.add_test("Simplified health tracking buttons - configuration driven", function()
     local ui_generator = core.create_ui_generator()
-    local buttons = ui_generator:create_health_tracking_buttons_simplified({}, {})
+    local buttons = ui_generator:create_health_tracking_buttons({}, {})
     
     -- Should return 5 elements: heart-pulse, lightning, spacer, running, pills
     test.assert_equals(5, #buttons, "Should return 5 button elements")
@@ -342,38 +265,6 @@ test.add_test("Simplified health tracking buttons - configuration driven", funct
     test.assert_equals("fa:pills", buttons[5][2], "Fifth button should be pills")
 end)
 
--- Test: Legacy compatibility for health tracking buttons
-test.add_test("Legacy health tracking buttons compatibility", function()
-    local mock_date, original_date = data.mock_os_date("2023-08-30")
-    os.date = mock_date
-    
-    local required_activities = {{name = "Work", required = true}}
-    local required_interventions = {{name = "LDN (4mg)", required = true}}
-    
-    local daily_logs = {
-        ["2023-08-30"] = {
-            activities = {["Work"] = 1},
-            interventions = {["LDN (4mg)"] = 1}
-        }
-    }
-    
-    local ui_generator = core.create_ui_generator()
-    
-    -- Test legacy function
-    local legacy_buttons = ui_generator:create_health_tracking_buttons(daily_logs, required_activities, required_interventions)
-    
-    -- Test simplified function
-    local required_items_config = {
-        activities = required_activities,
-        interventions = required_interventions
-    }
-    local simplified_buttons = ui_generator:create_health_tracking_buttons_simplified(daily_logs, required_items_config)
-    
-    test.assert_equals(#legacy_buttons, #simplified_buttons, "Should return same number of buttons")
-    test.assert_equals(legacy_buttons[4][3].color, simplified_buttons[4][3].color, "Activity button colors should match")
-    test.assert_equals(legacy_buttons[5][3].color, simplified_buttons[5][3].color, "Intervention button colors should match")
-    
-    os.date = original_date
-end)
+-- Legacy compatibility tests for health tracking buttons removed - only one implementation now exists
 
 print("Simplified Formatting Test Suite loaded - " .. #test.tests .. " tests")

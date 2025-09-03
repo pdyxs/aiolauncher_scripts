@@ -191,7 +191,11 @@ function render_widget()
     -- Add health tracking buttons
     local required_activities = cache_manager:get_required_activities()
     local required_interventions = cache_manager:get_required_interventions()
-    local health_buttons = ui_generator:create_health_tracking_buttons(daily_logs, required_activities, required_interventions)
+    local required_items_config = {
+        activities = required_activities,
+        interventions = required_interventions
+    }
+    local health_buttons = ui_generator:create_health_tracking_buttons(daily_logs, required_items_config)
     for _, element in ipairs(health_buttons) do
         table.insert(ui_elements, element)
     end

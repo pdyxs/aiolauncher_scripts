@@ -120,7 +120,11 @@ test.add_test("Health tracking buttons - all requirements met", function()
     local required_activities = data.create_sample_required_activities()
     local required_interventions = data.create_sample_required_interventions()
     
-    local elements = ui_generator:create_health_tracking_buttons(daily_logs, required_activities, required_interventions)
+    local required_items_config = {
+        activities = required_activities,
+        interventions = required_interventions
+    }
+    local elements = ui_generator:create_health_tracking_buttons(daily_logs, required_items_config)
     
     os.date = original_date
     
@@ -163,7 +167,11 @@ test.add_test("Health tracking buttons - requirements not met", function()
     local required_activities = data.create_sample_required_activities()
     local required_interventions = data.create_sample_required_interventions()
     
-    local elements = ui_generator:create_health_tracking_buttons(daily_logs, required_activities, required_interventions)
+    local required_items_config = {
+        activities = required_activities,
+        interventions = required_interventions
+    }
+    local elements = ui_generator:create_health_tracking_buttons(daily_logs, required_items_config)
     
     os.date = original_date
     
