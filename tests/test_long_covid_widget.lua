@@ -173,21 +173,6 @@ add_test("Daily reset functionality", function()
     assert_true(changes.daily_logs ~= nil, "Should purge old daily logs")
 end)
 
-add_test("Purge old daily logs", function()
-    local today = os.date("%Y-%m-%d")
-    local yesterday = os.date("%Y-%m-%d", os.time() - 86400)
-    
-    local daily_logs = {}
-    daily_logs[today] = {symptoms = {["Fatigue"] = 1}, activities = {}, interventions = {}, energy_levels = {}}
-    daily_logs[yesterday] = {symptoms = {["Headache"] = 2}, activities = {}, interventions = {}, energy_levels = {}}
-    
-    local purged = core.purge_old_daily_logs(daily_logs, today)
-    
-    assert_true(purged[today] ~= nil, "Should keep today's data")
-    assert_true(purged[yesterday] == nil, "Should remove yesterday's data")
-    assert_equals(1, purged[today].symptoms["Fatigue"], "Should preserve today's symptom data")
-end)
-
 add_test("Decision criteria parsing", function()
     local criteria = core.parse_decision_criteria(test_criteria_content)
     

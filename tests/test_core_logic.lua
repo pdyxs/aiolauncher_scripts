@@ -66,17 +66,6 @@ test.add_test("Daily reset functionality", function()
     os.date = original_date
 end)
 
-test.add_test("Purge old daily logs", function()
-    local daily_logs = data.create_sample_daily_logs()
-    daily_logs["2022-12-31"] = {symptoms = {["Old"] = 1}}
-    
-    local purged = core.purge_old_daily_logs(daily_logs, "2023-01-01")
-    
-    test.assert_not_nil(purged["2023-01-01"], "Should keep today's logs")
-    test.assert_nil(purged["2023-01-02"], "Should remove other dates")
-    test.assert_nil(purged["2022-12-31"], "Should remove old dates")
-end)
-
 test.add_test("Decision criteria parsing", function()
     local criteria = core.parse_decision_criteria(data.test_criteria_content)
     

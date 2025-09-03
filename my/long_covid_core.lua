@@ -114,30 +114,6 @@ function M.check_daily_reset(last_selection_date, selected_level, daily_capacity
     return changes
 end
 
-function M.purge_old_daily_logs(daily_logs, today)
-    if not daily_logs then
-        daily_logs = {}
-    end
-    
-    -- Keep only today's entry, remove all others for performance
-    local today_logs = daily_logs[today]
-    local new_daily_logs = {}
-    
-    -- Initialize today's logs if needed
-    if not today_logs then
-        new_daily_logs[today] = {
-            symptoms = {},
-            activities = {},
-            interventions = {},
-            energy_levels = {}
-        }
-    else
-        new_daily_logs[today] = today_logs
-    end
-    
-    return new_daily_logs
-end
-
 function M.get_daily_logs(daily_logs, date)
     if not daily_logs then
         daily_logs = {}
@@ -1730,7 +1706,7 @@ function M.get_weekly_required_items(parsed_items)
 end
 
 -- Purge old daily logs but keep 7 days for weekly requirement checking
-function M.purge_old_daily_logs_weekly(daily_logs, today)
+function M.purge_old_daily_logs(daily_logs, today)
     if not daily_logs then
         return {}
     end
