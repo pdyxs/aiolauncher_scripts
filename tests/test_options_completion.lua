@@ -32,11 +32,28 @@ test.add_test("Options completion - activity with options logged", function()
     local required_activities = core.parse_items_with_metadata(activities_with_options_content, "activities").metadata
     local daily_logs = {}
     
+    -- Mock date to Tuesday when only Yin Yoga is required (not Work which is Mon,Wed,Fri)
+    local original_date = os.date
+    os.date = function(format)
+        if format == "*t" then
+            return {year = 2023, month = 8, day = 29, wday = 3} -- Tuesday
+        elseif format == "%Y-%m-%d" then
+            return "2023-08-29"
+        elseif format == "%w" then
+            return "2"  -- Tuesday is day 2 (0=Sun, 1=Mon, 2=Tue)
+        else
+            return original_date(format)
+        end
+    end
+    
     -- Log activity with option (this was the bug scenario)
     core.log_item_with_tasker(daily_logs, "activity", "Yin Yoga: Morning", nil, function(msg) end)
     
     local activities_complete = core.are_all_required_items_completed(daily_logs, required_activities, "activities")
     test.assert_true(activities_complete, "Should complete required activity when logged with option")
+    
+    -- Restore original date function
+    os.date = original_date
 end)
 
 test.add_test("Options completion - intervention with options logged", function()
@@ -82,6 +99,20 @@ test.add_test("Options completion - multiple options for same base item", functi
     local required_activities = core.parse_items_with_metadata(activities_with_options_content, "activities").metadata
     local daily_logs = {}
     
+    -- Mock date to Tuesday when only Yin Yoga is required (not Work which is Mon,Wed,Fri)
+    local original_date = os.date
+    os.date = function(format)
+        if format == "*t" then
+            return {year = 2023, month = 8, day = 29, wday = 3} -- Tuesday
+        elseif format == "%Y-%m-%d" then
+            return "2023-08-29"
+        elseif format == "%w" then
+            return "2"  -- Tuesday is day 2 (0=Sun, 1=Mon, 2=Tue)
+        else
+            return original_date(format)
+        end
+    end
+    
     -- Log same base item with multiple options
     core.log_item_with_tasker(daily_logs, "activity", "Yin Yoga: Morning", nil, function(msg) end)
     core.log_item_with_tasker(daily_logs, "activity", "Yin Yoga: Evening", nil, function(msg) end)
@@ -92,6 +123,9 @@ test.add_test("Options completion - multiple options for same base item", functi
     -- Verify counts are summed correctly
     local today = core.get_today_date()
     local logs = core.get_daily_logs(daily_logs, today)
+    
+    -- Restore original date function
+    os.date = original_date
     test.assert_equals(logs.activities["Yin Yoga: Morning"], 1, "Should track morning option")
     test.assert_equals(logs.activities["Yin Yoga: Evening"], 1, "Should track evening option")
 end)
