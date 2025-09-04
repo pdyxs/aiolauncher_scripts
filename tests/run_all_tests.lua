@@ -15,6 +15,11 @@ test.set_quiet_mode(true)
 
 -- Test suites to run (in order)
 local test_suites = {
+    -- Unit tests (new modules)
+    {name = "Date Utils Tests", file = "unit.test_date_utils"},
+    {name = "Parsing Module Tests", file = "unit.test_parsing"},
+    
+    -- Existing integration tests
     {name = "Core Business Logic", file = "test_core_logic"},
     {name = "Options Completion Logic", file = "test_options_completion"},
     {name = "Logging Functions", file = "test_logging_functions"}, 

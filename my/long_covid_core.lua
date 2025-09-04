@@ -3,6 +3,10 @@
 
 local M = {}
 
+-- Dependencies
+local date_utils = require "long_covid_date"
+local parsing = require "long_covid_parsing"
+
 -- Module version for cache detection
 M.VERSION = "2.1.0-dialog-stack"
 
@@ -13,90 +17,8 @@ M.levels = {
     {name = "Engaging", color = "#44AA44", key = "green", icon = "rocket-launch"}
 }
 
--- Helper function to escape special pattern characters
-function M.escape_pattern(text)
-    return text:gsub("([^%w])", "%%%1")
-end
-
--- Helper function to split text into lines
-function M.split_lines(text)
-    local lines = {}
-    for line in text:gmatch("[^\r\n]+") do
-        table.insert(lines, line)
-    end
-    return lines
-end
-
-function M.get_current_day()
-    local day_names = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"}
-    local today = day_names[tonumber(os.date("%w")) + 1]
-    return today
-end
-
-function M.get_current_day_abbrev()
-    local day_abbrevs = {"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
-    return day_abbrevs[tonumber(os.date("%w")) + 1]
-end
-
-function M.get_today_date()
-    return os.date("%Y-%m-%d")
-end
-
--- Calculate date N days ago from today
-function M.get_date_days_ago(days_ago)
-    -- Input validation
-    if type(days_ago) ~= "number" or days_ago < 0 then
-        return nil
-    end
-    
-    if days_ago == 0 then
-        return os.date("%Y-%m-%d")
-    end
-    
-    -- Get today's date using the (possibly mocked) os.date
-    local today = os.date("%Y-%m-%d")
-    
-    -- Parse today's date
-    local year, month, day = today:match("(%d+)-(%d+)-(%d+)")
-    if not year then
-        return nil
-    end
-    
-    year, month, day = tonumber(year), tonumber(month), tonumber(day)
-    
-    -- Convert to timestamp for easy calculation
-    local today_time = os.time({year = year, month = month, day = day})
-    local seconds_ago = days_ago * 24 * 60 * 60  -- Convert days to seconds
-    local target_time = today_time - seconds_ago
-    
-    -- Format as YYYY-MM-DD
-    return os.date("%Y-%m-%d", target_time)
-end
-
--- Return array of last N calendar dates including today
-function M.get_last_n_dates(n)
-    -- Input validation
-    if type(n) ~= "number" or n < 0 then
-        return {}
-    end
-    
-    if n == 0 then
-        return {}
-    end
-    
-    local dates = {}
-    for i = 0, n - 1 do
-        local date = M.get_date_days_ago(i)
-        if date then
-            table.insert(dates, date)
-        end
-    end
-    
-    return dates
-end
-
 function M.check_daily_reset(last_selection_date, selected_level, daily_capacity_log, daily_logs)
-    local today = M.get_today_date()
+    local today = date_utils.get_today_date()
     local changes = {}
     
     if last_selection_date ~= today then
@@ -137,7 +59,7 @@ function M.get_daily_logs(daily_logs, date)
 end
 
 function M.log_item(daily_logs, item_type, item_name)
-    local today = M.get_today_date()
+    local today = date_utils.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     local category
@@ -156,7 +78,7 @@ function M.log_item(daily_logs, item_type, item_name)
 end
 
 function M.log_energy(daily_logs, energy_level)
-    local today = M.get_today_date()
+    local today = date_utils.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     local energy_entry = {
@@ -170,7 +92,7 @@ function M.log_energy(daily_logs, energy_level)
 end
 
 function M.get_energy_button_color(daily_logs)
-    local today = M.get_today_date()
+    local today = date_utils.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     if not logs.energy_levels or #logs.energy_levels == 0 then
@@ -203,265 +125,13 @@ function M.get_energy_button_color(daily_logs)
     end
 end
 
-function M.parse_decision_criteria(content)
-    if not content then
-        return {red = {}, yellow = {}, green = {}}
-    end
-    
-    local criteria = {red = {}, yellow = {}, green = {}}
-    local current_level = nil
-    
-    local lines = M.split_lines(content)
-    for _, line in ipairs(lines) do
-        if line:match("^## RED") then
-            current_level = "red"
-        elseif line:match("^## YELLOW") then
-            current_level = "yellow"
-        elseif line:match("^## GREEN") then
-            current_level = "green"
-        elseif line:match("^%- ") and current_level then
-            local item = line:match("^%- (.+)")
-            if item then
-                table.insert(criteria[current_level], item)
-            end
-        end
-    end
-    
-    return criteria
-end
 
-function M.parse_day_file(content)
-    if not content then
-        return {red = {}, yellow = {}, green = {}}
-    end
-    
-    local template = {red = {}, yellow = {}, green = {}}
-    local current_level = nil
-    local current_category = nil
-    
-    local lines = M.split_lines(content)
-    for _, line in ipairs(lines) do
-        if line:match("^## RED") then
-            current_level = "red"
-            current_category = nil
-            template[current_level].overview = {}
-        elseif line:match("^## YELLOW") then
-            current_level = "yellow"
-            current_category = nil
-            template[current_level].overview = {}
-        elseif line:match("^## GREEN") then
-            current_level = "green"
-            current_category = nil
-            template[current_level].overview = {}
-        elseif line:match("^%*%*") and current_level and not current_category then
-            table.insert(template[current_level].overview, line)
-        elseif line:match("^### ") and current_level then
-            current_category = line:match("^### (.+)")
-            if current_category then
-                template[current_level][current_category] = {}
-            end
-        elseif line:match("^#### ") and current_level then
-            current_category = line:match("^#### (.+)")
-            if current_category then
-                template[current_level][current_category] = {}
-            end
-        elseif line:match("^%- ") and current_level and current_category then
-            local item = line:match("^%- (.+)")
-            if item then
-                table.insert(template[current_level][current_category], item)
-            end
-        end
-    end
-    
-    return template
-end
 
-function M.parse_symptoms_file(content)
-    if not content then
-        return {
-            "Fatigue",
-            "Brain fog", 
-            "Headache",
-            "Shortness of breath",
-            "Joint pain",
-            "Muscle aches",
-            "Sleep issues",
-            "Other..."
-        }
-    end
-    
-    local symptoms = {}
-    local lines = M.split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local symptom = line:match("^%- (.+)")
-            if symptom then
-                table.insert(symptoms, symptom)
-            end
-        end
-    end
-    
-    -- Always add "Other..." as the last option
-    table.insert(symptoms, "Other...")
-    
-    return symptoms
-end
 
---- Consolidated parsing infrastructure with metadata-first design
-function M.parse_items_with_metadata(content, item_type)
-    -- Handle fallback content
-    if not content then
-        local fallback_content
-        if item_type == "activities" then
-            fallback_content = [[# Test Activities
 
-## Work
-- Work {Options: In Office, From Home}
-- Meeting-heavy day
-
-## Physical  
-- Walk {Options: Light, Medium, Heavy}
-- Yin Yoga {Required: Thu}
-- Exercise {Required}
-- Eye mask {Required: Weekly}
-
-## Daily Living
-- Cooking
-- Reading]]
-        elseif item_type == "interventions" then
-            fallback_content = [[# Test Interventions
-
-## Medications
-- LDN (4mg) {Required}
-- Claratyne
-
-## Supplements  
-- Salvital {Options: Morning, Evening}
-- Vitamin D
-- Weekly vitamin shot {Required: Weekly}
-
-## Treatments
-- Meditation
-- Breathing exercises {Required: Mon,Wed,Fri}
-- Deep tissue massage {Required: Weekly}]]
-        else
-            return { items = {}, metadata = {}, display_names = {} }
-        end
-        return M.parse_items_with_metadata(fallback_content, item_type)
-    end
-    
-    local items = {}
-    local metadata = {}
-    local display_names = {}
-    local lines = M.split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local item_line = line:match("^%- (.+)")
-            if item_line then
-                -- Extract clean item name (removing all markup)
-                local clean_name = item_line:match("^(.-)%s*%{") or item_line
-                clean_name = clean_name:gsub("^%s+", ""):gsub("%s+$", "")  -- Strip whitespace
-                
-                -- Create metadata object
-                local item_metadata = {
-                    name = clean_name,
-                    required = false,
-                    weekly_required = false,
-                    has_options = false,
-                    days = nil
-                }
-                
-                -- Parse {Required} variants
-                if item_line:match("%{Required%}") then
-                    item_metadata.required = true
-                elseif item_line:match("%{Required:%s*Weekly%}") then
-                    item_metadata.weekly_required = true
-                elseif item_line:match("%{Required:%s*([^%}]+)%}") then
-                    local days_match = item_line:match("%{Required:%s*([^%}]+)%}")
-                    if days_match and days_match ~= "Weekly" then
-                        item_metadata.required = true
-                        item_metadata.days = {}
-                        for day_abbrev in days_match:gmatch("([^,%s]+)") do
-                            table.insert(item_metadata.days, day_abbrev:lower())
-                        end
-                    end
-                end
-                
-                -- Parse {Options:} 
-                if item_line:match("%{Options:") then
-                    item_metadata.has_options = true
-                end
-                
-                table.insert(items, clean_name)
-                table.insert(metadata, item_metadata)
-                table.insert(display_names, clean_name)
-            end
-        end
-    end
-    
-    -- Always add "Other..." as the last option for display
-    table.insert(display_names, "Other...")
-    
-    return {
-        items = items,
-        metadata = metadata,
-        display_names = display_names
-    }
-end
-
--- Shared dialog processing utilities
-function M.parse_radio_result(options, selected_index)
-    if not options or not selected_index then
-        return nil
-    end
-    
-    if selected_index < 1 or selected_index > #options then
-        return nil
-    end
-    
-    return options[selected_index]
-end
-
-function M.handle_other_selection(custom_input)
-    -- Simple pass-through for now, could add validation/processing later
-    return custom_input
-end
 
 -- Legacy parsing functions removed - use parse_items_with_metadata() directly
 
--- Parse options from activities/interventions with {Options: ...} syntax
-function M.parse_item_options(content, item_name)
-    if not content or not item_name then
-        return nil
-    end
-    
-    local lines = M.split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local full_line = line:match("^%- (.+)")
-            if full_line then
-                -- Check if this line matches our item name
-                local clean_name = full_line:match("^(.-)%s*%{") or full_line
-                if clean_name == item_name then
-                    -- Look for {Options: ...} pattern
-                    local options_match = full_line:match("%{Options:%s*([^%}]+)%}")
-                    if options_match then
-                        local options = {}
-                        for option in options_match:gmatch("([^,]+)") do
-                            table.insert(options, option:match("^%s*(.-)%s*$")) -- trim whitespace
-                        end
-                        return options
-                    end
-                end
-            end
-        end
-    end
-    
-    return nil
-end
 
 -- Legacy parsing functions removed - use parse_items_with_metadata() directly
 
@@ -495,7 +165,7 @@ function M.is_required_today(required_info, daily_logs)
     end
     
     -- Handle specific day requirements (existing logic)
-    local today_abbrev = M.get_current_day_abbrev()
+    local today_abbrev = date_utils.get_current_day_abbrev()
     for _, day in ipairs(required_info.days) do
         if day == today_abbrev then
             return true
@@ -529,7 +199,7 @@ function M.are_all_required_items_completed(daily_logs, required_items, item_cat
         return true
     end
     
-    local today = M.get_today_date()
+    local today = date_utils.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     local category_logs = logs[item_category] or {}
     
@@ -567,7 +237,7 @@ end
 
 -- Configuration-driven formatting with simplified parameters
 function M.format_list_items(items, item_type, daily_logs, required_items)
-    local today = M.get_today_date()
+    local today = date_utils.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
     -- Configuration mapping for item categories
@@ -653,7 +323,7 @@ function M.save_daily_choice(daily_capacity_log, level_idx)
         return daily_capacity_log
     end
     
-    local today = M.get_today_date()
+    local today = date_utils.get_today_date()
     local level_name = M.levels[level_idx].name
     
     if not daily_capacity_log then
@@ -793,7 +463,7 @@ function M.create_dialog_manager()
         if not self.cached_activities or not self.cached_required_activities then
             local content = file_reader("activities.md")
             self.cached_activities_content = content
-            local parsed = M.parse_items_with_metadata(content, "activities")
+            local parsed = parsing.parse_items_with_metadata(content, "activities")
             self.cached_activities = parsed.display_names
             self.cached_required_activities = parsed.metadata
         end
@@ -804,7 +474,7 @@ function M.create_dialog_manager()
         if not self.cached_interventions or not self.cached_required_interventions then
             local content = file_reader("interventions.md")
             self.cached_interventions_content = content
-            local parsed = M.parse_items_with_metadata(content, "interventions")
+            local parsed = parsing.parse_items_with_metadata(content, "interventions")
             self.cached_interventions = parsed.display_names
             self.cached_required_interventions = parsed.metadata
         end
@@ -889,7 +559,7 @@ function M.create_cache_manager()
     function manager:load_decision_criteria(file_reader)
         if not self.cached_criteria then
             local content = file_reader("decision_criteria.md")
-            self.cached_criteria = M.parse_decision_criteria(content)
+            self.cached_criteria = parsing.parse_decision_criteria(content)
         end
         return self.cached_criteria
     end
@@ -897,7 +567,7 @@ function M.create_cache_manager()
     function manager:load_day_plan(day, file_reader)
         if not self.cached_plans[day] then
             local content = file_reader(day .. ".md")
-            self.cached_plans[day] = M.parse_day_file(content)
+            self.cached_plans[day] = parsing.parse_day_file(content)
         end
         return self.cached_plans[day]
     end
@@ -905,7 +575,7 @@ function M.create_cache_manager()
     function manager:load_symptoms(file_reader)
         if not self.cached_symptoms then
             local content = file_reader("symptoms.md")
-            self.cached_symptoms = M.parse_symptoms_file(content)
+            self.cached_symptoms = parsing.parse_symptoms_file(content)
         end
         return self.cached_symptoms
     end
@@ -914,7 +584,7 @@ function M.create_cache_manager()
         if not self.cached_activities or not self.cached_required_activities then
             local content = file_reader("activities.md")
             self.cached_activities_content = content
-            local parsed = M.parse_items_with_metadata(content, "activities")
+            local parsed = parsing.parse_items_with_metadata(content, "activities")
             self.cached_activities = parsed.display_names
             self.cached_required_activities = parsed.metadata
         end
@@ -925,7 +595,7 @@ function M.create_cache_manager()
         if not self.cached_interventions or not self.cached_required_interventions then
             local content = file_reader("interventions.md")
             self.cached_interventions_content = content
-            local parsed = M.parse_items_with_metadata(content, "interventions")
+            local parsed = parsing.parse_items_with_metadata(content, "interventions")
             self.cached_interventions = parsed.display_names
             self.cached_required_interventions = parsed.metadata
         end
@@ -1081,7 +751,7 @@ function M.create_ui_generator()
     function generator:create_plan_details(day_plan, selected_level)
         if not day_plan then
             return {
-                {"text", "No plan available for " .. (M.get_current_day() or "today"), {color = "#ff6b6b"}},
+                {"text", "No plan available for " .. (date_utils.get_current_day() or "today"), {color = "#ff6b6b"}},
                 {"new_line", 2},
                 {"button", "%%fa:sync%% Sync Files", {color = "#4CAF50", gravity = "center_h"}},
                 {"spacer", 2},
@@ -1293,7 +963,7 @@ M.flow_definitions = {
                     -- Check if this item has options
                     local clean_item = M.extract_item_name(selected_item)
                     local activities_content = manager:get_activities_content()
-                    local options = M.parse_item_options(activities_content, clean_item)
+                    local options = parsing.parse_item_options(activities_content, clean_item)
                     if options and #options > 0 then
                         context.selected_item = clean_item
                         context.available_options = options
@@ -1342,7 +1012,7 @@ M.flow_definitions = {
                     -- Check if this item has options
                     local clean_item = M.extract_item_name(selected_item)
                     local interventions_content = manager:get_interventions_content()
-                    local options = M.parse_item_options(interventions_content, clean_item)
+                    local options = parsing.parse_item_options(interventions_content, clean_item)
                     if options and #options > 0 then
                         context.selected_item = clean_item
                         context.available_options = options
@@ -1653,29 +1323,6 @@ function M.get_weekly_required_items(parsed_items)
     return weekly_items
 end
 
--- Parse items from content and extract weekly required ones
-function M.parse_and_get_weekly_items(content)
-    if not content then
-        return {}
-    end
-    
-    local weekly_items = {}
-    local lines = M.split_lines(content)
-    
-    for _, line in ipairs(lines) do
-        if line:match("^%- ") then
-            local item_line = line:match("^%- (.+)")
-            if item_line and item_line:match("%{Required:%s*Weekly%}") then
-                local item_name = item_line:match("^(.-)%s*%{Required:")
-                if item_name then
-                    table.insert(weekly_items, item_name)
-                end
-            end
-        end
-    end
-    
-    return weekly_items
-end
 
 -- Override get_weekly_required_items to work with content parsing
 function M.get_weekly_required_items(parsed_items)
@@ -1711,7 +1358,7 @@ function M.purge_old_daily_logs(daily_logs, today)
         return {}
     end
     
-    local last_7_dates = M.get_last_n_dates(7)
+    local last_7_dates = date_utils.get_last_n_dates(7)
     local date_set = {}
     for _, date in ipairs(last_7_dates) do
         date_set[date] = true
@@ -1733,7 +1380,7 @@ function M.is_weekly_item_required(item_name, daily_logs)
         return true -- Required if no logs
     end
     
-    local last_7_dates = M.get_last_n_dates(7)
+    local last_7_dates = date_utils.get_last_n_dates(7)
     
     for _, date in ipairs(last_7_dates) do
         local day_logs = daily_logs[date]
@@ -1787,7 +1434,7 @@ function M.get_button_colors(items, category, daily_logs)
         colors[item_name] = "default"
         
         if type(item) == "table" then
-            local today = M.get_today_date()
+            local today = date_utils.get_today_date()
             local logs = M.get_daily_logs(daily_logs, today)
             
             local category_logs = nil
@@ -1829,5 +1476,25 @@ function M.get_button_colors(items, category, daily_logs)
     return colors
 end
 
+-- Parsing function wrappers for backward compatibility
+-- These delegate to the parsing module
+M.escape_pattern = parsing.escape_pattern
+M.split_lines = parsing.split_lines
+M.parse_decision_criteria = parsing.parse_decision_criteria
+M.parse_day_file = parsing.parse_day_file
+M.parse_symptoms_file = parsing.parse_symptoms_file
+M.parse_items_with_metadata = parsing.parse_items_with_metadata
+M.parse_radio_result = parsing.parse_radio_result
+M.handle_other_selection = parsing.handle_other_selection
+M.parse_item_options = parsing.parse_item_options
+M.parse_and_get_weekly_items = parsing.parse_and_get_weekly_items
+
+-- Date utility function wrappers for backward compatibility
+-- These delegate to the date_utils module
+M.get_current_day = date_utils.get_current_day
+M.get_current_day_abbrev = date_utils.get_current_day_abbrev
+M.get_today_date = date_utils.get_today_date
+M.get_date_days_ago = date_utils.get_date_days_ago
+M.get_last_n_dates = date_utils.get_last_n_dates
 
 return M

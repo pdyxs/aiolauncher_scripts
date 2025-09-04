@@ -274,15 +274,16 @@ test.add_test("Required items completion status", function()
     core.log_item(daily_logs, "activity", "Yin Yoga")
     
     -- Mock current day to match required activity days for testing
-    local orig_get_current_day_abbrev = core.get_current_day_abbrev
-    core.get_current_day_abbrev = function() return "tue" end -- Tuesday - only Yin Yoga required
+    local date_utils = require "long_covid_date"
+    local orig_get_current_day_abbrev = date_utils.get_current_day_abbrev
+    date_utils.get_current_day_abbrev = function() return "tue" end -- Tuesday - only Yin Yoga required
     
     -- Should now be complete
     test.assert_true(core.are_all_required_items_completed(daily_logs, required_activities, "activities"), 
                 "Should be complete after logging all required activities for today")
     
     -- Restore original function
-    core.get_current_day_abbrev = orig_get_current_day_abbrev
+    date_utils.get_current_day_abbrev = orig_get_current_day_abbrev
 end)
 
 test.add_test("Format list items with required markers", function()
