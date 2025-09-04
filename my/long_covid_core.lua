@@ -6,6 +6,8 @@ local M = {}
 -- Dependencies
 local date_utils = require "long_covid_date"
 local parsing = require "long_covid_parsing"
+local state = require "long_covid_state"
+local weekly = require "long_covid_weekly"
 
 -- Module version for cache detection
 M.VERSION = "2.1.0-dialog-stack"
@@ -17,6 +19,9 @@ M.levels = {
     {name = "Engaging", color = "#44AA44", key = "green", icon = "rocket-launch"}
 }
 
+-- Initialize state module with levels
+state.init(M.levels)
+
 function M.check_daily_reset(last_selection_date, selected_level, daily_capacity_log, daily_logs)
     local today = date_utils.get_today_date()
     local changes = {}
@@ -25,7 +30,7 @@ function M.check_daily_reset(last_selection_date, selected_level, daily_capacity
         -- New day - reset to no selection
         changes.selected_level = 0
         changes.last_selection_date = today
-        changes.daily_logs = M.purge_old_daily_logs(daily_logs, today)
+        changes.daily_logs = state.purge_old_daily_logs(daily_logs, today)
     else
         -- Same day - check if we have a stored selection
         if daily_capacity_log and daily_capacity_log[today] then
@@ -60,7 +65,7 @@ end
 
 function M.log_item(daily_logs, item_type, item_name)
     local today = date_utils.get_today_date()
-    local logs = M.get_daily_logs(daily_logs, today)
+    local logs = state.get_daily_logs(daily_logs, today)
     
     local category
     if item_type == "symptom" then
@@ -79,7 +84,7 @@ end
 
 function M.log_energy(daily_logs, energy_level)
     local today = date_utils.get_today_date()
-    local logs = M.get_daily_logs(daily_logs, today)
+    local logs = state.get_daily_logs(daily_logs, today)
     
     local energy_entry = {
         level = energy_level,
@@ -93,7 +98,7 @@ end
 
 function M.get_energy_button_color(daily_logs)
     local today = date_utils.get_today_date()
-    local logs = M.get_daily_logs(daily_logs, today)
+    local logs = state.get_daily_logs(daily_logs, today)
     
     if not logs.energy_levels or #logs.energy_levels == 0 then
         -- Never logged today - red
@@ -136,26 +141,9 @@ end
 -- Legacy parsing functions removed - use parse_items_with_metadata() directly
 
 function M.is_required_today(required_info, daily_logs)
-    -- Handle weekly requirements (new format: weekly_required=true)
-    if required_info.weekly_required then
-        -- Weekly items are only required when not logged in last 7 days
-        if daily_logs then
-            return M.is_weekly_item_required(required_info.name, daily_logs)
-        else
-            -- If no logs available, assume required (safe default)
-            return true
-        end
-    end
-    
-    -- Handle weekly requirements (old format: days=["weekly"])
-    if required_info.days and #required_info.days == 1 and required_info.days[1] == "weekly" then
-        -- Weekly items are only required when not logged in last 7 days
-        if daily_logs then
-            return M.is_weekly_item_required(required_info.name, daily_logs)
-        else
-            -- If no logs available, assume required (safe default)
-            return true
-        end
+    -- Handle weekly requirements (both old and new formats)
+    if required_info.weekly_required or (required_info.days and #required_info.days == 1 and required_info.days[1] == "weekly") then
+        return weekly.is_weekly_requirement(required_info, daily_logs)
     end
     
     -- Handle daily requirements (existing logic)
@@ -200,7 +188,7 @@ function M.are_all_required_items_completed(daily_logs, required_items, item_cat
     end
     
     local today = date_utils.get_today_date()
-    local logs = M.get_daily_logs(daily_logs, today)
+    local logs = state.get_daily_logs(daily_logs, today)
     local category_logs = logs[item_category] or {}
     
     for _, required_item in ipairs(required_today) do
@@ -238,7 +226,7 @@ end
 -- Configuration-driven formatting with simplified parameters
 function M.format_list_items(items, item_type, daily_logs, required_items)
     local today = date_utils.get_today_date()
-    local logs = M.get_daily_logs(daily_logs, today)
+    local logs = state.get_daily_logs(daily_logs, today)
     
     -- Configuration mapping for item categories
     local item_config = {
@@ -342,7 +330,7 @@ end
 -- Generic logging function with Tasker integration
 function M.log_item_with_tasker(daily_logs, item_type, item_name, tasker_callback, ui_callback)
     local success, error_msg = pcall(function()
-        local result, err = M.log_item(daily_logs, item_type, item_name)
+        local result, err = state.log_item(daily_logs, item_type, item_name)
         if not result then
             error(err or "Unknown error")
         end
@@ -378,7 +366,7 @@ end
 -- Energy logging with Tasker integration
 function M.log_energy_with_tasker(daily_logs, energy_level, tasker_callback, ui_callback)
     local success, error_msg = pcall(function()
-        local result = M.log_energy(daily_logs, energy_level)
+        local result = state.log_energy(daily_logs, energy_level)
         if not result then
             error("Energy logging failed")
         end
@@ -1435,7 +1423,7 @@ function M.get_button_colors(items, category, daily_logs)
         
         if type(item) == "table" then
             local today = date_utils.get_today_date()
-            local logs = M.get_daily_logs(daily_logs, today)
+            local logs = state.get_daily_logs(daily_logs, today)
             
             local category_logs = nil
             if category == "activities" then
@@ -1488,6 +1476,25 @@ M.parse_radio_result = parsing.parse_radio_result
 M.handle_other_selection = parsing.handle_other_selection
 M.parse_item_options = parsing.parse_item_options
 M.parse_and_get_weekly_items = parsing.parse_and_get_weekly_items
+
+-- State management function wrappers for backward compatibility
+-- These delegate to the state module
+M.check_daily_reset = state.check_daily_reset
+M.get_daily_logs = state.get_daily_logs
+M.log_item = state.log_item
+M.log_energy = state.log_energy
+M.get_energy_button_color = state.get_energy_button_color
+M.save_daily_choice = state.save_daily_choice
+M.log_item_with_tasker = state.log_item_with_tasker
+M.log_energy_with_tasker = state.log_energy_with_tasker
+M.purge_old_daily_logs = state.purge_old_daily_logs
+
+-- Weekly requirements function wrappers for backward compatibility
+-- These delegate to the weekly module
+M.get_weekly_required_items = weekly.get_weekly_required_items
+M.is_weekly_item_required = weekly.is_weekly_item_required
+M.is_weekly_requirement = weekly.is_weekly_requirement
+M.purge_for_weekly_tracking = weekly.purge_for_weekly_tracking
 
 -- Date utility function wrappers for backward compatibility
 -- These delegate to the date_utils module

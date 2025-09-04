@@ -18,6 +18,8 @@ local test_suites = {
     -- Unit tests (new modules)
     {name = "Date Utils Tests", file = "unit.test_date_utils"},
     {name = "Parsing Module Tests", file = "unit.test_parsing"},
+    {name = "State Management Tests", file = "unit.test_state_management"},
+    {name = "Weekly Requirements Tests", file = "unit.test_weekly_requirements"},
     
     -- Existing integration tests
     {name = "Core Business Logic", file = "test_core_logic"},

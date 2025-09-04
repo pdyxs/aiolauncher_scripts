@@ -173,7 +173,7 @@ test.add_test("Purge old logs retains 7 days for weekly requirements", function(
         }
     end
     
-    local purged_logs = core.purge_old_daily_logs(daily_logs, "2023-08-30")
+    local purged_logs = core.purge_for_weekly_tracking(daily_logs)
     
     -- Should keep 7 days: today + previous 6 days
     test.assert_equals(7, core.count_log_days(purged_logs), "Should keep 7 days of logs")
