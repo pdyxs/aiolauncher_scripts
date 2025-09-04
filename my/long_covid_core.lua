@@ -8,6 +8,7 @@ local date_utils = require "long_covid_date"
 local parsing = require "long_covid_parsing"
 local state = require "long_covid_state"
 local weekly = require "long_covid_weekly"
+local ui = require "long_covid_ui"
 
 -- Module version for cache detection
 M.VERSION = "2.1.0-dialog-stack"
@@ -1503,5 +1504,10 @@ M.get_current_day_abbrev = date_utils.get_current_day_abbrev
 M.get_today_date = date_utils.get_today_date
 M.get_date_days_ago = date_utils.get_date_days_ago
 M.get_last_n_dates = date_utils.get_last_n_dates
+
+-- UI function wrappers for backward compatibility  
+-- These delegate to the ui module for extracted functions
+M.create_button_mapper = ui.create_button_mapper
+M.create_dialog_manager = ui.create_dialog_manager
 
 return M
