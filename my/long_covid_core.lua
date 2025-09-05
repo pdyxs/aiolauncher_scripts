@@ -147,6 +147,8 @@ function M.log_item(daily_logs, item_type, item_name)
         category = logs.activities
     elseif item_type == "intervention" then
         category = logs.interventions
+    elseif item_type == "note" then
+        return true
     else
         return nil, "Invalid item type: " .. tostring(item_type)
     end
@@ -966,6 +968,8 @@ function M.create_button_mapper()
             return "activity_dialog", nil
         elseif elem_text:find("pills") then
             return "intervention_dialog", nil
+        elseif elem_text:find("note%-sticky") then
+            return "note_dialog", nil
         elseif elem_text == "Back" then
             return "back", nil
         else
@@ -1051,7 +1055,8 @@ function M.create_ui_generator()
         local energy_color = M.get_energy_button_color(daily_logs)
         
         return {
-            {"button", "fa:heart-pulse", {color = "#6c757d", gravity = "center_h"}},
+            {"button", "fa:note-sticky", {color="6c757d", gravity = "center_h"}},
+            {"button", "fa:heart-pulse", {color = "#6c757d", gravity = "anchor_prev"}},
             {"button", "fa:bolt-lightning", {color = energy_color, gravity = "anchor_prev"}},
             {"spacer", 3},
             {"button", button_config.activities.icon, {color = colors.activities or "#dc3545", gravity = "anchor_prev"}},
@@ -1059,11 +1064,8 @@ function M.create_ui_generator()
         }
     end
     
-    -- Legacy function removed - use create_health_tracking_buttons() directly
-    
     function generator:create_no_selection_content()
         return {
-            {"new_line", 2},
             {"text", "<b>Select your capacity level:</b>", {size = 18}},
             {"new_line", 1},
             {"text", "%%fa:bed%% <b>Recovering</b> - Low energy, prioritize rest", {color = "#FF4444"}},
@@ -1392,6 +1394,18 @@ M.flow_definitions = {
                 return "complete"
             end
         }
+    },
+
+    note = {
+        main_list = {
+            dialog_type = "edit",
+            title = "Log note",
+            prompt = "Enter note:",
+            default_text = "",
+            next_step = function(custom_name, context)
+                return "complete"
+            end
+        },
     }
 }
 
@@ -1603,6 +1617,8 @@ function M.create_dialog_flow_manager()
             if context.selected_item then
                 logged_item = tonumber(context.selected_item:match("^(%d+)"))
             end
+        elseif category == "note" then
+            logged_item = context.custom_input
         end
         
         self:reset()

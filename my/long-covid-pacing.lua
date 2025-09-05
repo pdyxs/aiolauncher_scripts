@@ -134,13 +134,15 @@ function on_click(idx)
         elseif action_type == "sync" then
             sync_plan_files()
         elseif action_type == "symptom_dialog" then
-            show_symptom_dialog()
+            show_generic_dialog("symptom")
         elseif action_type == "energy_dialog" then
-            show_energy_dialog()
+            show_generic_dialog("energy")
         elseif action_type == "activity_dialog" then
-            show_activity_dialog()
+            show_generic_dialog("activity")
+        elseif action_type == "note_dialog" then
+            show_generic_dialog("note")
         elseif action_type == "intervention_dialog" then
-            show_intervention_dialog()
+            show_generic_dialog("intervention")
         elseif action_type == "back" then
             render_widget()
         end
@@ -203,6 +205,7 @@ function render_widget()
     ui:set_expandable(true)
     
     if ui:is_expanded() then
+        table.insert(ui_elements, {"new_line", 2})
         if selected_level == 0 then
             local no_selection_content = ui_generator:create_no_selection_content()
             for _, element in ipairs(no_selection_content) do
@@ -337,10 +340,6 @@ function show_generic_dialog(flow_type)
     end
 end
 
-function show_symptom_dialog()
-    show_generic_dialog("symptom")
-end
-
 function show_aio_dialog(dialog_config)
     if dialog_config.type == "list" then
         dialogs:show_list_dialog({
@@ -354,18 +353,6 @@ function show_aio_dialog(dialog_config)
     elseif dialog_config.type == "edit" then
         dialogs:show_edit_dialog(dialog_config.title, dialog_config.data.prompt, dialog_config.data.default_text or "")
     end
-end
-
-function show_activity_dialog()
-    show_generic_dialog("activity")
-end
-
-function show_intervention_dialog()
-    show_generic_dialog("intervention")
-end
-
-function show_energy_dialog()
-    show_generic_dialog("energy")
 end
 
 -- Generic logging function that handles all item types
