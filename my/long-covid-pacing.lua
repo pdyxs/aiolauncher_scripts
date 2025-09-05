@@ -387,12 +387,7 @@ function log_item(item_type, item_value, metadata)
         ui:show_toast(message)
     end
     
-    local success
-    if item_type == "energy" then
-        success = core.log_energy_with_tasker(daily_logs, item_value, tasker_callback, ui_callback)
-    else
-        success = core.log_item_with_tasker(daily_logs, item_type, item_value, tasker_callback, ui_callback)
-    end
+    local success = core.log_item_with_tasker(daily_logs, item_type, item_value, tasker_callback, ui_callback)
     
     if success then
         save_prefs_data()

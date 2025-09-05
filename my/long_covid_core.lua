@@ -3,9 +3,6 @@
 
 local M = {}
 
--- Module version for cache detection
-M.VERSION = "2.1.0-dialog-stack"
-
 -- Capacity levels
 M.levels = {
     {name = "Recovering", color = "#FF4444", key = "red", icon = "bed"},
@@ -140,6 +137,15 @@ function M.log_item(daily_logs, item_type, item_name)
     local today = M.get_today_date()
     local logs = M.get_daily_logs(daily_logs, today)
     
+    if item_type == "energy" then
+        table.insert(logs.energy_levels, {
+            level = energy_level,
+            timestamp = os.time(),
+            time_display = os.date("%H:%M")
+        })
+        return true
+    end
+
     local category
     if item_type == "symptom" then
         category = logs.symptoms
@@ -154,20 +160,6 @@ function M.log_item(daily_logs, item_type, item_name)
     end
     
     category[item_name] = (category[item_name] or 0) + 1
-    return true
-end
-
-function M.log_energy(daily_logs, energy_level)
-    local today = M.get_today_date()
-    local logs = M.get_daily_logs(daily_logs, today)
-    
-    local energy_entry = {
-        level = energy_level,
-        timestamp = os.time(),
-        time_display = os.date("%H:%M")
-    }
-    
-    table.insert(logs.energy_levels, energy_entry)
     return true
 end
 
@@ -431,8 +423,6 @@ function M.handle_other_selection(custom_input)
     return custom_input
 end
 
--- Legacy parsing functions removed - use parse_items_with_metadata() directly
-
 -- Parse options from activities/interventions with {Options: ...} syntax
 function M.parse_item_options(content, item_name)
     if not content or not item_name then
@@ -507,10 +497,6 @@ function M.is_required_today(required_info, daily_logs)
     return false
 end
 
--- ===================================================================
--- CONSOLIDATED COMPLETION LOGIC (Phase 2 Refactoring)
--- ===================================================================
-
 -- Generic function to get required items for today (replaces both activity/intervention variants)
 function M.get_required_items_for_today(required_items, daily_logs)
     local today_required = {}
@@ -556,16 +542,6 @@ function M.are_all_required_items_completed(daily_logs, required_items, item_cat
     
     return true
 end
-
--- ===================================================================
--- LEGACY COMPLETION FUNCTIONS (maintained for backward compatibility)
--- ===================================================================
-
--- Legacy completion and formatting functions removed - use consolidated versions directly
-
--- ===================================================================
--- CONSOLIDATED FORMATTING FUNCTIONS
--- ===================================================================
 
 -- Configuration-driven formatting with simplified parameters
 function M.format_list_items(items, item_type, daily_logs, required_items)
@@ -702,40 +678,6 @@ function M.log_item_with_tasker(daily_logs, item_type, item_name, tasker_callbac
     if ui_callback then
         local message = "✓ " .. event_type .. " logged: " .. item_name
         ui_callback(message)
-    end
-    
-    return true
-end
-
--- Energy logging with Tasker integration
-function M.log_energy_with_tasker(daily_logs, energy_level, tasker_callback, ui_callback)
-    local success, error_msg = pcall(function()
-        local result = M.log_energy(daily_logs, energy_level)
-        if not result then
-            error("Energy logging failed")
-        end
-        return result
-    end)
-    
-    if not success then
-        if ui_callback then
-            ui_callback("Error logging energy: " .. tostring(error_msg))
-        end
-        return false
-    end
-    
-    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-    
-    if tasker_callback then
-        tasker_callback({
-            timestamp = timestamp,
-            event_type = "Energy",
-            value = tostring(energy_level)
-        })
-    end
-    
-    if ui_callback then
-        ui_callback("✓ Energy level " .. tostring(energy_level or "unknown") .. " logged")
     end
     
     return true
