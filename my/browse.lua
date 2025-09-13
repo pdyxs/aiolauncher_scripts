@@ -9,6 +9,33 @@ local prefs = require "prefs"
 local w_vivaldi_bridge = nil
 local vivaldi_provider = "com.vivaldi.browser/org.chromium.chrome.browser.searchwidget.SearchWidgetProvider"
 
+local buttons = {
+    browser = {
+        label = "fa:browser",
+        callback = function()
+            apps:launch("info.plateaukao.einkbro")
+        end
+    },
+    claude = {
+        label = "fa:robot",
+        callback = function()
+            apps:launch("com.anthropic.claude")
+        end
+    },
+    reader = {
+        label = "fa:bookmark",
+        callback = function()
+            apps:launch("com.readermobile")
+        end
+    },
+    qr = {
+        label = "fa:qrcode",
+        callback = function()
+            w_vivaldi_bridge:click("image_2")
+        end
+    }
+}
+
 function on_resume()
     if not widgets:bound(prefs.vivaldi_wid) then
         setup_vivaldi_widget()
@@ -24,26 +51,31 @@ function on_app_widget_updated(bridge)
     end
 
     my_gui = gui{
-        {"button", "fa:browser"},
+        {"button", buttons.browser.label},
         {"spacer", 1},
-        {"button", "fa:magnifying-glass", {expand=true}},
+        {"button", buttons.reader.label, {expand=true}},
         {"spacer", 1},
-        {"button", "fa:robot", {expand=true}},
+        {"button", buttons.claude.label, {expand=true}},
         {"spacer", 1},
-        {"button", "fa:qrcode", { expand=false }},
+        {"button", buttons.qr.label, { expand=false }},
     }
     my_gui.render()
 end
 
 function on_click(idx)
-    if idx == 1 then
-        w_vivaldi_bridge:click("h_layout_1")
-    elseif idx == 3 then
-        apps:launch("com.openai.chatgpt")
-    elseif idx == 5 then
-        apps:launch("com.anthropic.claude")
-    elseif idx == 7 then
-        w_vivaldi_bridge:click("image_2")
+    if not my_gui then return end
+    
+    local element = my_gui.ui[idx]
+    if not element then return end
+    
+    local elem_type = element[1]
+    local elem_text = element[2]
+    
+    for id, button in pairs(buttons) do
+        if button.label == elem_text then
+            button.callback()
+            break
+        end
     end
 end
 
