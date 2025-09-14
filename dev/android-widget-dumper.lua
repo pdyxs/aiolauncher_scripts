@@ -1,10 +1,10 @@
 -- name = "Android widgets dumper"
+-- foldable = false
 
 -- Place app package name with widget here
---app_pkg = "org.isoron.uhabits"
---app_pkg = "com.calm.android"
---app_pkg = "au.com.ingdirect.android"
---app_pkg = "au.com.up.money"
+--app_pkg = "com.google.android.googlequicksearchbox"
+--app_pkg = "com.weather.Weather"
+--app_pkg = "com.google.android.apps.tasks"
 --app_pkg = "com.android.chrome"
 --app_pkg = "com.whatsapp"
 app_pkg = "com.ticktick.task"
@@ -14,7 +14,7 @@ app_pkg = "com.ticktick.task"
 
 -- Widget size (string from "1x1" to "4x4")
 -- In most cases you can use nil
-widget_size = nil
+widget_size = "4x1"
 
 -- Globals
 labels = {}
@@ -38,7 +38,7 @@ function on_resume()
     if wid < 0 then
         ui:show_lines(labels)
     else
-        widgets:request_updates(wid)
+        widgets:request_updates(wid, widget_size)
     end
 end
 
