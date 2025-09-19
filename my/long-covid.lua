@@ -11,6 +11,7 @@ local logger = require "core.log-via-tasker"
 local dialog_flow = require "core.dialog-flow"
 local util = require "core.util"
 local time_utils = require "core.time-utils"
+local markdown_parser = require "core.markdown_parser"
 
 local dialog_manager = dialog_flow.create_dialog_flow()
 
@@ -93,6 +94,8 @@ end
 
 ------- OTHER LOGGING
 
+local OTHER_TEXT = "Other..."
+
 local dialog_buttons = util.map(
     {
         log_energy = {
@@ -120,7 +123,7 @@ local dialog_buttons = util.map(
             label = "fa:note-sticky",
             dialogs = {
                 main = {
-                    dialog_type = "edit",
+                    type = "edit",
                     title = "Log note",
                     prompt = "Enter note:",
                     default_text = "",
@@ -133,7 +136,50 @@ local dialog_buttons = util.map(
         log_symptoms = {
             label = "fa:heart-pulse",
             dialogs = {
-                
+                main = {
+                    type = "radio",
+                    title = "Log Symptom",
+                    get_options = function()
+                        local parsed_symptoms = markdown_parser.get_list_items("symptoms.md")
+                        local options = util.map(parsed_symptoms, function(symptom) return symptom.text end)
+                        table.insert(options, OTHER_TEXT)
+                        return options
+                    end,
+                    handle_result = function(results, dialogs)
+                        if results[1].value == OTHER_TEXT then
+                            return dialogs.custom_input
+                        end
+                        return dialogs.severity
+                    end
+                },
+
+                custom_input = {
+                    type = "edit",
+                    title = "Custom Symptom",
+                    prompt = "Enter symptom name:",
+                    default_text = "",
+                    handle_result = function(results, dialogs)
+                        return dialogs.severity
+                    end
+                },
+
+                severity = {
+                    type = "radio",
+                    title = "Symptom Severity",
+                    get_options = function()
+                        return {
+                            "1 - Minimal", "2 - Mild", "3 - Mild-Moderate", "4 - Moderate", "5 - Moderate-High",
+                            "6 - High", "7 - High-Severe", "8 - Severe", "9 - Very Severe", "10 - Extreme"
+                        }
+                    end,
+                    handle_result = function(results)
+                        if #results == 2 then
+                            logger.log_to_spreadsheet("Symptom", results[1].value, results[2].index)
+                        elseif #results == 3 then
+                            logger.log_to_spreadsheet("Symptom", results[2], results[3].index)
+                        end
+                    end
+                }
             }
         }
     }, 
@@ -222,7 +268,8 @@ function render_capacity_selected()
             {"button", selected_button.label, {color = COLOR_TERTIARY}},
             {"spacer", 3 },
             {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color()}},
-            {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY}}
+            {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY}},
+            {"button", dialog_buttons.log_symptoms.label, {color = COLOR_TERTIARY}}
         }
         my_gui.render()
     end

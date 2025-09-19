@@ -1,14 +1,7 @@
 local markdown_parser = {}
 
 function markdown_parser.get_list_items(filename)
-    local file = io.open(filename, "r")
-    if not file then
-        return {}
-    end
-
-    local content = file:read("*all")
-    file:close()
-
+    local content = files:read(filename)
     return markdown_parser.parse_list_items(content)
 end
 
