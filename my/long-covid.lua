@@ -14,7 +14,7 @@ local COLOR_PRIMARY = "#333333"    -- Darkest
 local COLOR_SECONDARY = "#666666"  -- Middle
 local COLOR_TERTIARY = "#BBBBBB"   -- Lightest
 
-local buttons = {
+local capacity_buttons = {
     recovering = {
         label = "fa:bed",
         name = "Recovering",
@@ -46,7 +46,7 @@ function on_click(idx)
     local element = my_gui.ui[idx]
     if not element then return end
 
-    ui_core.handle_button_click(element, buttons)
+    ui_core.handle_button_click(element, capacity_buttons)
 end
 
 function on_long_click(idx)
@@ -55,7 +55,7 @@ function on_long_click(idx)
     local element = my_gui.ui[idx]
     if not element then return end
 
-    ui_core.handle_button_long_click(element, buttons)
+    ui_core.handle_button_long_click(element, capacity_buttons)
 end
 
 function set_capacity(capacity)
@@ -97,7 +97,7 @@ function check_new_day()
     end
 end
 
-function get_button_display(button)
+function get_capacity_button_display(button)
     local current_capacity = get_current_capacity()
 
     -- Show name if no selection made OR this button is selected
@@ -111,11 +111,11 @@ end
 function render_select_capacity()
     -- Show all buttons when no capacity is set
     my_gui = gui{
-        {"button", get_button_display(buttons.recovering), {color = COLOR_PRIMARY, gravity = "center_h"}},
+        {"button", get_capacity_button_display(capacity_buttons.recovering), {color = COLOR_PRIMARY, gravity = "center_h"}},
         {"spacer", 1},
-        {"button", get_button_display(buttons.maintaining), {color = COLOR_PRIMARY, gravity = "anchor_prev"}},
+        {"button", get_capacity_button_display(capacity_buttons.maintaining), {color = COLOR_PRIMARY, gravity = "anchor_prev"}},
         {"spacer", 1},
-        {"button", get_button_display(buttons.engaging), {color = COLOR_PRIMARY, gravity = "anchor_prev"}}
+        {"button", get_capacity_button_display(capacity_buttons.engaging), {color = COLOR_PRIMARY, gravity = "anchor_prev"}}
     }
     my_gui.render()
 end
@@ -125,7 +125,7 @@ function render_capacity_selected()
 
     -- Find and show only the selected capacity button
     local selected_button
-    for _, button in pairs(buttons) do
+    for _, button in pairs(capacity_buttons) do
         if button.name == current_capacity then
             selected_button = button
             break
