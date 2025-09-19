@@ -10,6 +10,7 @@ local ui_core = require "core.ui"
 local logger = require "core.log-via-tasker"
 local dialog_flow = require "core.dialog-flow"
 local util = require "core.util"
+local time_utils = require "core.time-utils"
 
 local dialog_manager = dialog_flow.create_dialog_flow()
 
@@ -80,6 +81,7 @@ local dialog_buttons = {
                     }
                 end,
                 handle_result = function(results)
+                    prefs.last_energy_log_time = time_utils.get_current_timestamp()
                     logger.log_to_spreadsheet("Energy", results[#results].index)
                 end
             }
@@ -146,6 +148,31 @@ function check_new_day()
     end
 end
 
+function get_energy_button_color()
+    if not prefs.last_energy_log_time then
+        -- Never logged today - PRIMARY
+        return COLOR_PRIMARY
+    end
+
+    local current_time = time_utils.get_current_timestamp()
+
+    -- Check if it's a different calendar day
+    if not time_utils.is_same_calendar_day(prefs.last_energy_log_time, current_time) then
+        -- Different calendar day - PRIMARY
+        return COLOR_PRIMARY
+    end
+
+    local hours_since_last = time_utils.hours_between(prefs.last_energy_log_time, current_time)
+
+    if hours_since_last >= 4 then
+        -- 4+ hours since last log - SECONDARY
+        return COLOR_SECONDARY
+    else
+        -- Logged within 4 hours - TERTIARY
+        return COLOR_TERTIARY
+    end
+end
+
 function get_capacity_button_display(button)
     local current_capacity = get_current_capacity()
 
@@ -183,9 +210,9 @@ function render_capacity_selected()
 
     if selected_button then
         my_gui = gui{
-            {"button", selected_button.label, {color = COLOR_PRIMARY}},
+            {"button", selected_button.label, {color = COLOR_TERTIARY}},
             {"spacer", 3 },
-            {"button", dialog_buttons.log_energy.label, {color = COLOR_PRIMARY}}
+            {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color()}}
         }
         my_gui.render()
     end
