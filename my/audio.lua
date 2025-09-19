@@ -5,9 +5,29 @@
 -- version = "0.1"
 
 local prefs = require "prefs"
+local ui = require "core.ui"
 
 local w_calm_bridge = nil
 local calm_provider = "com.calm.android/com.calm.android.widgets.DailyCalmWidget"
+
+local buttons = {
+    calm = {
+        label = "fa:spa",
+        callback = function() w_calm_bridge:click("v_layout_1") end
+    },
+    spotify = {
+        label = "fa:music",
+        callback = function() apps:launch("com.spotify.music") end
+    },
+    pocketcasts = {
+        label = "fa:microphone-stand",
+        callback = function() apps:launch("au.com.shiftyjelly.pocketcasts") end
+    },
+    sonos = {
+        label = "fa:speakers",
+        callback = function() apps:launch("com.sonos.acr2") end
+    }
+}
 
 function on_resume()
     if not widgets:bound(prefs.calm_wid) then
@@ -22,27 +42,24 @@ function on_app_widget_updated(bridge)
     w_calm_bridge = bridge
 
     my_gui = gui{
-        {"button", "fa:spa"},
+        {"button", buttons.calm.label},
         {"spacer", 1},
-        {"button", "fa:music", {expand=true}},
+        {"button", buttons.spotify.label, {expand=true}},
         {"spacer", 1},
-        {"button", "fa:microphone-stand", {expand=true}},
+        {"button", buttons.pocketcasts.label, {expand=true}},
         {"spacer", 1},
-        {"button", "fa:speakers", { expand=false }},
+        {"button", buttons.sonos.label, { expand=false }},
     }
     my_gui.render()
 end
 
 function on_click(idx)
-    if idx == 1 then
-        w_calm_bridge:click("v_layout_1")
-    elseif idx == 3 then
-        apps:launch("com.spotify.music")
-    elseif idx == 5 then
-        apps:launch("au.com.shiftyjelly.pocketcasts")
-    elseif idx == 7 then
-        apps:launch("com.sonos.acr2")
-    end
+    if not my_gui then return end
+
+    local element = my_gui.ui[idx]
+    if not element then return end
+
+    ui.handle_button_click(element, buttons)
 end
 
 function setup_calm_widget()

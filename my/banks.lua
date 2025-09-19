@@ -5,12 +5,28 @@
 -- version = "0.1"
 
 local prefs = require "prefs"
+local ui = require "core.ui"
 
 local w_ing_bridge = nil
 local w_up_bridge = nil
 
 local ing_balance = nil
 local up_balance = nil
+
+local buttons = {
+    up_balance = {
+        label = "%%fa:triangle%%",
+        callback = function() apps:launch("au.com.up.money") end
+    },
+    ing_balance = {
+        label = "%%fa:paw-claws%%",
+        callback = function() w_ing_bridge:click("button_2") end
+    },
+    refresh = {
+        label = "fa:rotate-right",
+        callback = function() w_ing_bridge:click("button_1") end
+    }
+}
 
 function on_resume()
     if not widgets:bound(prefs.ing_wid) then
@@ -44,23 +60,22 @@ function on_app_widget_updated(bridge)
     end
 
     my_gui = gui{
-        {"button", "%%fa:triangle%% "..(up_balance or "??")},
+        {"button", buttons.up_balance.label.." "..(up_balance or "??")},
         {"new_line", 1},
-        {"button", "%%fa:paw-claws%% "..(ing_balance or "??")},
+        {"button", buttons.ing_balance.label.." "..(ing_balance or "??")},
         {"spacer", 1},
-        {"button", "fa:rotate-right"},
+        {"button", buttons.refresh.label},
     }
     my_gui.render()
 end
 
 function on_click(idx)
-    if idx == 3 then
-        w_ing_bridge:click("button_2")
-    elseif idx == 5 then
-        w_ing_bridge:click("button_1")
-    elseif idx == 1 then
-        apps:launch("au.com.up.money")
-    end
+    if not my_gui then return end
+
+    local element = my_gui.ui[idx]
+    if not element then return end
+
+    ui.handle_button_click(element, buttons)
 end
 
 function setup_up_widget()

@@ -5,6 +5,7 @@
 -- version = "0.1"
 
 local prefs = require "prefs"
+local ui = require "core.ui"
 
 local w_vivaldi_bridge = nil
 local vivaldi_provider = "com.vivaldi.browser/org.chromium.chrome.browser.searchwidget.SearchWidgetProvider"
@@ -68,15 +69,7 @@ function on_click(idx)
     local element = my_gui.ui[idx]
     if not element then return end
     
-    local elem_type = element[1]
-    local elem_text = element[2]
-    
-    for id, button in pairs(buttons) do
-        if button.label == elem_text then
-            button.callback()
-            break
-        end
-    end
+    ui.handle_button_click(element, buttons)
 end
 
 function setup_vivaldi_widget()
