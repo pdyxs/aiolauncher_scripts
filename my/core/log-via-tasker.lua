@@ -5,21 +5,12 @@ local M = {}
 
 -- Log data to spreadsheet via Tasker with 4-column support
 -- Parameters:
---   timestamp - Date/time string (YYYY-MM-DD HH:MM:SS format)
 --   event - Event type (e.g., "Capacity", "Symptom", "Activity", "Intervention", "Energy", "Note")
 --   value - Primary value (e.g., level name, item name, energy level)
 --   detail - Optional additional information (e.g., severity, options, notes)
---   ui_callback - Function to call for user feedback (required)
-function M.log_to_spreadsheet(timestamp, event, value, detail, ui_callback)
-    -- Input validation
-    if not ui_callback or type(ui_callback) ~= "function" then
-        error("ui_callback is required and must be a function")
-    end
-
-    if not timestamp or type(timestamp) ~= "string" then
-        ui_callback("Error: Invalid timestamp")
-        return false
-    end
+--   ui_callback - Function to call for user feedback (optional)
+function M.log_to_spreadsheet(event, value, detail, ui_callback)
+    ui_callback = ui_callback or function(message) ui:show_toast(message) end
 
     if not event or type(event) ~= "string" then
         ui_callback("Error: Invalid event type")
@@ -30,6 +21,8 @@ function M.log_to_spreadsheet(timestamp, event, value, detail, ui_callback)
         ui_callback("Error: Invalid value")
         return false
     end
+
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
 
     -- Convert value to string
     local value_str = tostring(value)

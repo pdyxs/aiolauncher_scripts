@@ -18,23 +18,48 @@ local COLOR_PRIMARY = "#333333"    -- Darkest
 local COLOR_SECONDARY = "#666666"  -- Middle
 local COLOR_TERTIARY = "#BBBBBB"   -- Lightest
 
+function handle_capacity_click(button)
+    -- Don't allow setting capacity if one is already set today
+    if get_current_capacity() then
+        return
+    end
+
+    dialog_manager:start({
+        main = {
+            type = "radio",
+            title = "Capacity compared to yesterday",
+            get_options = function()
+                return {
+                    "25%", "50%", "75%", "90%", "100%", "110%", "125%", "150%", "200%"
+                }
+            end,
+            handle_result = function(results)
+                set_capacity(button.name)
+                morph:run_with_delay(1000, function()
+                    logger.log_to_spreadsheet("Relative Capacity", results[#results].value)
+                end)
+            end
+        }
+    })
+end
+
 local capacity_buttons = {
     recovering = {
         label = "fa:bed",
         name = "Recovering",
-        callback = function(button) set_capacity(button.name) end,
+        callback = handle_capacity_click,
         long_callback = function(button) reset_capacity() end
     },
     maintaining = {
         label = "fa:balance-scale",
         name = "Maintaining",
-        callback = function(button) set_capacity(button.name) end,
+        callback = handle_capacity_click,
         long_callback = function(button) reset_capacity() end
     },
     engaging = {
         label = "fa:rocket-launch",
         name = "Engaging",
-        callback = function(button) set_capacity(button.name) end,
+        callback = handle_capacity_click,
         long_callback = function(button) reset_capacity() end
     }
 }
@@ -55,8 +80,7 @@ local dialog_buttons = {
                     }
                 end,
                 handle_result = function(results)
-                    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-                    logger.log_to_spreadsheet(timestamp, "Energy", results[#results].index, nil, function(message) ui:show_toast(message) end)
+                    logger.log_to_spreadsheet("Energy", results[#results].index)
                 end
             }
         }
@@ -91,17 +115,10 @@ function on_long_click(idx)
 end
 
 function set_capacity(capacity)
-    -- Don't allow setting capacity if one is already set today
-    if get_current_capacity() then
-        return
-    end
-
     prefs.capacity = capacity
     prefs.capacity_date = os.date("%Y-%m-%d")
 
-    -- Log to spreadsheet (capacity buttons don't use detail column)
-    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-    logger.log_to_spreadsheet(timestamp, "Capacity", capacity, nil, function(message) ui:show_toast(message) end)
+    logger.log_to_spreadsheet("Capacity", capacity)
 
     render_widget()
 end
