@@ -8,7 +8,7 @@ function ui.handle_button_click(gui_element, buttons)
 
     for id, button in pairs(buttons) do
         if button.label == elem_text or elem_text:find(button.label:gsub("%%", "%%%%")) then
-            button.callback()
+            button.callback(button)
             break
         end
     end
