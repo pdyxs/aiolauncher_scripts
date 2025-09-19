@@ -7,10 +7,10 @@
 local prefs = require "prefs"
 local ui = require "core.ui"
 
--- Button colors for monochrome display
-local BUTTON_COLOR_SELECTED = "#333333"    -- Darkest
-local BUTTON_COLOR_NONE = "#666666"        -- Middle
-local BUTTON_COLOR_UNSELECTED = "#999999"  -- Lightest
+-- Colors for monochrome display
+local COLOR_PRIMARY = "#333333"    -- Darkest
+local COLOR_SECONDARY = "#666666"  -- Middle
+local COLOR_TERTIARY = "#BBBBBB"   -- Lightest
 
 local buttons = {
     recovering = {
@@ -81,11 +81,11 @@ function get_button_color(button)
     local current_capacity = get_current_capacity()
 
     if current_capacity == button.name then
-        return BUTTON_COLOR_SELECTED
+        return COLOR_PRIMARY
     elseif not current_capacity then
-        return BUTTON_COLOR_NONE
+        return COLOR_SECONDARY
     else
-        return BUTTON_COLOR_UNSELECTED
+        return COLOR_TERTIARY
     end
 end
 
