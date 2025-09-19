@@ -18,17 +18,20 @@ local buttons = {
     recovering = {
         label = "fa:bed",
         name = "Recovering",
-        callback = function(button) set_capacity(button.name) end
+        callback = function(button) set_capacity(button.name) end,
+        long_callback = function(button) reset_capacity() end
     },
     maintaining = {
         label = "fa:balance-scale",
         name = "Maintaining",
-        callback = function(button) set_capacity(button.name) end
+        callback = function(button) set_capacity(button.name) end,
+        long_callback = function(button) reset_capacity() end
     },
     engaging = {
         label = "fa:rocket-launch",
         name = "Engaging",
-        callback = function(button) set_capacity(button.name) end
+        callback = function(button) set_capacity(button.name) end,
+        long_callback = function(button) reset_capacity() end
     }
 }
 
@@ -46,13 +49,34 @@ function on_click(idx)
     ui_core.handle_button_click(element, buttons)
 end
 
+function on_long_click(idx)
+    if not my_gui then return end
+
+    local element = my_gui.ui[idx]
+    if not element then return end
+
+    ui_core.handle_button_long_click(element, buttons)
+end
+
 function set_capacity(capacity)
+    -- Don't allow setting capacity if one is already set today
+    if get_current_capacity() then
+        return
+    end
+
     prefs.capacity = capacity
     prefs.capacity_date = os.date("%Y-%m-%d")
 
     -- Log to spreadsheet (capacity buttons don't use detail column)
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
     logger.log_to_spreadsheet(timestamp, "Capacity", capacity, nil, function(message) ui:show_toast(message) end)
+
+    render_widget()
+end
+
+function reset_capacity()
+    prefs.capacity = nil
+    prefs.capacity_date = nil
 
     render_widget()
 end
@@ -84,25 +108,44 @@ function get_button_display(button)
     end
 end
 
-function get_button_color(button)
+function render_select_capacity()
+    -- Show all buttons when no capacity is set
+    my_gui = gui{
+        {"button", get_button_display(buttons.recovering), {color = COLOR_PRIMARY, gravity = "center_h"}},
+        {"spacer", 1},
+        {"button", get_button_display(buttons.maintaining), {color = COLOR_PRIMARY, gravity = "anchor_prev"}},
+        {"spacer", 1},
+        {"button", get_button_display(buttons.engaging), {color = COLOR_PRIMARY, gravity = "anchor_prev"}}
+    }
+    my_gui.render()
+end
+
+function render_capacity_selected()
     local current_capacity = get_current_capacity()
 
-    if current_capacity == button.name then
-        return COLOR_PRIMARY
-    elseif not current_capacity then
-        return COLOR_SECONDARY
-    else
-        return COLOR_TERTIARY
+    -- Find and show only the selected capacity button
+    local selected_button
+    for _, button in pairs(buttons) do
+        if button.name == current_capacity then
+            selected_button = button
+            break
+        end
+    end
+
+    if selected_button then
+        my_gui = gui{
+            {"button", selected_button.label, {color = COLOR_PRIMARY}}
+        }
+        my_gui.render()
     end
 end
 
 function render_widget()
-    my_gui = gui{
-        {"button", get_button_display(buttons.recovering), {color = get_button_color(buttons.recovering), gravity = "center_h"}},
-        {"spacer", 1},
-        {"button", get_button_display(buttons.maintaining), {color = get_button_color(buttons.maintaining), gravity = "anchor_prev"}},
-        {"spacer", 1},
-        {"button", get_button_display(buttons.engaging), {color = get_button_color(buttons.engaging), gravity = "anchor_prev"}}
-    }
-    my_gui.render()
+    local current_capacity = get_current_capacity()
+
+    if current_capacity then
+        render_capacity_selected()
+    else
+        render_select_capacity()
+    end
 end
