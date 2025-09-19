@@ -19,6 +19,8 @@ local COLOR_PRIMARY = "#333333"    -- Darkest
 local COLOR_SECONDARY = "#666666"  -- Middle
 local COLOR_TERTIARY = "#BBBBBB"   -- Lightest
 
+------- CAPACITY LOGGING
+
 function handle_capacity_click(button)
     -- Don't allow setting capacity if one is already set today
     if get_current_capacity() then
@@ -65,6 +67,32 @@ local capacity_buttons = {
     }
 }
 
+function set_capacity(capacity)
+    prefs.capacity = capacity
+    prefs.capacity_date = os.date("%Y-%m-%d")
+
+    logger.log_to_spreadsheet("Capacity", capacity)
+
+    render_widget()
+end
+
+function reset_capacity()
+    prefs.capacity = nil
+    prefs.capacity_date = nil
+
+    render_widget()
+end
+
+function get_current_capacity()
+    local today = os.date("%Y-%m-%d")
+    if prefs.capacity_date == today then
+        return prefs.capacity
+    end
+    return nil
+end
+
+------- OTHER LOGGING
+
 local dialog_buttons = {
     log_energy = {
         label = "fa:bolt",
@@ -90,55 +118,7 @@ local dialog_buttons = {
     }
 }
 
-function on_resume()
-    render_widget()
-end
-
-function on_click(idx)
-    if not my_gui then return end
-
-    local element = my_gui.ui[idx]
-    if not element then return end
-
-    ui_core.handle_button_click(element, util.tables_to_array(capacity_buttons, dialog_buttons))
-end
-
-function on_dialog_action(result)
-    dialog_manager:handle_result(result)
-end
-
-function on_long_click(idx)
-    if not my_gui then return end
-
-    local element = my_gui.ui[idx]
-    if not element then return end
-
-    ui_core.handle_button_long_click(element, capacity_buttons)
-end
-
-function set_capacity(capacity)
-    prefs.capacity = capacity
-    prefs.capacity_date = os.date("%Y-%m-%d")
-
-    logger.log_to_spreadsheet("Capacity", capacity)
-
-    render_widget()
-end
-
-function reset_capacity()
-    prefs.capacity = nil
-    prefs.capacity_date = nil
-
-    render_widget()
-end
-
-function get_current_capacity()
-    local today = os.date("%Y-%m-%d")
-    if prefs.capacity_date == today then
-        return prefs.capacity
-    end
-    return nil
-end
+-------- RENDERING HELPERS
 
 function get_energy_button_color()
     if not prefs.last_energy_log_time then
@@ -176,6 +156,18 @@ function get_capacity_button_display(button)
     end
 end
 
+------- RENDERING
+
+function render_widget()
+    local current_capacity = get_current_capacity()
+
+    if current_capacity then
+        render_capacity_selected()
+    else
+        render_select_capacity()
+    end
+end
+
 function render_select_capacity()
     -- Show all buttons when no capacity is set
     my_gui = gui{
@@ -210,12 +202,30 @@ function render_capacity_selected()
     end
 end
 
-function render_widget()
-    local current_capacity = get_current_capacity()
+------ AIO Functions
 
-    if current_capacity then
-        render_capacity_selected()
-    else
-        render_select_capacity()
-    end
+function on_resume()
+    render_widget()
+end
+
+function on_click(idx)
+    if not my_gui then return end
+
+    local element = my_gui.ui[idx]
+    if not element then return end
+
+    ui_core.handle_button_click(element, util.tables_to_array(capacity_buttons, dialog_buttons))
+end
+
+function on_dialog_action(result)
+    dialog_manager:handle_result(result)
+end
+
+function on_long_click(idx)
+    if not my_gui then return end
+
+    local element = my_gui.ui[idx]
+    if not element then return end
+
+    ui_core.handle_button_long_click(element, capacity_buttons)
 end
