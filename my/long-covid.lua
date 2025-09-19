@@ -93,30 +93,55 @@ end
 
 ------- OTHER LOGGING
 
-local dialog_buttons = {
-    log_energy = {
-        label = "fa:bolt",
-        callback = function(button) dialog_manager:start(button.dialogs) end,
-        dialogs = {
-            main = {
-                type = "radio",
-                title = "Log Energy Level",
-                get_options = function()
-                    return {
-                        "1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
-                        "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
-                        "9 - Excellent", "10 - Peak energy"
-                    }
-                end,
-                handle_result = function(results)
-                    prefs.last_energy_log_time = time_utils.get_current_timestamp()
-                    logger.log_to_spreadsheet("Energy", results[#results].index)
-                    render_widget()
-                end
+local dialog_buttons = util.map(
+    {
+        log_energy = {
+            label = "fa:bolt",
+            dialogs = {
+                main = {
+                    type = "radio",
+                    title = "Log Energy Level",
+                    get_options = function()
+                        return {
+                            "1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
+                            "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
+                            "9 - Excellent", "10 - Peak energy"
+                        }
+                    end,
+                    handle_result = function(results)
+                        prefs.last_energy_log_time = time_utils.get_current_timestamp()
+                        logger.log_to_spreadsheet("Energy", results[#results].index)
+                        render_widget()
+                    end
+                }
+            }
+        },
+        log_note = {
+            label = "fa:note-sticky",
+            dialogs = {
+                main = {
+                    dialog_type = "edit",
+                    title = "Log note",
+                    prompt = "Enter note:",
+                    default_text = "",
+                    handle_result = function(results)
+                        logger.log_to_spreadsheet("Note", results[#results])
+                    end
+                }
+            }
+        },
+        log_symptoms = {
+            label = "fa:heart-pulse",
+            dialogs = {
+                
             }
         }
-    }
-}
+    }, 
+    function(btn) 
+        btn.callback = function(button) dialog_manager:start(button.dialogs) end
+        return btn
+    end
+)
 
 -------- RENDERING HELPERS
 
@@ -196,7 +221,8 @@ function render_capacity_selected()
         my_gui = gui{
             {"button", selected_button.label, {color = COLOR_TERTIARY}},
             {"spacer", 3 },
-            {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color()}}
+            {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color()}},
+            {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY}}
         }
         my_gui.render()
     end
