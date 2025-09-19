@@ -8,6 +8,10 @@
 local prefs = require "prefs"
 local ui_core = require "core.ui"
 local logger = require "core.log-via-tasker"
+local dialog_flow = require "core.dialog-flow"
+local util = require "core.util"
+
+local dialog_manager = dialog_flow.create_dialog_flow()
 
 -- Colors for monochrome display
 local COLOR_PRIMARY = "#333333"    -- Darkest
@@ -35,6 +39,30 @@ local capacity_buttons = {
     }
 }
 
+local dialog_buttons = {
+    log_energy = {
+        label = "fa:bolt",
+        callback = function(button) dialog_manager:start(button.dialogs) end,
+        dialogs = {
+            main = {
+                type = "radio",
+                title = "Log Energy Level",
+                get_options = function()
+                    return {
+                        "1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
+                        "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
+                        "9 - Excellent", "10 - Peak energy"
+                    }
+                end,
+                handle_result = function(results)
+                    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+                    logger.log_to_spreadsheet(timestamp, "Energy", results[#results].index, nil, function(message) ui:show_toast(message) end)
+                end
+            }
+        }
+    }
+}
+
 function on_resume()
     check_new_day()
     render_widget()
@@ -46,7 +74,11 @@ function on_click(idx)
     local element = my_gui.ui[idx]
     if not element then return end
 
-    ui_core.handle_button_click(element, capacity_buttons)
+    ui_core.handle_button_click(element, util.tables_to_array(capacity_buttons, dialog_buttons))
+end
+
+function on_dialog_action(result)
+    dialog_manager:handle_result(result)
 end
 
 function on_long_click(idx)
@@ -134,7 +166,9 @@ function render_capacity_selected()
 
     if selected_button then
         my_gui = gui{
-            {"button", selected_button.label, {color = COLOR_PRIMARY}}
+            {"button", selected_button.label, {color = COLOR_PRIMARY}},
+            {"spacer", 3 },
+            {"button", dialog_buttons.log_energy.label, {color = COLOR_PRIMARY}}
         }
         my_gui.render()
     end
