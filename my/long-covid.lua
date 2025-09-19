@@ -83,6 +83,7 @@ local dialog_buttons = {
                 handle_result = function(results)
                     prefs.last_energy_log_time = time_utils.get_current_timestamp()
                     logger.log_to_spreadsheet("Energy", results[#results].index)
+                    render_widget()
                 end
             }
         }
@@ -90,7 +91,6 @@ local dialog_buttons = {
 }
 
 function on_resume()
-    check_new_day()
     render_widget()
 end
 
@@ -138,14 +138,6 @@ function get_current_capacity()
         return prefs.capacity
     end
     return nil
-end
-
-function check_new_day()
-    local today = os.date("%Y-%m-%d")
-    if prefs.capacity_date ~= today then
-        prefs.capacity = nil
-        prefs.capacity_date = nil
-    end
 end
 
 function get_energy_button_color()
