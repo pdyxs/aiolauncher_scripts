@@ -3,9 +3,11 @@
 -- type = "widget"
 -- author = "Paul Sztajer"
 -- version = "0.1"
+-- icon = "shield-virus"
 
 local prefs = require "prefs"
-local ui = require "core.ui"
+local ui_core = require "core.ui"
+local logger = require "core.log-via-tasker"
 
 -- Colors for monochrome display
 local COLOR_PRIMARY = "#333333"    -- Darkest
@@ -24,7 +26,7 @@ local buttons = {
         callback = function(button) set_capacity(button.name) end
     },
     engaging = {
-        label = "fa:bolt",
+        label = "fa:rocket-launch",
         name = "Engaging",
         callback = function(button) set_capacity(button.name) end
     }
@@ -41,12 +43,17 @@ function on_click(idx)
     local element = my_gui.ui[idx]
     if not element then return end
 
-    ui.handle_button_click(element, buttons)
+    ui_core.handle_button_click(element, buttons)
 end
 
 function set_capacity(capacity)
     prefs.capacity = capacity
     prefs.capacity_date = os.date("%Y-%m-%d")
+
+    -- Log to spreadsheet (capacity buttons don't use detail column)
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    logger.log_to_spreadsheet(timestamp, "Capacity", capacity, nil, function(message) ui:show_toast(message) end)
+
     render_widget()
 end
 
