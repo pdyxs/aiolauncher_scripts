@@ -3,23 +3,27 @@
 
 local M = {}
 
-function M.open_dialog(dialog_config)
+function M.open_dialog(dialog_config, results)
     if dialog_config.type == "radio" then
-        return M.open_radio_dialog(dialog_config)
+        return M.open_radio_dialog(dialog_config, results)
     elseif dialog_config.type == "edit" then
-        return M.open_input_dialog(dialog_config)
+        return M.open_input_dialog(dialog_config, results)
     end
 end
 
-function M.open_radio_dialog(dialog_config)
-    local options = dialog_config.get_options()
+function M.open_radio_dialog(dialog_config, results)
+    local options, metas = dialog_config.get_options(results)
     dialogs:show_radio_dialog(dialog_config.title, options, 0)
 
     return function(result)
         if type(result) ~= "number" or result < 1 then
             return -1
         end
-        return { index=result, value=options[result] }
+        if metas == nil then
+            return { index=result, value=options[result] }
+        else
+            return { index=result, value=options[result], meta=metas[result] }
+        end
     end
 end
 
@@ -56,7 +60,7 @@ function M.create_dialog_flow()
     end
 
     function flow:open_dialog(dialog_config)
-        self.parse_result = M.open_dialog(dialog_config)
+        self.parse_result = M.open_dialog(dialog_config, self.results)
     end
 
     function flow:handle_result(result)

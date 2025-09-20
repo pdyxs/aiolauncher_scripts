@@ -207,16 +207,22 @@ local dialog_buttons = util.map(
                     type = "radio",
                     title = "Log Activity",
                     get_options = function()
-                        local parsed_activities = markdown_parser.get_list_items(DATA_PREFIX.."Activities.md")
-                        local options = util.map(parsed_activities, item_parser.parse_item)
+                        local parsed = markdown_parser.get_list_items(DATA_PREFIX.."Activities.md")
+                        local parsed_items = util.map(parsed, item_parser.parse_item)
+                        local options = util.map(parsed_items, function(i) return i.text end)
                         table.insert(options, OTHER_TEXT)
-                        return options
+                        local metas = util.map(parsed_items, function(i) return i.meta end)
+                        table.insert(metas, {})
+                        return options, metas
                     end,
                     handle_result = function(results, dialogs)
                         if results[1].value == OTHER_TEXT then
                             return dialogs.custom_input
                         end
-                        logger.log_to_spreadsheet("Activity", results[1].value)
+                        if results[1].meta.specifiers.Options then
+                            return dialogs.options
+                        end
+                        logger.log_to_spreadsheet("Activity", results[1].meta.text)
                     end
                 },
 
@@ -229,6 +235,17 @@ local dialog_buttons = util.map(
                         logger.log_to_spreadsheet("Activity", results[#results])
                     end
                 },
+
+                options = {
+                    type = "radio",
+                    title = "Choose Option",
+                    get_options = function(results)
+                        return results[1].meta.specifiers.Options
+                    end,
+                    handle_result = function(results, dialogs)
+                        logger.log_to_spreadsheet("Activity", results[1].meta.text, results[2].value)
+                    end
+                }
             }
         },
 
@@ -240,15 +257,21 @@ local dialog_buttons = util.map(
                     title = "Log Intervention",
                     get_options = function()
                         local parsed = markdown_parser.get_list_items(DATA_PREFIX.."Interventions.md")
-                        local options = util.map(parsed, item_parser.parse_item)
+                        local parsed_items = util.map(parsed, item_parser.parse_item)
+                        local options = util.map(parsed_items, function(i) return i.text end)
                         table.insert(options, OTHER_TEXT)
-                        return options
+                        local metas = util.map(parsed_items, function(i) return i.meta end)
+                        table.insert(metas, {})
+                        return options, metas
                     end,
                     handle_result = function(results, dialogs)
                         if results[1].value == OTHER_TEXT then
                             return dialogs.custom_input
                         end
-                        logger.log_to_spreadsheet("Intervention", results[1].value)
+                        if results[1].meta.specifiers.Options then
+                            return dialogs.options
+                        end
+                        logger.log_to_spreadsheet("Intervention", results[1].meta.text)
                     end
                 },
 
@@ -261,6 +284,17 @@ local dialog_buttons = util.map(
                         logger.log_to_spreadsheet("Intervention", results[#results])
                     end
                 },
+
+                options = {
+                    type = "radio",
+                    title = "Choose Option",
+                    get_options = function(results)
+                        return results[1].meta.specifiers.Options
+                    end,
+                    handle_result = function(results, dialogs)
+                        logger.log_to_spreadsheet("Intervention", results[1].meta.text, results[2].value)
+                    end
+                }
             }
         }
     }, 

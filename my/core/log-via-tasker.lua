@@ -50,9 +50,9 @@ function M.log_to_spreadsheet(event, value, detail, ui_callback)
         return false
     end
 
-    local message = "✓ Logged to spreadsheet: " .. event
+    local message = "✓ Logged " .. event .. ": " .. value_str
     if detail_str ~= "" then
-        message = message .. " (detail: " .. detail_str .. ")"
+        message = message .. " - " .. detail_str
     end
     ui_callback(message)
 
