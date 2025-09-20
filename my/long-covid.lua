@@ -20,6 +20,22 @@ local COLOR_PRIMARY = "#333333"    -- Darkest
 local COLOR_SECONDARY = "#666666"  -- Middle
 local COLOR_TERTIARY = "#BBBBBB"   -- Lightest
 
+------- COMMANDS
+
+local COMMAND_DELIM = ":"
+local DATA_PREFIX = "long-covid-data-"
+
+local commands = {
+    copy_data = function(parts)
+        local filename = parts[2]
+        local content = table.concat(parts, COMMAND_DELIM, 3)
+
+        files:write(DATA_PREFIX .. filename, content)
+
+        render_widget()
+    end
+}
+
 ------- CAPACITY LOGGING
 
 function handle_capacity_click(button)
@@ -140,7 +156,7 @@ local dialog_buttons = util.map(
                     type = "radio",
                     title = "Log Symptom",
                     get_options = function()
-                        local parsed_symptoms = markdown_parser.get_list_items("symptoms.md")
+                        local parsed_symptoms = markdown_parser.get_list_items(DATA_PREFIX.."Symptoms.md")
                         local options = util.map(parsed_symptoms, function(symptom) return symptom.text end)
                         table.insert(options, OTHER_TEXT)
                         return options
@@ -199,7 +215,6 @@ function get_energy_button_color()
 
     local current_time = time_utils.get_current_timestamp()
 
-    -- Check if it's a different calendar day
     if not time_utils.is_same_calendar_day(prefs.last_energy_log_time, current_time) then
         -- Different calendar day - PRIMARY
         return COLOR_PRIMARY
@@ -278,6 +293,7 @@ end
 ------ AIO Functions
 
 function on_resume()
+    tasker:run_task("LongCovid_CopyData", {})
     render_widget()
 end
 
@@ -301,4 +317,15 @@ function on_long_click(idx)
     if not element then return end
 
     ui_core.handle_button_long_click(element, capacity_buttons)
+end
+
+function on_command(data)
+    local parts = data:split(COMMAND_DELIM)
+    if #parts < 1 then
+        return
+    end
+
+    if commands[parts[1]] ~= nil then
+        commands[parts[1]](parts)
+    end
 end
