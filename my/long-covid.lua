@@ -345,12 +345,11 @@ function render_capacity_selected()
     if selected_button then
         my_gui = gui{
             {"button", selected_button.label, {color = COLOR_TERTIARY}},
-            {"spacer", 3 },
-            {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color()}},
-            {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY}},
-            {"button", dialog_buttons.log_symptoms.label, {color = COLOR_TERTIARY}},
-            {"spacer", 3 },
-            {"button", dialog_buttons.log_activity.label, {color = COLOR_TERTIARY}},
+            {"spacer", 10},
+            {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color(), gravity="center_h"}},
+            {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY, gravity="anchor_prev"}},
+            {"button", dialog_buttons.log_symptoms.label, {color = COLOR_TERTIARY, gravity="anchor_prev"}},
+            {"button", dialog_buttons.log_activity.label, {color = COLOR_TERTIARY, gravity="right"}},
             {"button", dialog_buttons.log_intervention.label, {color = COLOR_TERTIARY}},
         }
         my_gui.render()
