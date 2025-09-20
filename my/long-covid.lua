@@ -197,6 +197,70 @@ local dialog_buttons = util.map(
                     end
                 }
             }
+        },
+
+        log_activity = {
+            label = "fa:running",
+            dialogs = {
+                main = {
+                    type = "radio",
+                    title = "Log Activity",
+                    get_options = function()
+                        local parsed_activities = markdown_parser.get_list_items(DATA_PREFIX.."Activities.md")
+                        local options = util.map(parsed_activities, function(activity) return activity.text end)
+                        table.insert(options, OTHER_TEXT)
+                        return options
+                    end,
+                    handle_result = function(results, dialogs)
+                        if results[1].value == OTHER_TEXT then
+                            return dialogs.custom_input
+                        end
+                        logger.log_to_spreadsheet("Activity", results[1].value)
+                    end
+                },
+
+                custom_input = {
+                    type = "edit",
+                    title = "Custom Activity",
+                    prompt = "Enter activity name:",
+                    default_text = "",
+                    handle_result = function(results, dialogs)
+                        logger.log_to_spreadsheet("Activity", results[#results])
+                    end
+                },
+            }
+        },
+
+        log_intervention = {
+            label = "fa:pills",
+            dialogs = {
+                main = {
+                    type = "radio",
+                    title = "Log Intervention",
+                    get_options = function()
+                        local parsed = markdown_parser.get_list_items(DATA_PREFIX.."Interventions.md")
+                        local options = util.map(parsed, function(item) return item.text end)
+                        table.insert(options, OTHER_TEXT)
+                        return options
+                    end,
+                    handle_result = function(results, dialogs)
+                        if results[1].value == OTHER_TEXT then
+                            return dialogs.custom_input
+                        end
+                        logger.log_to_spreadsheet("Intervention", results[1].value)
+                    end
+                },
+
+                custom_input = {
+                    type = "edit",
+                    title = "Custom Intervention",
+                    prompt = "Enter intervention name:",
+                    default_text = "",
+                    handle_result = function(results, dialogs)
+                        logger.log_to_spreadsheet("Intervention", results[#results])
+                    end
+                },
+            }
         }
     }, 
     function(btn) 
@@ -284,7 +348,10 @@ function render_capacity_selected()
             {"spacer", 3 },
             {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color()}},
             {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY}},
-            {"button", dialog_buttons.log_symptoms.label, {color = COLOR_TERTIARY}}
+            {"button", dialog_buttons.log_symptoms.label, {color = COLOR_TERTIARY}},
+            {"spacer", 3 },
+            {"button", dialog_buttons.log_activity.label, {color = COLOR_TERTIARY}},
+            {"button", dialog_buttons.log_intervention.label, {color = COLOR_TERTIARY}},
         }
         my_gui.render()
     end
