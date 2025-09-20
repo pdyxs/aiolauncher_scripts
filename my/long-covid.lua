@@ -12,6 +12,7 @@ local dialog_flow = require "core.dialog-flow"
 local util = require "core.util"
 local time_utils = require "core.time-utils"
 local markdown_parser = require "core.markdown_parser"
+local item_parser = require "core.item-parser"
 
 local dialog_manager = dialog_flow.create_dialog_flow()
 
@@ -207,7 +208,7 @@ local dialog_buttons = util.map(
                     title = "Log Activity",
                     get_options = function()
                         local parsed_activities = markdown_parser.get_list_items(DATA_PREFIX.."Activities.md")
-                        local options = util.map(parsed_activities, function(activity) return activity.text end)
+                        local options = util.map(parsed_activities, item_parser.parse_item)
                         table.insert(options, OTHER_TEXT)
                         return options
                     end,
@@ -239,7 +240,7 @@ local dialog_buttons = util.map(
                     title = "Log Intervention",
                     get_options = function()
                         local parsed = markdown_parser.get_list_items(DATA_PREFIX.."Interventions.md")
-                        local options = util.map(parsed, function(item) return item.text end)
+                        local options = util.map(parsed, item_parser.parse_item)
                         table.insert(options, OTHER_TEXT)
                         return options
                     end,
