@@ -5,7 +5,6 @@
 -- version = "0.1"
 -- icon = "shield-virus"
 
-local prefs = require "prefs"
 local ui_core = require "core.ui"
 local logger = require "core.log-via-tasker"
 local dialog_flow = require "core.dialog-flow"
@@ -57,7 +56,8 @@ function handle_capacity_click(button)
                 }
             end,
             handle_result = function(results)
-                set_capacity(button.name)
+                logger.log_to_spreadsheet("Capacity", button.name)
+                render_widget()
                 morph:run_with_delay(1000, function()
                     logger.log_to_spreadsheet("Relative Capacity", results[#results].value)
                 end)
@@ -87,26 +87,19 @@ local capacity_buttons = {
     }
 }
 
-function set_capacity(capacity)
-    prefs.capacity = capacity
-    prefs.capacity_date = os.date("%Y-%m-%d")
-
-    logger.log_to_spreadsheet("Capacity", capacity)
-
-    render_widget()
-end
-
 function reset_capacity()
-    prefs.capacity = nil
-    prefs.capacity_date = nil
-
+    logger.store_log("Capacity", "reset")
     render_widget()
 end
 
 function get_current_capacity()
-    local today = os.date("%Y-%m-%d")
-    if prefs.capacity_date == today then
-        return prefs.capacity
+    local today = time_utils.get_current_timestamp()
+    if time_utils.is_same_calendar_day(today, logger.last_logged("Capacity")) then
+        local last = logger.last_value("Capacity")
+        if last == "reset" then
+            return nil
+        end
+        return last
     end
     return nil
 end
@@ -131,7 +124,6 @@ local dialog_buttons = util.map(
                         }
                     end,
                     handle_result = function(results)
-                        prefs.last_energy_log_time = time_utils.get_current_timestamp()
                         logger.log_to_spreadsheet("Energy", results[#results].index)
                         render_widget()
                     end
@@ -320,19 +312,15 @@ end
 ------- RENDERING HELPERS
 
 function get_energy_button_color()
-    if not prefs.last_energy_log_time then
-        -- Never logged today - PRIMARY
-        return COLOR_PRIMARY
-    end
-
+    local last_time = logger.last_logged("Energy")
     local current_time = time_utils.get_current_timestamp()
 
-    if not time_utils.is_same_calendar_day(prefs.last_energy_log_time, current_time) then
+    if not time_utils.is_same_calendar_day(last_time, current_time) then
         -- Different calendar day - PRIMARY
         return COLOR_PRIMARY
     end
 
-    local hours_since_last = time_utils.hours_between(prefs.last_energy_log_time, current_time)
+    local hours_since_last = time_utils.hours_between(last_time, current_time)
 
     if hours_since_last >= 4 then
         -- 4+ hours since last log - SECONDARY

@@ -2,6 +2,8 @@
 -- Extends the existing 3-column logging to support timestamp, event, value, detail
 
 local M = {}
+local time_utils = require "core.time-utils"
+local prefs = require "prefs"
 
 -- Log data to spreadsheet via Tasker with 4-column support
 -- Parameters:
@@ -56,7 +58,67 @@ function M.log_to_spreadsheet(event, value, detail, ui_callback)
     end
     ui_callback(message)
 
+    M.store_log(event, value_str)
+
     return true
+end
+
+function M.store_log(event, value)
+    local logs = prefs.logs or {}
+
+    if not logs[event] then
+        logs[event] = {count = 0, values = {}}
+    end
+
+    logs[event].count = (logs[event].count or 0) + 1
+    logs[event].last_logged = time_utils.get_current_timestamp()
+    logs[event].last_value = value
+    
+    if not logs[event].values[value] then
+        logs[event].values[value] = { count = 0 }
+    end
+
+    logs[event].values[value].count = (logs[event].values[value].count or 0) + 1
+    logs[event].values[value].last_logged = time_utils.get_current_timestamp()
+
+    prefs.logs = logs
+end
+
+function M.log_count(event, value)
+    if prefs.logs == nil or prefs.logs[event] == nil then
+        return 0
+    end
+
+    if value == nil then
+        return prefs.logs[event].count
+    end
+
+    if prefs.logs[event].values[value] == nil then
+        return 0
+    end
+    return prefs.logs[event].values[value].count
+end
+
+function M.last_logged(event, value)
+    if prefs.logs == nil or prefs.logs[event] == nil then
+        return 0
+    end
+
+    if value == nil then
+        return prefs.logs[event].last_logged
+    end
+
+    if prefs.logs[event].values[value] == nil then
+        return 0
+    end
+    return prefs.logs[event].values[value].last_logged
+end
+
+function M.last_value(event)
+    if prefs.logs == nil or prefs.logs[event] == nil then
+        return nil
+    end
+    return prefs.logs[event].last_value
 end
 
 return M
