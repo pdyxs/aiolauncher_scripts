@@ -32,7 +32,9 @@ local commands = {
         local content = table.concat(parts, COMMAND_DELIM, 3)
 
         files:write(DATA_PREFIX .. filename, content)
-
+    end,
+    copy_finished = function()
+        setup_loggables()
         render_widget()
     end
 }
@@ -207,11 +209,9 @@ local dialog_buttons = util.map(
                     type = "radio",
                     title = "Log Activity",
                     get_options = function()
-                        local parsed = markdown_parser.get_list_items(DATA_PREFIX.."Activities.md")
-                        local parsed_items = util.map(parsed, item_parser.parse_item)
-                        local options = util.map(parsed_items, function(i) return i.text end)
+                        local options = util.map(activity_items, function(i) return i.text end)
                         table.insert(options, OTHER_TEXT)
-                        local metas = util.map(parsed_items, function(i) return i.meta end)
+                        local metas = util.map(activity_items, function(i) return i.meta end)
                         table.insert(metas, {})
                         return options, metas
                     end,
@@ -256,11 +256,9 @@ local dialog_buttons = util.map(
                     type = "radio",
                     title = "Log Intervention",
                     get_options = function()
-                        local parsed = markdown_parser.get_list_items(DATA_PREFIX.."Interventions.md")
-                        local parsed_items = util.map(parsed, item_parser.parse_item)
-                        local options = util.map(parsed_items, function(i) return i.text end)
+                        local options = util.map(intervention_items, function(i) return i.text end)
                         table.insert(options, OTHER_TEXT)
-                        local metas = util.map(parsed_items, function(i) return i.meta end)
+                        local metas = util.map(intervention_items, function(i) return i.meta end)
                         table.insert(metas, {})
                         return options, metas
                     end,
@@ -304,7 +302,22 @@ local dialog_buttons = util.map(
     end
 )
 
--------- RENDERING HELPERS
+------- SETUP ACTIVITIES/INTERVENTIONS
+
+local activity_items = {}
+local intervention_items = {}
+
+function setup_loggables()
+    activity_items = get_loggable_items("Activities")
+    intervention_items = get_loggable_items("Interventions")
+end
+
+function get_loggable_items(filename)
+    local parsed = markdown_parser.get_list_items(DATA_PREFIX..filename..".md")
+    return util.map(parsed, item_parser.parse_item)
+end
+
+------- RENDERING HELPERS
 
 function get_energy_button_color()
     if not prefs.last_energy_log_time then
@@ -394,6 +407,7 @@ end
 ------ AIO Functions
 
 function on_resume()
+    setup_loggables()
     tasker:run_task("LongCovid_CopyData", {})
     render_widget()
 end
