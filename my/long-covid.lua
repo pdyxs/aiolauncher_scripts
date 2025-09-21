@@ -108,6 +108,8 @@ end
 ------- OTHER LOGGING
 
 local OTHER_TEXT = "Other..."
+local ACTIVITY = "Activity"
+local INTERVENTION = "Intervention"
 
 local dialog_buttons = util.map(
     {
@@ -202,7 +204,7 @@ local dialog_buttons = util.map(
                     type = "radio",
                     title = "Log Activity",
                     get_options = function()
-                        local options = util.map(prefs.activity_items, function(i) return get_modified_item_text("Activity", i) end)
+                        local options = util.map(prefs.activity_items, function(i) return get_modified_item_text(ACTIVITY, i) end)
                         table.insert(options, OTHER_TEXT)
                         local metas = util.map(prefs.activity_items, function(i) return i.meta end)
                         table.insert(metas, {})
@@ -215,7 +217,7 @@ local dialog_buttons = util.map(
                         if results[1].meta.specifiers.Options then
                             return dialogs.options
                         end
-                        logger.log_to_spreadsheet("Activity", results[1].meta.text)
+                        logger.log_to_spreadsheet(ACTIVITY, results[1].meta.text)
                     end
                 },
 
@@ -225,7 +227,7 @@ local dialog_buttons = util.map(
                     prompt = "Enter activity name:",
                     default_text = "",
                     handle_result = function(results, dialogs)
-                        logger.log_to_spreadsheet("Activity", results[#results])
+                        logger.log_to_spreadsheet(ACTIVITY, results[#results])
                     end
                 },
 
@@ -236,7 +238,7 @@ local dialog_buttons = util.map(
                         return results[1].meta.specifiers.Options
                     end,
                     handle_result = function(results, dialogs)
-                        logger.log_to_spreadsheet("Activity", results[1].meta.text, results[2].value)
+                        logger.log_to_spreadsheet(ACTIVITY, results[1].meta.text, results[2].value)
                     end
                 }
             }
@@ -249,7 +251,7 @@ local dialog_buttons = util.map(
                     type = "radio",
                     title = "Log Intervention",
                     get_options = function()
-                        local options = util.map(prefs.intervention_items, function(i) return get_modified_item_text("Intervention", i) end)
+                        local options = util.map(prefs.intervention_items, function(i) return get_modified_item_text(INTERVENTION, i) end)
                         table.insert(options, OTHER_TEXT)
                         local metas = util.map(prefs.intervention_items, function(i) return i.meta end)
                         table.insert(metas, {})
@@ -262,7 +264,7 @@ local dialog_buttons = util.map(
                         if results[1].meta.specifiers.Options then
                             return dialogs.options
                         end
-                        logger.log_to_spreadsheet("Intervention", results[1].meta.text)
+                        logger.log_to_spreadsheet(INTERVENTION, results[1].meta.text)
                     end
                 },
 
@@ -272,7 +274,7 @@ local dialog_buttons = util.map(
                     prompt = "Enter intervention name:",
                     default_text = "",
                     handle_result = function(results, dialogs)
-                        logger.log_to_spreadsheet("Intervention", results[#results])
+                        logger.log_to_spreadsheet(INTERVENTION, results[#results])
                     end
                 },
 
@@ -283,7 +285,7 @@ local dialog_buttons = util.map(
                         return results[1].meta.specifiers.Options
                     end,
                     handle_result = function(results, dialogs)
-                        logger.log_to_spreadsheet("Intervention", results[1].meta.text, results[2].value)
+                        logger.log_to_spreadsheet(INTERVENTION, results[1].meta.text, results[2].value)
                     end
                 }
             }
@@ -308,6 +310,15 @@ end
 function get_loggable_items(filename)
     local parsed = markdown_parser.get_list_items(DATA_PREFIX..filename..".md")
     return util.map(parsed, item_parser.parse_item)
+end
+
+function are_any_required(event, items)
+    for _,item in ipairs(items) do
+        if is_item_required(event, item) then
+            return true
+        end
+    end
+    return false
 end
 
 function get_modified_item_text(event, item)
@@ -346,6 +357,20 @@ function is_item_required(event, item)
 end
 
 ------- RENDERING HELPERS
+
+function get_activity_button_color()
+    if are_any_required(ACTIVITY, prefs.activity_items) then
+        return COLOR_PRIMARY
+    end
+    return COLOR_TERTIARY
+end
+
+function get_interventions_button_color()
+    if are_any_required(INTERVENTION, prefs.intervention_items) then
+        return COLOR_PRIMARY
+    end
+    return COLOR_TERTIARY
+end
 
 function get_energy_button_color()
     local last_time = logger.last_logged("Energy")
@@ -421,8 +446,8 @@ function render_capacity_selected()
             {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color(), gravity="center_h"}},
             {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY, gravity="anchor_prev"}},
             {"button", dialog_buttons.log_symptoms.label, {color = COLOR_TERTIARY, gravity="anchor_prev"}},
-            {"button", dialog_buttons.log_activity.label, {color = COLOR_TERTIARY, gravity="right"}},
-            {"button", dialog_buttons.log_intervention.label, {color = COLOR_TERTIARY}},
+            {"button", dialog_buttons.log_activity.label, {color = get_activity_button_color(), gravity="right"}},
+            {"button", dialog_buttons.log_intervention.label, {color = get_interventions_button_color()}},
         }
         my_gui.render()
     end

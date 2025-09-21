@@ -50,6 +50,7 @@ function M.create_dialog_flow()
     }
 
     function flow:start(config)
+        self:clear()
         self.config = config
         self:push_dialog(self.config.main)
     end
