@@ -2,26 +2,24 @@ local item_parser = {}
 
 local LINKED_ITEM = "♾️"
 local OPTIONS = "⚟"
-local REQUIRED_ITEM = "‼️"
-local COMPLETED_ITEM = "✓"
 
 function item_parser.parse_item(item)
     local text = item.text
+    local meta_text = text
 
     -- Check if text is surrounded by double angle brackets
     if text:match("^%[%[(.+)%]%]$") then
-        text = text:match("^%[%[(.+)%]%]$") .. " " .. LINKED_ITEM
+        text = text:match("^%[%[(.+)%]%]$")
+        meta_text = text
+        text = text .. " " .. LINKED_ITEM
     end
 
     local specifiers = item_parser.extract_specifiers(item)
     if specifiers.Options then
         text = text .. " " .. OPTIONS
     end
-    if specifiers.Required then
-        text = REQUIRED_ITEM .. text
-    end
 
-    return { text=text, meta = { text=item.text, specifiers=specifiers } }
+    return { text=text, meta = { text=meta_text, specifiers=specifiers } }
 end
 
 -- Helper function for string trimming

@@ -5,6 +5,7 @@
 -- version = "0.1"
 -- icon = "shield-virus"
 
+local prefs = require "prefs"
 local ui_core = require "core.ui"
 local logger = require "core.log-via-tasker"
 local dialog_flow = require "core.dialog-flow"
@@ -201,9 +202,9 @@ local dialog_buttons = util.map(
                     type = "radio",
                     title = "Log Activity",
                     get_options = function()
-                        local options = util.map(activity_items, function(i) return i.text end)
+                        local options = util.map(prefs.activity_items, function(i) return get_modified_item_text("Activity", i) end)
                         table.insert(options, OTHER_TEXT)
-                        local metas = util.map(activity_items, function(i) return i.meta end)
+                        local metas = util.map(prefs.activity_items, function(i) return i.meta end)
                         table.insert(metas, {})
                         return options, metas
                     end,
@@ -248,9 +249,9 @@ local dialog_buttons = util.map(
                     type = "radio",
                     title = "Log Intervention",
                     get_options = function()
-                        local options = util.map(intervention_items, function(i) return i.text end)
+                        local options = util.map(prefs.intervention_items, function(i) return get_modified_item_text("Intervention", i) end)
                         table.insert(options, OTHER_TEXT)
-                        local metas = util.map(intervention_items, function(i) return i.meta end)
+                        local metas = util.map(prefs.intervention_items, function(i) return i.meta end)
                         table.insert(metas, {})
                         return options, metas
                     end,
@@ -296,17 +297,52 @@ local dialog_buttons = util.map(
 
 ------- SETUP ACTIVITIES/INTERVENTIONS
 
-local activity_items = {}
-local intervention_items = {}
+local REQUIRED_ITEM = "‼️"
+local COMPLETED_ITEM = "✓"
 
 function setup_loggables()
-    activity_items = get_loggable_items("Activities")
-    intervention_items = get_loggable_items("Interventions")
+    prefs.activity_items = get_loggable_items("Activities")
+    prefs.intervention_items = get_loggable_items("Interventions")
 end
 
 function get_loggable_items(filename)
     local parsed = markdown_parser.get_list_items(DATA_PREFIX..filename..".md")
     return util.map(parsed, item_parser.parse_item)
+end
+
+function get_modified_item_text(event, item)
+    local text = item.text
+    if is_item_required(event, item) then
+        text = REQUIRED_ITEM .. text
+    end
+
+    local last_logged = logger.last_logged(event, item.meta.text)
+    local now = time_utils.get_current_timestamp()
+    if time_utils.is_same_calendar_day(last_logged, now) then
+        text = text .. " " .. COMPLETED_ITEM
+    end
+
+    return text
+end
+
+function is_item_required(event, item)
+    if not item.meta.specifiers.Required then
+        return false
+    end
+
+    local requiredParams = util.map(item.meta.specifiers.Required, function(i) return i:lower() end)
+    local now = time_utils.get_current_timestamp()
+    local last_logged = logger.last_logged(event, item.meta.text)
+    
+    if util.contains(requiredParams, "daily") or time_utils.is_day_of_week(now, requiredParams) then
+        return not time_utils.is_same_calendar_day(last_logged, now)
+    end
+
+    if util.contains(requiredParams, "weekly") then
+        return not time_utils.is_same_week(last_logged, now)
+    end
+
+    return false
 end
 
 ------- RENDERING HELPERS

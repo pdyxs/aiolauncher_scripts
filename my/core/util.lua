@@ -18,4 +18,11 @@ function util.map(tbl, func)
     return result
 end
 
+function util.contains(array, value)
+    for i, v in ipairs(array) do
+        if v == value then return true end
+    end
+    return false
+end
+
 return util
