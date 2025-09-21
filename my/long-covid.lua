@@ -24,7 +24,7 @@ local COLOR_PRIMARY = "#333333"    -- Darkest
 local COLOR_SECONDARY = "#666666"  -- Middle
 local COLOR_TERTIARY = "#BBBBBB"   -- Lightest
 
-local OBSIDIAN_FILEPATH = "Long Covid/v2/Data/"
+local OBSIDIAN_FILEPATH = "Long Covid/Data/"
 
 ------- COMMANDS
 
