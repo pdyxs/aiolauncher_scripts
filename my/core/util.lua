@@ -39,4 +39,14 @@ function util.filter(tbl, predicate)
     return result
 end
 
+function util.concat_arrays(...)
+    local result = {}
+    for _, array in ipairs({...}) do
+        for i = 1, #array do
+            table.insert(result, array[i])
+        end
+    end
+    return result
+end
+
 return util

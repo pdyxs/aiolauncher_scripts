@@ -162,6 +162,8 @@ local dialog_buttons = util.map(
                     get_options = function()
                         local parsed_symptoms = markdown_parser.get_list_items(DATA_PREFIX.."Symptoms.md")
                         local values = util.map(parsed_symptoms, function(symptom) return symptom.text end)
+                        local custom_values = get_unresolved_custom_symptoms(values)
+                        values = util.concat_arrays(values, custom_values)
                         table.insert(values, OTHER_TEXT)
                         local options = util.map(values, function(value) 
                             if is_symptom_unresolved(value) then
@@ -432,6 +434,16 @@ function get_unresolved_symptoms()
     local unresolved_symptoms = {}
     for value,data in pairs(prefs.logs["Symptom"].values) do
         if is_symptom_unresolved(value) then
+            table.insert(unresolved_symptoms, value)
+        end
+    end
+    return unresolved_symptoms
+end
+
+function get_unresolved_custom_symptoms(default_symptoms)
+    local unresolved_symptoms = {}
+    for value,data in pairs(prefs.logs["Symptom"].values) do
+        if not util.contains(default_symptoms, value) and is_symptom_unresolved(value) then
             table.insert(unresolved_symptoms, value)
         end
     end
