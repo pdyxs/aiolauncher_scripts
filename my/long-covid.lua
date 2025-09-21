@@ -13,6 +13,7 @@ local util = require "core.util"
 local time_utils = require "core.time-utils"
 local markdown_parser = require "core.markdown_parser"
 local item_parser = require "core.item-parser"
+local plan_parser = require "core.plan_parser"
 local todo_parser = require "core.todo_parser"
 local obsidian = require "core.obsidian"
 
@@ -313,6 +314,22 @@ local dialog_buttons = util.map(
                     end
                 }
             }
+        },
+
+        plans = {
+            label = "fa:calendar",
+            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Plans.md") end,
+            dialogs = {
+                main = {
+                    type="list",
+                    title="Plans",
+                    get_lines = function()
+                        return prefs.plans.list
+                    end,
+                    handle_result = function()
+                    end
+                }
+            }
         }
     }, 
     function(btn) 
@@ -329,6 +346,23 @@ local COMPLETED_ITEM = "✓"
 function setup_loggables()
     prefs.activity_items = get_loggable_items("Activities")
     prefs.intervention_items = get_loggable_items("Interventions")
+    prefs.plans = get_plans_info()
+end
+
+function get_plans_info()
+    local parsed_plans = markdown_parser.get_list_items(DATA_PREFIX.."Plans.md")
+    local incomplete = util.filter(parsed_plans, function(plan)
+        return not string.match(plan.text, "^✔")
+    end)
+    local any_overdue = false
+    local list = util.map(incomplete, function(p)
+        local item, overdue = plan_parser.parse_plan(p.text)
+        if overdue then
+            any_overdue = true
+        end
+        return item
+    end)
+    return { list = list, any_overdue = any_overdue }
 end
 
 function get_loggable_items(filename)
@@ -391,6 +425,13 @@ end
 
 function get_interventions_button_color()
     if are_any_required(INTERVENTION, prefs.intervention_items) then
+        return COLOR_PRIMARY
+    end
+    return COLOR_TERTIARY
+end
+
+function get_plans_button_color()
+    if prefs.plans.any_overdue then
         return COLOR_PRIMARY
     end
     return COLOR_TERTIARY
@@ -466,9 +507,10 @@ function render_capacity_selected()
     if selected_button then
         my_gui = gui{
             {"button", selected_button.label, {color = COLOR_TERTIARY}},
-            {"spacer", 10},
-            {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color(), gravity="center_h"}},
-            {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY, gravity="anchor_prev"}},
+            {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color()}},
+            {"button", dialog_buttons.plans.label, {color = get_plans_button_color()}},
+            {"spacer", 6},
+            {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY, gravity="center_h"}},
             {"button", dialog_buttons.log_symptoms.label, {color = COLOR_TERTIARY, gravity="anchor_prev"}},
             {"button", dialog_buttons.log_activity.label, {color = get_activity_button_color(), gravity="right"}},
             {"button", dialog_buttons.log_intervention.label, {color = get_interventions_button_color()}},

@@ -25,4 +25,18 @@ function util.contains(array, value)
     return false
 end
 
+function util.filter(tbl, predicate)
+    local result = {}
+    for k, v in pairs(tbl) do
+        if predicate(v, k) then
+            if type(k) == "number" then
+                table.insert(result, v)
+            else
+                result[k] = v
+            end
+        end
+    end
+    return result
+end
+
 return util

@@ -11,6 +11,33 @@ function M.open_dialog(dialog_config, results)
         return M.open_input_dialog(dialog_config, results)
     elseif dialog_config.type == "checkbox" then
         return M.open_checkbox_dialog(dialog_config, results)
+    elseif dialog_config.type == "list" then
+        return M.open_list_dialog(dialog_config, results)
+    elseif dialog_config.type == "text" then
+        return M.open_text_dialog(dialog_config, results)
+    end
+end
+
+function M.open_list_dialog(dialog_config, results)
+    local lines = dialog_config.get_lines(results)
+    dialogs:show_list_dialog({
+        title = dialog_config.title,
+        search = false,
+        split_symbol = ":",
+        lines = lines
+    })
+
+    return function(result)
+        return result
+    end
+end
+
+function M.open_text_dialog(dialog_config, results)
+    local text = dialog_config.get_text(results)
+    dialogs:show_dialog(dialog_config.title, text)
+
+    return function(result)
+        return result
     end
 end
 
