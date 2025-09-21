@@ -4,6 +4,10 @@ function M.get_current_timestamp()
     return os.time()
 end
 
+function M.is_today(timestamp)
+    return M.is_same_calendar_day(timestamp, M.get_current_timestamp())
+end
+
 function M.is_same_calendar_day(timestamp1, timestamp2)
     if not timestamp1 or not timestamp2 then
         return false

@@ -17,7 +17,7 @@ local plan_parser = require "core.plan_parser"
 local todo_parser = require "core.todo_parser"
 local obsidian = require "core.obsidian"
 
-local dialog_manager = dialog_flow.create_dialog_flow()
+local dialog_manager = dialog_flow.create_dialog_flow(function() render_widget() end)
 
 -- Colors for monochrome display
 local COLOR_PRIMARY = "#333333"    -- Darkest
@@ -161,9 +161,15 @@ local dialog_buttons = util.map(
                     title = "Log Symptom",
                     get_options = function()
                         local parsed_symptoms = markdown_parser.get_list_items(DATA_PREFIX.."Symptoms.md")
-                        local options = util.map(parsed_symptoms, function(symptom) return symptom.text end)
-                        table.insert(options, OTHER_TEXT)
-                        return options
+                        local values = util.map(parsed_symptoms, function(symptom) return symptom.text end)
+                        table.insert(values, OTHER_TEXT)
+                        local options = util.map(values, function(value) 
+                            if is_symptom_unresolved(value) then
+                                return "‼️"..value
+                            end
+                            return value
+                        end)
+                        return options, values
                     end,
                     handle_result = function(results, dialogs)
                         if results[1].value == OTHER_TEXT then
@@ -186,17 +192,25 @@ local dialog_buttons = util.map(
                 severity = {
                     type = "radio",
                     title = "Symptom Severity",
-                    get_options = function()
-                        return {
+                    get_options = function(results)
+                        local options = {
                             "1 - Minimal", "2 - Mild", "3 - Mild-Moderate", "4 - Moderate", "5 - Moderate-High",
                             "6 - High", "7 - High-Severe", "8 - Severe", "9 - Very Severe", "10 - Extreme"
                         }
+                        if is_symptom_unresolved(results[1].meta) then
+                            table.insert(options, 1, "0 - Resolved")
+                        end
+                        return options
                     end,
                     handle_result = function(results)
+                        local severity = results[#results].index
+                        if is_symptom_unresolved(results[1].meta) then
+                            severity = severity - 1
+                        end
                         if #results == 2 then
-                            logger.log_to_spreadsheet("Symptom", results[1].value, results[2].index)
+                            logger.log_to_spreadsheet("Symptom", results[1].meta, severity)
                         elseif #results == 3 then
-                            logger.log_to_spreadsheet("Symptom", results[2], results[3].index)
+                            logger.log_to_spreadsheet("Symptom", results[2], severity)
                         end
                     end
                 }
@@ -338,7 +352,7 @@ local dialog_buttons = util.map(
     end
 )
 
-------- SETUP ACTIVITIES/INTERVENTIONS
+------- SETUP LISTS FOR DIALOGS
 
 local REQUIRED_ITEM = "‼️"
 local COMPLETED_ITEM = "✓"
@@ -414,6 +428,26 @@ function is_item_required(event, item)
     return false
 end
 
+function get_unresolved_symptoms()
+    local unresolved_symptoms = {}
+    for value,data in pairs(prefs.logs["Symptom"].values) do
+        if is_symptom_unresolved(value) then
+            table.insert(unresolved_symptoms, value)
+        end
+    end
+    return unresolved_symptoms
+end
+
+function is_symptom_unresolved(value)
+    local data = prefs.logs["Symptom"].values[value]
+    if not data then
+        return false
+    end
+    if data.last_detail ~= "0" and not time_utils.is_today(data.last_logged) then
+        return true
+    end
+end
+
 ------- RENDERING HELPERS
 
 function get_activity_button_color()
@@ -432,6 +466,13 @@ end
 
 function get_plans_button_color()
     if prefs.plans.any_overdue then
+        return COLOR_PRIMARY
+    end
+    return COLOR_TERTIARY
+end
+
+function get_symptoms_color()
+    if #get_unresolved_symptoms() > 0 then
         return COLOR_PRIMARY
     end
     return COLOR_TERTIARY
@@ -511,7 +552,7 @@ function render_capacity_selected()
             {"button", dialog_buttons.plans.label, {color = get_plans_button_color()}},
             {"spacer", 6},
             {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY, gravity="center_h"}},
-            {"button", dialog_buttons.log_symptoms.label, {color = COLOR_TERTIARY, gravity="anchor_prev"}},
+            {"button", dialog_buttons.log_symptoms.label, {color = get_symptoms_color(), gravity="anchor_prev"}},
             {"button", dialog_buttons.log_activity.label, {color = get_activity_button_color(), gravity="right"}},
             {"button", dialog_buttons.log_intervention.label, {color = get_interventions_button_color()}},
         }

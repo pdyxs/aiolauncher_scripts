@@ -83,7 +83,7 @@ function M.open_input_dialog(dialog_config)
 end
 
 -- Dialog Flow for handling sequential dialog interactions
-function M.create_dialog_flow()
+function M.create_dialog_flow(on_complete)
     local flow = {
         config = nil,
         results = {},
@@ -136,6 +136,9 @@ function M.create_dialog_flow()
 
     function flow:handle_complete()
         self:clear()
+        if on_complete then
+            on_complete()
+        end
     end
 
     function flow:get_current_dialog()

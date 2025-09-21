@@ -58,12 +58,12 @@ function M.log_to_spreadsheet(event, value, detail, ui_callback)
     end
     ui_callback(message)
 
-    M.store_log(event, value_str)
+    M.store_log(event, value_str, detail_str)
 
     return true
 end
 
-function M.store_log(event, value)
+function M.store_log(event, value, detail)
     local logs = prefs.logs or {}
 
     if not logs[event] then
@@ -80,6 +80,10 @@ function M.store_log(event, value)
 
     logs[event].values[value].count = (logs[event].values[value].count or 0) + 1
     logs[event].values[value].last_logged = time_utils.get_current_timestamp()
+
+    if detail ~= "" then
+        logs[event].values[value].last_detail = detail
+    end
 
     prefs.logs = logs
 end
@@ -119,6 +123,13 @@ function M.last_value(event)
         return nil
     end
     return prefs.logs[event].last_value
+end
+
+function M.last_detail(event, value)
+    if prefs.logs == nil or prefs.logs[event] == nil or prefs.logs[event].values[value] == nil then
+        return nil
+    end
+    return prefs.logs[event].values[value].last_detail
 end
 
 return M
