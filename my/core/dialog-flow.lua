@@ -2,18 +2,33 @@
 -- Supports radio and edit dialogs only (no list dialogs for simplicity)
 
 local M = {}
+local util = require "core.util"
 
 function M.open_dialog(dialog_config, results)
     if dialog_config.type == "radio" then
         return M.open_radio_dialog(dialog_config, results)
     elseif dialog_config.type == "edit" then
         return M.open_input_dialog(dialog_config, results)
+    elseif dialog_config.type == "checkbox" then
+        return M.open_checkbox_dialog(dialog_config, results)
+    end
+end
+
+function M.open_checkbox_dialog(dialog_config, results)
+    local options, metas = dialog_config.get_options(results)
+    dialogs:show_checkbox_dialog(dialog_config.title, options)
+
+    return function(result)
+        if result == -1 then
+            return -1
+        end
+        return { indices=result, values=util.map(result, function(r) return options[r] end) }
     end
 end
 
 function M.open_radio_dialog(dialog_config, results)
     local options, metas = dialog_config.get_options(results)
-    dialogs:show_radio_dialog(dialog_config.title, options, 0)
+    dialogs:show_radio_dialog(dialog_config.title, options)
 
     return function(result)
         if type(result) ~= "number" or result < 1 then

@@ -264,6 +264,9 @@ local dialog_buttons = util.map(
                         if results[1].meta.specifiers.Options then
                             return dialogs.options
                         end
+                        if results[1].meta.is_link then
+                            return dialogs.todo
+                        end
                         logger.log_to_spreadsheet(INTERVENTION, results[1].meta.text)
                     end
                 },
@@ -286,6 +289,18 @@ local dialog_buttons = util.map(
                     end,
                     handle_result = function(results, dialogs)
                         logger.log_to_spreadsheet(INTERVENTION, results[1].meta.text, results[2].value)
+                    end
+                },
+
+                todo = {
+                    type = "checkbox",
+                    title = "Todos",
+                    get_options = function(results)
+                        local parsed_todos = markdown_parser.get_list_items(DATA_PREFIX..results[1].meta.text..".md")
+                        local options = util.map(parsed_todos, function(item) return item.text end)
+                        return options
+                    end,
+                    handle_result = function(results, dialogs)
                     end
                 }
             }
