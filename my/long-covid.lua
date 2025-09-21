@@ -14,6 +14,7 @@ local time_utils = require "core.time-utils"
 local markdown_parser = require "core.markdown_parser"
 local item_parser = require "core.item-parser"
 local todo_parser = require "core.todo_parser"
+local obsidian = require "core.obsidian"
 
 local dialog_manager = dialog_flow.create_dialog_flow()
 
@@ -21,6 +22,8 @@ local dialog_manager = dialog_flow.create_dialog_flow()
 local COLOR_PRIMARY = "#333333"    -- Darkest
 local COLOR_SECONDARY = "#666666"  -- Middle
 local COLOR_TERTIARY = "#BBBBBB"   -- Lightest
+
+local OBSIDIAN_FILEPATH = "Long Covid/v2/Data/"
 
 ------- COMMANDS
 
@@ -150,6 +153,7 @@ local dialog_buttons = util.map(
         },
         log_symptoms = {
             label = "fa:heart-pulse",
+            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Symptoms.md") end,
             dialogs = {
                 main = {
                     type = "radio",
@@ -200,6 +204,7 @@ local dialog_buttons = util.map(
 
         log_activity = {
             label = "fa:running",
+            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Activities.md") end,
             dialogs = {
                 main = {
                     type = "radio",
@@ -247,6 +252,7 @@ local dialog_buttons = util.map(
 
         log_intervention = {
             label = "fa:pills",
+            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Interventions.md") end,
             dialogs = {
                 main = {
                     type = "radio",
@@ -498,7 +504,7 @@ function on_long_click(idx)
     local element = my_gui.ui[idx]
     if not element then return end
 
-    ui_core.handle_button_long_click(element, capacity_buttons)
+    ui_core.handle_button_long_click(element, util.tables_to_array(capacity_buttons, dialog_buttons))
 end
 
 function on_command(data)
