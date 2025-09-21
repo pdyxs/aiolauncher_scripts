@@ -22,7 +22,7 @@ function M.open_checkbox_dialog(dialog_config, results)
         if result == -1 then
             return -1
         end
-        return { indices=result, values=util.map(result, function(r) return options[r] end) }
+        return { indices=result, values=util.map(result, function(r) return options[r] end), options=options }
     end
 end
 

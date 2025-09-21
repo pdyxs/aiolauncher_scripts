@@ -13,6 +13,7 @@ local util = require "core.util"
 local time_utils = require "core.time-utils"
 local markdown_parser = require "core.markdown_parser"
 local item_parser = require "core.item-parser"
+local todo_parser = require "core.todo_parser"
 
 local dialog_manager = dialog_flow.create_dialog_flow()
 
@@ -296,11 +297,13 @@ local dialog_buttons = util.map(
                     type = "checkbox",
                     title = "Todos",
                     get_options = function(results)
-                        local parsed_todos = markdown_parser.get_list_items(DATA_PREFIX..results[1].meta.text..".md")
-                        local options = util.map(parsed_todos, function(item) return item.text end)
-                        return options
+                        local item_name = results[1].meta.text
+                        local parsed_todos = markdown_parser.get_list_items(DATA_PREFIX..item_name..".md")
+                        local completions = logger.log_count(INTERVENTION, item_name)
+                        return todo_parser.parse_todo_list(parsed_todos, completions, get_current_capacity())
                     end,
                     handle_result = function(results, dialogs)
+                        logger.log_to_spreadsheet(INTERVENTION, results[1].meta.text, string.format("%.0f%%", (#results[2].indices / #results[2].options) * 100))
                     end
                 }
             }
