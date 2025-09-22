@@ -228,11 +228,11 @@ local dialog_buttons = util.map(
                     get_options = function()
                         local parsed_symptoms = markdown_parser.get_list_items(DATA_PREFIX.."Symptoms.md")
                         local values = util.map(parsed_symptoms, function(symptom) return symptom.text end)
-                        local custom_values = get_unresolved_custom_symptoms(values)
+                        local custom_values = get_tracking_custom_symptoms(values)
                         values = util.concat_arrays(values, custom_values)
                         table.insert(values, OTHER_TEXT)
                         local options = util.map(values, function(value) 
-                            if is_symptom_unresolved(value) then
+                            if is_symptom_tracking(value) then
                                 return "‼️"..value
                             end
                             return value
@@ -265,18 +265,18 @@ local dialog_buttons = util.map(
                             "1 - Minimal", "2 - Mild", "3 - Mild-Moderate", "4 - Moderate", "5 - Moderate-High",
                             "6 - High", "7 - High-Severe", "8 - Severe", "9 - Very Severe", "10 - Extreme"
                         }
-                        if is_symptom_unresolved(results[1].meta) then
+                        if is_symptom_unresolved(results[1].value) then
                             table.insert(options, 1, "0 - Resolved")
                         end
                         return options
                     end,
                     handle_result = function(results)
                         local severity = results[#results].index
-                        if is_symptom_unresolved(results[1].meta) then
+                        if is_symptom_unresolved(results[1].value) then
                             severity = severity - 1
                         end
                         if #results == 2 then
-                            logger.log_to_spreadsheet("Symptom", results[1].meta, severity)
+                            logger.log_to_spreadsheet("Symptom", results[1].value, severity)
                         elseif #results == 3 then
                             logger.log_to_spreadsheet("Symptom", results[2], severity)
                         end
@@ -405,24 +405,34 @@ function is_item_required(event, item)
     return false
 end
 
-function get_unresolved_symptoms()
-    local unresolved_symptoms = {}
+function get_tracking_symptoms()
+    local tracking_symptoms = {}
     for value,data in pairs(prefs.logs["Symptom"].values) do
-        if is_symptom_unresolved(value) then
-            table.insert(unresolved_symptoms, value)
+        if is_symptom_tracking(value) then
+            table.insert(tracking_symptoms, value)
         end
     end
-    return unresolved_symptoms
+    return tracking_symptoms
 end
 
-function get_unresolved_custom_symptoms(default_symptoms)
-    local unresolved_symptoms = {}
+function get_tracking_custom_symptoms(default_symptoms)
+    local tracking_symptoms = {}
     for value,data in pairs(prefs.logs["Symptom"].values) do
-        if not util.contains(default_symptoms, value) and is_symptom_unresolved(value) then
-            table.insert(unresolved_symptoms, value)
+        if not util.contains(default_symptoms, value) and is_symptom_tracking(value) then
+            table.insert(tracking_symptoms, value)
         end
     end
-    return unresolved_symptoms
+    return tracking_symptoms
+end
+
+function is_symptom_tracking(value)
+    if not is_symptom_unresolved(value) then
+        return false
+    end
+    local data = prefs.logs["Symptom"].values[value]
+    if not time_utils.is_today(data.last_logged) then
+        return true
+    end
 end
 
 function is_symptom_unresolved(value)
@@ -430,7 +440,7 @@ function is_symptom_unresolved(value)
     if not data then
         return false
     end
-    if data.last_detail ~= "0" and not time_utils.is_today(data.last_logged) then
+    if data.last_detail ~= "0" then
         return true
     end
 end
@@ -459,7 +469,7 @@ function get_plans_button_color()
 end
 
 function get_symptoms_color()
-    if #get_unresolved_symptoms() > 0 then
+    if #get_tracking_symptoms() > 0 then
         return COLOR_PRIMARY
     end
     return COLOR_TERTIARY
