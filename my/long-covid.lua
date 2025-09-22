@@ -62,11 +62,11 @@ function handle_capacity_click(button)
                 }
             end,
             handle_result = function(results)
-                logger.log_to_spreadsheet("Capacity", button.name)
+                logger.log_events_to_spreadsheet({
+                    {"Capacity", button.name},
+                    {"Relative Capacity", results[#results].option}
+                })
                 render_widget()
-                morph:run_with_delay(1000, function()
-                    logger.log_to_spreadsheet("Relative Capacity", results[#results].value)
-                end)
             end
         }
     })

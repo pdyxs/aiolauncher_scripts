@@ -3,6 +3,7 @@
 
 local M = {}
 local time_utils = require "core.time-utils"
+local util = require "core.util"
 local prefs = require "prefs"
 
 -- Log data to spreadsheet via Tasker with 4-column support
@@ -12,38 +13,33 @@ local prefs = require "prefs"
 --   detail - Optional additional information (e.g., severity, options, notes)
 --   ui_callback - Function to call for user feedback (optional)
 function M.log_to_spreadsheet(event, value, detail, ui_callback)
+    return M.log_events_to_spreadsheet({{event, value, detail}}, ui_callback)
+end
+
+function M.log_events_to_spreadsheet(events, ui_callback)
     ui_callback = ui_callback or function(message) ui:show_toast(message) end
-
-    if not event or type(event) ~= "string" then
-        ui_callback("Error: Invalid event type")
-        return false
-    end
-
-    if not value then
-        ui_callback("Error: Invalid value")
-        return false
-    end
 
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
 
-    -- Convert value to string
-    local value_str = tostring(value)
+    local data = map(function(event)
+        return map(tostring, event)
+    end, events)
 
-    -- Detail is optional, convert to string if provided, ensure it's never nil
-    local detail_str = (detail and tostring(detail) ~= "") and tostring(detail) or ""
+    local str = table.concat(
+        map(function(event) 
+            return timestamp.."¦"..table.concat(event, "¦")
+        end, events), 
+        "\n"
+    )
 
     if not tasker then
         ui_callback("Tasker not available")
         return false
     end
 
-    -- Call Tasker with 4-column data
     local success, error_msg = pcall(function()
-        tasker:run_task("LongCovid_LogEvent4Col", {
-            timestamp = timestamp,
-            event = event,
-            value = value_str,
-            detail = detail_str
+        tasker:run_task("LongCovid_Log", {
+            data=str
         })
     end)
 
@@ -52,15 +48,13 @@ function M.log_to_spreadsheet(event, value, detail, ui_callback)
         return false
     end
 
-    local message = "✓ Logged " .. event .. ": " .. value_str
-    if detail_str ~= "" then
-        message = message .. " - " .. detail_str
+    local message = "✓ Logged:"
+    for k, event in pairs(data) do
+        message = message.."\n"..table.concat(event, " - ")
+        M.store_log(event[1], event[2], event[3])
     end
+
     ui_callback(message)
-
-    M.store_log(event, value_str, detail_str)
-
-    return true
 end
 
 function M.store_log(event, value, detail)
