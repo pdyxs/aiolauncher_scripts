@@ -4,22 +4,22 @@
 local M = {}
 local util = require "core.util"
 
-function M.open_dialog(dialog_config, results)
+function M.open_dialog(dialog_config, results, loggables)
     if dialog_config.type == "radio" then
-        return M.open_radio_dialog(dialog_config, results)
+        return M.open_radio_dialog(dialog_config, results, loggables)
     elseif dialog_config.type == "edit" then
-        return M.open_input_dialog(dialog_config, results)
+        return M.open_input_dialog(dialog_config, results, loggables)
     elseif dialog_config.type == "checkbox" then
-        return M.open_checkbox_dialog(dialog_config, results)
+        return M.open_checkbox_dialog(dialog_config, results, loggables)
     elseif dialog_config.type == "list" then
-        return M.open_list_dialog(dialog_config, results)
+        return M.open_list_dialog(dialog_config, results, loggables)
     elseif dialog_config.type == "text" then
-        return M.open_text_dialog(dialog_config, results)
+        return M.open_text_dialog(dialog_config, results, loggables)
     end
 end
 
-function M.open_list_dialog(dialog_config, results)
-    local lines = dialog_config.get_lines(results)
+function M.open_list_dialog(dialog_config, results, loggables)
+    local lines = dialog_config.get_lines(results, loggables)
     dialogs:show_list_dialog({
         title = dialog_config.title,
         search = false,
@@ -32,8 +32,8 @@ function M.open_list_dialog(dialog_config, results)
     end
 end
 
-function M.open_text_dialog(dialog_config, results)
-    local text = dialog_config.get_text(results)
+function M.open_text_dialog(dialog_config, results, loggables)
+    local text = dialog_config.get_text(results, loggables)
     dialogs:show_dialog(dialog_config.title, text)
 
     return function(result)
@@ -41,8 +41,8 @@ function M.open_text_dialog(dialog_config, results)
     end
 end
 
-function M.open_checkbox_dialog(dialog_config, results)
-    local options, metas = dialog_config.get_options(results)
+function M.open_checkbox_dialog(dialog_config, results, loggables)
+    local options, metas = dialog_config.get_options(results, loggables)
     dialogs:show_checkbox_dialog(dialog_config.title, options)
 
     return function(result)
@@ -53,8 +53,8 @@ function M.open_checkbox_dialog(dialog_config, results)
     end
 end
 
-function M.open_radio_dialog(dialog_config, results)
-    local options, values, metas = dialog_config.get_options(results)
+function M.open_radio_dialog(dialog_config, results, loggables)
+    local options, values, metas = dialog_config.get_options(results, loggables)
     dialogs:show_radio_dialog(dialog_config.title, options)
 
     return function(result)
@@ -90,6 +90,7 @@ function M.create_dialog_flow(on_complete)
     local flow = {
         config = nil,
         results = {},
+        loggables = {},
         dialogs = {},
         parse_result = nil
     }
@@ -106,7 +107,7 @@ function M.create_dialog_flow(on_complete)
     end
 
     function flow:open_dialog(dialog_config)
-        self.parse_result = M.open_dialog(dialog_config, self.results)
+        self.parse_result = M.open_dialog(dialog_config, self.results, self.loggables)
     end
 
     function flow:handle_result(result)
@@ -117,7 +118,12 @@ function M.create_dialog_flow(on_complete)
         end
 
         table.insert(self.results, result)
-        local next = self:get_current_dialog().handle_result(self.results, self.config)
+        local next, log = self:get_current_dialog().handle_result(self.results, self.config, self.loggables)
+
+        if log then
+            table.insert(self.loggables, log)
+        end
+
         if next == -1 then
             self:handle_cancel()
             return
@@ -156,6 +162,7 @@ function M.create_dialog_flow(on_complete)
         self.config = nil
         self.dialogs = {}
         self.results = {}
+        self.loggables = {}
         self.parse_result = nil
     end
 

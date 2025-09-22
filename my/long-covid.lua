@@ -115,8 +115,17 @@ end
 local OTHER_TEXT = "Other..."
 local ACTIVITY = "Activity"
 local INTERVENTION = "Intervention"
+local SYMPTOM = "Symptom"
 
-function create_dialogs_for_items(name, get_items)
+function create_dialogs_for_items(name, get_items, override_log)
+    local do_log = function(loggables, new_loggable)
+        if override_log then
+            return override_log(new_loggable)
+        end
+        logger.log_to_spreadsheet(
+            util.concat_arrays({name}, loggables, {new_loggable})
+        )
+    end
     return {
         main = {
             type = "radio",
@@ -131,17 +140,18 @@ function create_dialogs_for_items(name, get_items)
                 table.insert(metas, {})
                 return options, values, metas
             end,
-            handle_result = function(results, dialogs)
-                if results[1].value == OTHER_TEXT then
+            handle_result = function(results, dialogs, loggables)
+                local result = results[#results]
+                if result.value == OTHER_TEXT then
                     return dialogs.custom_input
                 end
-                if results[1].meta.specifiers.Options then
-                    return dialogs.options
+                if result.meta.specifiers.Options then
+                    return dialogs.options, result.value
                 end
-                if results[1].meta.is_link then
-                    return dialogs.todo
+                if result.meta.is_link then
+                    return dialogs.todo, result.value
                 end
-                logger.log_to_spreadsheet(name, results[1].value)
+                return do_log(loggables, result.value)
             end
         },
 
@@ -150,8 +160,8 @@ function create_dialogs_for_items(name, get_items)
             title = "Custom "..name,
             prompt = "Enter "..name:lower().." name:",
             default_text = "",
-            handle_result = function(results, dialogs)
-                logger.log_to_spreadsheet(name, results[#results])
+            handle_result = function(results, dialogs, loggables)
+                return do_log(loggables, results[#results])
             end
         },
 
@@ -159,10 +169,10 @@ function create_dialogs_for_items(name, get_items)
             type = "radio",
             title = "Choose Option",
             get_options = function(results)
-                return results[1].meta.specifiers.Options
+                return results[#results].meta.specifiers.Options
             end,
-            handle_result = function(results, dialogs)
-                logger.log_to_spreadsheet(name, results[1].value, results[2].option)
+            handle_result = function(results, dialogs, loggables)
+                return do_log(loggables, results[#results].option)
             end
         },
 
@@ -170,13 +180,14 @@ function create_dialogs_for_items(name, get_items)
             type = "checkbox",
             title = "Todos",
             get_options = function(results)
-                local item_name = results[1].value
+                local item_name = results[#results].value
                 local parsed_todos = markdown_parser.get_list_items(DATA_PREFIX..item_name..".md")
                 local completions = logger.log_count(name, item_name)
                 return todo_parser.parse_todo_list(parsed_todos, completions, get_current_capacity())
             end,
-            handle_result = function(results, dialogs)
-                logger.log_to_spreadsheet(name, results[1].value, string.format("%.0f%%", (#results[2].indices / #results[2].all_options) * 100))
+            handle_result = function(results, dialogs, loggables)
+                local perc = string.format("%.0f%%", (#results[#results].indices / #results[#results].all_options) * 100)
+                return do_log(loggables, perc)
             end
         }
     }
@@ -198,7 +209,7 @@ local dialog_buttons = util.map(
                         }
                     end,
                     handle_result = function(results)
-                        logger.log_to_spreadsheet("Energy", results[#results].index)
+                        logger.log_to_spreadsheet({"Energy", results[#results].index})
                         render_widget()
                     end
                 }
@@ -213,7 +224,7 @@ local dialog_buttons = util.map(
                     prompt = "Enter note:",
                     default_text = "",
                     handle_result = function(results)
-                        logger.log_to_spreadsheet("Note", results[#results])
+                        logger.log_to_spreadsheet({"Note", results[#results]})
                     end
                 }
             }
@@ -221,68 +232,37 @@ local dialog_buttons = util.map(
         log_symptoms = {
             label = "fa:heart-pulse",
             long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Symptoms.md") end,
-            dialogs = {
-                main = {
-                    type = "radio",
-                    title = "Log Symptom",
-                    get_options = function()
-                        local parsed_symptoms = markdown_parser.get_list_items(DATA_PREFIX.."Symptoms.md")
-                        local values = util.map(parsed_symptoms, function(symptom) return symptom.text end)
-                        local custom_values = get_tracking_custom_symptoms(values)
-                        values = util.concat_arrays(values, custom_values)
-                        table.insert(values, OTHER_TEXT)
-                        local options = util.map(values, function(value) 
-                            if is_symptom_tracking(value) then
-                                return "‼️"..value
+            dialogs = create_dialogs_for_items(
+                SYMPTOM, 
+                function() return prefs.symptom_items end,
+                function(loggable)
+                    local dialog = {
+                        type = "radio",
+                        title = "Symptom Severity",
+                        get_options = function(results, loggables)
+                            local options = {
+                                "1 - Minimal", "2 - Mild", "3 - Mild-Moderate", "4 - Moderate", "5 - Moderate-High",
+                                "6 - High", "7 - High-Severe", "8 - Severe", "9 - Very Severe", "10 - Extreme"
+                            }
+                            if is_symptom_unresolved(loggables[1]) then
+                                table.insert(options, 1, "0 - Resolved")
                             end
-                            return value
-                        end)
-                        return options, values
-                    end,
-                    handle_result = function(results, dialogs)
-                        if results[1].value == OTHER_TEXT then
-                            return dialogs.custom_input
+                            return options
+                        end,
+                        handle_result = function(results, dialogs, loggables)
+                            local severity = results[#results].index
+                            if is_symptom_unresolved(loggables[1]) then
+                                severity = severity - 1
+                            end
+                            logger.log_to_spreadsheet(
+                                util.concat_arrays({SYMPTOM}, loggables, {severity})
+                            )
+                            setup_symptoms()
                         end
-                        return dialogs.severity
-                    end
-                },
-
-                custom_input = {
-                    type = "edit",
-                    title = "Custom Symptom",
-                    prompt = "Enter symptom name:",
-                    default_text = "",
-                    handle_result = function(results, dialogs)
-                        return dialogs.severity
-                    end
-                },
-
-                severity = {
-                    type = "radio",
-                    title = "Symptom Severity",
-                    get_options = function(results)
-                        local options = {
-                            "1 - Minimal", "2 - Mild", "3 - Mild-Moderate", "4 - Moderate", "5 - Moderate-High",
-                            "6 - High", "7 - High-Severe", "8 - Severe", "9 - Very Severe", "10 - Extreme"
-                        }
-                        if is_symptom_unresolved(results[1].value) then
-                            table.insert(options, 1, "0 - Resolved")
-                        end
-                        return options
-                    end,
-                    handle_result = function(results)
-                        local severity = results[#results].index
-                        if is_symptom_unresolved(results[1].value) then
-                            severity = severity - 1
-                        end
-                        if #results == 2 then
-                            logger.log_to_spreadsheet("Symptom", results[1].value, severity)
-                        elseif #results == 3 then
-                            logger.log_to_spreadsheet("Symptom", results[2], severity)
-                        end
-                    end
-                }
-            }
+                    }
+                    return dialog, loggable
+                end
+            ),
         },
 
         log_activity = {
@@ -329,7 +309,12 @@ local OPTIONS = "⚟"
 function setup_loggables()
     prefs.activity_items = get_loggable_items("Activities")
     prefs.intervention_items = get_loggable_items("Interventions")
+    setup_symptoms()
     prefs.plans = get_plans_info()
+end
+
+function setup_symptoms()
+    prefs.symptom_items = get_loggable_symptom_items()
 end
 
 function get_plans_info()
@@ -346,6 +331,29 @@ function get_plans_info()
         return item
     end)
     return { list = list, any_overdue = any_overdue }
+end
+
+function get_loggable_symptom_items()
+    local items = get_loggable_items("Symptoms")
+
+    local tracking_symptoms = get_tracking_symptoms()
+    for _,symptom in pairs(tracking_symptoms) do
+        local found = false
+        -- try to find each tracking symptom
+        for _,item in pairs(items) do
+            if item.value == symptom then
+                found = true
+                item.meta.specifiers.Required = {"now"}
+            end
+        end
+
+        --custom symptom
+        if not found then
+            table.insert(items, {value=symptom, meta={ specifiers={Required={"now"}} }})
+        end
+    end
+
+    return items
 end
 
 function get_loggable_items(filename)
@@ -393,6 +401,10 @@ function is_item_required(event, item)
     local requiredParams = util.map(item.meta.specifiers.Required, function(i) return i:lower() end)
     local now = time_utils.get_current_timestamp()
     local last_logged = logger.last_logged(event, item.value)
+
+    if util.contains(requiredParams, "now") then
+        return true
+    end
     
     if util.contains(requiredParams, "daily") or time_utils.is_day_of_week(now, requiredParams) then
         return not time_utils.is_same_calendar_day(last_logged, now)

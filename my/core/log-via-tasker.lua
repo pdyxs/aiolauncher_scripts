@@ -12,8 +12,8 @@ local prefs = require "prefs"
 --   value - Primary value (e.g., level name, item name, energy level)
 --   detail - Optional additional information (e.g., severity, options, notes)
 --   ui_callback - Function to call for user feedback (optional)
-function M.log_to_spreadsheet(event, value, detail, ui_callback)
-    return M.log_events_to_spreadsheet({{event, value, detail}}, ui_callback)
+function M.log_to_spreadsheet(event, ui_callback)
+    return M.log_events_to_spreadsheet({event}, ui_callback)
 end
 
 function M.log_events_to_spreadsheet(events, ui_callback)
