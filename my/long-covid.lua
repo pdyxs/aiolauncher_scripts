@@ -116,6 +116,72 @@ local OTHER_TEXT = "Other..."
 local ACTIVITY = "Activity"
 local INTERVENTION = "Intervention"
 
+function create_dialogs_for_items(name, get_items)
+    return {
+        main = {
+            type = "radio",
+            title = "Log "..name,
+            get_options = function()
+                local items = get_items()
+                local options = util.map(items, function(i) return get_modified_item_text(name, i) end)
+                table.insert(options, OTHER_TEXT)
+                local values = util.map(items, function(i) return i.value end)
+                table.insert(values, OTHER_TEXT)
+                local metas = util.map(items, function(i) return i.meta end)
+                table.insert(metas, {})
+                return options, values, metas
+            end,
+            handle_result = function(results, dialogs)
+                if results[1].value == OTHER_TEXT then
+                    return dialogs.custom_input
+                end
+                if results[1].meta.specifiers.Options then
+                    return dialogs.options
+                end
+                if results[1].meta.is_link then
+                    return dialogs.todo
+                end
+                logger.log_to_spreadsheet(name, results[1].value)
+            end
+        },
+
+        custom_input = {
+            type = "edit",
+            title = "Custom "..name,
+            prompt = "Enter "..name:lower().." name:",
+            default_text = "",
+            handle_result = function(results, dialogs)
+                logger.log_to_spreadsheet(name, results[#results])
+            end
+        },
+
+        options = {
+            type = "radio",
+            title = "Choose Option",
+            get_options = function(results)
+                return results[1].meta.specifiers.Options
+            end,
+            handle_result = function(results, dialogs)
+                logger.log_to_spreadsheet(name, results[1].value, results[2].option)
+            end
+        },
+
+        todo = {
+            type = "checkbox",
+            title = "Todos",
+            get_options = function(results)
+                local item_name = results[1].value
+                local parsed_todos = markdown_parser.get_list_items(DATA_PREFIX..item_name..".md")
+                local completions = logger.log_count(name, item_name)
+                return todo_parser.parse_todo_list(parsed_todos, completions, get_current_capacity())
+            end,
+            handle_result = function(results, dialogs)
+                logger.log_to_spreadsheet(name, results[1].value, string.format("%.0f%%", (#results[2].indices / #results[2].all_options) * 100))
+            end
+        }
+    }
+end
+
 local dialog_buttons = util.map(
     {
         log_energy = {
@@ -222,114 +288,13 @@ local dialog_buttons = util.map(
         log_activity = {
             label = "fa:running",
             long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Activities.md") end,
-            dialogs = {
-                main = {
-                    type = "radio",
-                    title = "Log Activity",
-                    get_options = function()
-                        local options = util.map(prefs.activity_items, function(i) return get_modified_item_text(ACTIVITY, i) end)
-                        table.insert(options, OTHER_TEXT)
-                        local metas = util.map(prefs.activity_items, function(i) return i.meta end)
-                        table.insert(metas, {})
-                        return options, metas
-                    end,
-                    handle_result = function(results, dialogs)
-                        if results[1].value == OTHER_TEXT then
-                            return dialogs.custom_input
-                        end
-                        if results[1].meta.specifiers.Options then
-                            return dialogs.options
-                        end
-                        logger.log_to_spreadsheet(ACTIVITY, results[1].meta.text)
-                    end
-                },
-
-                custom_input = {
-                    type = "edit",
-                    title = "Custom Activity",
-                    prompt = "Enter activity name:",
-                    default_text = "",
-                    handle_result = function(results, dialogs)
-                        logger.log_to_spreadsheet(ACTIVITY, results[#results])
-                    end
-                },
-
-                options = {
-                    type = "radio",
-                    title = "Choose Option",
-                    get_options = function(results)
-                        return results[1].meta.specifiers.Options
-                    end,
-                    handle_result = function(results, dialogs)
-                        logger.log_to_spreadsheet(ACTIVITY, results[1].meta.text, results[2].value)
-                    end
-                }
-            }
+            dialogs = create_dialogs_for_items(ACTIVITY, function() return prefs.activity_items end)
         },
 
         log_intervention = {
             label = "fa:pills",
             long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Interventions.md") end,
-            dialogs = {
-                main = {
-                    type = "radio",
-                    title = "Log Intervention",
-                    get_options = function()
-                        local options = util.map(prefs.intervention_items, function(i) return get_modified_item_text(INTERVENTION, i) end)
-                        table.insert(options, OTHER_TEXT)
-                        local metas = util.map(prefs.intervention_items, function(i) return i.meta end)
-                        table.insert(metas, {})
-                        return options, metas
-                    end,
-                    handle_result = function(results, dialogs)
-                        if results[1].value == OTHER_TEXT then
-                            return dialogs.custom_input
-                        end
-                        if results[1].meta.specifiers.Options then
-                            return dialogs.options
-                        end
-                        if results[1].meta.is_link then
-                            return dialogs.todo
-                        end
-                        logger.log_to_spreadsheet(INTERVENTION, results[1].meta.text)
-                    end
-                },
-
-                custom_input = {
-                    type = "edit",
-                    title = "Custom Intervention",
-                    prompt = "Enter intervention name:",
-                    default_text = "",
-                    handle_result = function(results, dialogs)
-                        logger.log_to_spreadsheet(INTERVENTION, results[#results])
-                    end
-                },
-
-                options = {
-                    type = "radio",
-                    title = "Choose Option",
-                    get_options = function(results)
-                        return results[1].meta.specifiers.Options
-                    end,
-                    handle_result = function(results, dialogs)
-                        logger.log_to_spreadsheet(INTERVENTION, results[1].meta.text, results[2].value)
-                    end
-                },
-
-                todo = {
-                    type = "checkbox",
-                    title = "Todos",
-                    get_options = function(results)
-                        local item_name = results[1].meta.text
-                        local parsed_todos = markdown_parser.get_list_items(DATA_PREFIX..item_name..".md")
-                        local completions = logger.log_count(INTERVENTION, item_name)
-                        return todo_parser.parse_todo_list(parsed_todos, completions, get_current_capacity())
-                    end,
-                    handle_result = function(results, dialogs)
-                        logger.log_to_spreadsheet(INTERVENTION, results[1].meta.text, string.format("%.0f%%", (#results[2].indices / #results[2].options) * 100))
-                    end
-                }
-            }
+            dialogs = create_dialogs_for_items(INTERVENTION, function() return prefs.intervention_items end),
         },
 
         plans = {
@@ -358,6 +323,8 @@ local dialog_buttons = util.map(
 
 local REQUIRED_ITEM = "‼️"
 local COMPLETED_ITEM = "✓"
+local LINKED_ITEM = "♾️"
+local OPTIONS = "⚟"
 
 function setup_loggables()
     prefs.activity_items = get_loggable_items("Activities")
@@ -396,12 +363,20 @@ function are_any_required(event, items)
 end
 
 function get_modified_item_text(event, item)
-    local text = item.text
+    local text = item.value
     if is_item_required(event, item) then
         text = REQUIRED_ITEM .. text
     end
 
-    local last_logged = logger.last_logged(event, item.meta.text)
+    if item.meta.is_link then
+        text = text .. " " .. LINKED_ITEM
+    end
+
+    if item.meta.specifiers.Options then
+        text = text .. " " .. OPTIONS
+    end
+
+    local last_logged = logger.last_logged(event, item.value)
     local now = time_utils.get_current_timestamp()
     if time_utils.is_same_calendar_day(last_logged, now) then
         text = text .. " " .. COMPLETED_ITEM
@@ -417,7 +392,7 @@ function is_item_required(event, item)
 
     local requiredParams = util.map(item.meta.specifiers.Required, function(i) return i:lower() end)
     local now = time_utils.get_current_timestamp()
-    local last_logged = logger.last_logged(event, item.meta.text)
+    local last_logged = logger.last_logged(event, item.value)
     
     if util.contains(requiredParams, "daily") or time_utils.is_day_of_week(now, requiredParams) then
         return not time_utils.is_same_calendar_day(last_logged, now)

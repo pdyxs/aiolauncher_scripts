@@ -49,23 +49,26 @@ function M.open_checkbox_dialog(dialog_config, results)
         if result == -1 then
             return -1
         end
-        return { indices=result, values=util.map(result, function(r) return options[r] end), options=options }
+        return { indices=result, options=util.map(result, function(r) return options[r] end), all_options=options }
     end
 end
 
 function M.open_radio_dialog(dialog_config, results)
-    local options, metas = dialog_config.get_options(results)
+    local options, values, metas = dialog_config.get_options(results)
     dialogs:show_radio_dialog(dialog_config.title, options)
 
     return function(result)
         if type(result) ~= "number" or result < 1 then
             return -1
         end
-        if metas == nil then
-            return { index=result, value=options[result] }
-        else
-            return { index=result, value=options[result], meta=metas[result] }
+        local ret = { index=result, option=options[result] }
+        if values ~= nil then
+            ret.value = values[result]
         end
+        if metas ~= nil then
+            ret.meta = metas[result]
+        end
+        return ret
     end
 end
 

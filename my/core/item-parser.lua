@@ -1,27 +1,18 @@
 local item_parser = {}
 
-local LINKED_ITEM = "♾️"
-local OPTIONS = "⚟"
-
 function item_parser.parse_item(item)
     local text = item.text
-    local meta_text = text
     local is_link = false
 
     -- Check if text is surrounded by double angle brackets
     if text:match("^%[%[(.+)%]%]$") then
         is_link = true
         text = text:match("^%[%[(.+)%]%]$")
-        meta_text = text
-        text = text .. " " .. LINKED_ITEM
     end
 
     local specifiers = item_parser.extract_specifiers(item)
-    if specifiers.Options then
-        text = text .. " " .. OPTIONS
-    end
 
-    return { text=text, meta = { text=meta_text, is_link = is_link, specifiers=specifiers } }
+    return { value=text, meta = { is_link = is_link, specifiers=specifiers } }
 end
 
 -- Helper function for string trimming
