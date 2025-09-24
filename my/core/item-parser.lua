@@ -15,11 +15,6 @@ function item_parser.parse_item(item)
     return { value=text, meta = { is_link = is_link, specifiers=specifiers } }
 end
 
--- Helper function for string trimming
-function string:trim()
-    return self:match("^%s*(.-)%s*$")
-end
-
 -- Extracts specifiers and their parameters from an item's children
 -- Returns a table where keys are specifier names and values are parameter arrays
 function item_parser.extract_specifiers(item)
