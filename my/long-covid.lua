@@ -122,8 +122,13 @@ function create_dialogs_for_items(name, get_items, override_log)
         if override_log then
             return override_log(new_loggable)
         end
+
+        if not type(new_loggable) == "table" then
+            new_loggable = { new_loggable }
+        end
+
         logger.log_to_spreadsheet(
-            util.concat_arrays({name}, loggables, {new_loggable})
+            util.concat_arrays({name}, loggables, new_loggable)
         )
     end
     return {
@@ -145,13 +150,21 @@ function create_dialogs_for_items(name, get_items, override_log)
                 if result.value == OTHER_TEXT then
                     return dialogs.custom_input
                 end
+
+                local log = result.value
+                local main_text, extracted_detail = log:match("^(.+)%s+%((.+)%)$")
+                
+                if main_text and extracted_detail then
+                    log = {main_text, extracted_detail}
+                end
+                
                 if result.meta.specifiers.Options then
-                    return dialogs.options, result.value
+                    return dialogs.options, log
                 end
                 if result.meta.is_link then
-                    return dialogs.todo, result.value
+                    return dialogs.todo, log
                 end
-                return do_log(loggables, result.value)
+                return do_log(loggables, log)
             end
         },
 

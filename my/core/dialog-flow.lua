@@ -121,7 +121,13 @@ function M.create_dialog_flow(on_complete)
         local next, log = self:get_current_dialog().handle_result(self.results, self.config, self.loggables)
 
         if log then
-            table.insert(self.loggables, log)
+            if type(log) == "table" and #log > 0 then
+                for _, item in ipairs(log) do
+                    table.insert(self.loggables, item)
+                end
+            else
+                table.insert(self.loggables, log)
+            end
         end
 
         if next == -1 then
