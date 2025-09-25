@@ -10,9 +10,19 @@ function item_parser.parse_item(item)
         text = text:match("^%[%[(.+)%]%]$")
     end
 
-    local specifiers = item_parser.extract_specifiers(item)
+    local value = text
 
-    return { value=text, meta = { is_link = is_link, specifiers=specifiers } }
+    local specifiers = item_parser.extract_specifiers(item)
+    
+    local meta = { is_link = is_link, specifiers=specifiers }
+
+    local main_text, extracted_detail = text:match("^(.+)%s+%((.+)%)$")
+    if main_text and extracted_detail then
+        value = main_text
+        meta.detail = extracted_detail
+    end
+
+    return { value=value, text=text, meta=meta }
 end
 
 -- Extracts specifiers and their parameters from an item's children

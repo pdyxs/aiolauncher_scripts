@@ -123,9 +123,10 @@ function create_dialogs_for_items(name, get_items, override_log)
             return override_log(new_loggable)
         end
 
-        if not type(new_loggable) == "table" then
+        if type(new_loggable) == "string" then
             new_loggable = { new_loggable }
         end
+        debug:toast(new_loggable)
 
         logger.log_to_spreadsheet(
             util.concat_arrays({name}, loggables, new_loggable)
@@ -150,12 +151,11 @@ function create_dialogs_for_items(name, get_items, override_log)
                 if result.value == OTHER_TEXT then
                     return dialogs.custom_input
                 end
-
-                local log = result.value
-                local main_text, extracted_detail = log:match("^(.+)%s+%((.+)%)$")
                 
-                if main_text and extracted_detail then
-                    log = {main_text, extracted_detail}
+                local log = result.value
+
+                if result.meta.detail then
+                    log = {log, result.meta.detail}
                 end
                 
                 if result.meta.specifiers.Options then
@@ -384,7 +384,7 @@ function are_any_required(event, items)
 end
 
 function get_modified_item_text(event, item)
-    local text = item.value
+    local text = item.text
     if is_item_required(event, item) then
         text = REQUIRED_ITEM .. text
     end
