@@ -26,6 +26,11 @@ The type of script is determined by the line (meta tag) at the beginning of the 
 
 # Changelog
 
+### 5.8.0
+
+* Rich UI has added functions for managing margins and for precise positioning of elements
+* AIO now supports the fa-fw: icon prefix for rendering icons in a fixed box
+
 ### 5.7.1
 
 * Added `tags` field to the app table
@@ -180,15 +185,21 @@ _Keep in mind: HTML formatting and icons will not work if you use the second par
 
 ### Icons
 
-You can insert FontAwesome icons inside the text, to do this use this syntax: `%%fa:ICON_NAME%%. For example:
+You can insert FontAwesome icons inside the text, to do this use this syntax: `%%fa:ICON_NAME%%`. For example:
 
 ```
 ui:show_text("<b>This</b> is the text with icons %%fa:face-smile%% %%fa:poo%% <i>and styles</i>")
 ```
 
-The `ui:show_buttons()` function supports Fontawesome icons. Simply specify `fa:icon_name` as the button name, for example: `fa:play`.
+To align icons to a uniform width (like FontAwesome’s `fa-fw`), use `%%fa-fw:ICON_NAME%%`. This renders the icon in a fixed box (\~1.25em), which keeps lists and inline rows from shifting:
 
-_Note: AIO only supports icons up to Fontawesome 6.3.0._
+```
+ui:show_text("Aligned list: %%fa-fw:check%% Done  •  %%fa-fw:xmark%% Skip")
+```
+
+The `ui:show_buttons()` function supports FontAwesome icons. Simply specify `fa:icon_name` as the button name, for example: `fa:play`.
+
+*Note: AIO only supports icons up to FontAwesome 6.3.0.*
 
 ## Dialogs
 
@@ -928,8 +939,7 @@ end
 Some tips on writing and debugging scripts:
 
 * The most convenient way to upload scripts to your smartphone is to use the `install-scripts.sh` script from this repository. This is a sh script for UNIX systems which loads all the scripts from the repository onto the (virtual) memory card of the smartphone using ADB. You can edit it to your liking.
-* The easiest way to reload an updated widget script is to swipe the widget to the right and then press the "reload" button. The search scripts will be reloaded automatically next time you open the search window.
-* Since version 4.3.0 AIO Launcher supports widget scripts hot reloading. To enable it, go to AIO Settings -> About and click on the version number 7 times. Then open AIO Settings -> Testing and enable the option "Hot reload scripts on resume". Now when you change the script, it will be automatically reloaded when you return to the desktop.
+* When you change the script, it will be automatically reloaded when you return to the desktop. The search scripts will be reloaded automatically next time you open the search window.
 * Since version 4.4.2 AIO Launcher includes `debug` module with methods: `debug:log(text)`, `debug:toast(text)` and `debug:dialog(text)`;
 * Since version 4.8.0 you can use `--testing = "true"` meta tag. In this case, launcher will gray out the script and place it at the end of the list in the side menu.
 
