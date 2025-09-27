@@ -126,7 +126,6 @@ function create_dialogs_for_items(name, get_items, override_log)
         if type(new_loggable) == "string" then
             new_loggable = { new_loggable }
         end
-        debug:toast(new_loggable)
 
         logger.log_to_spreadsheet(
             util.concat_arrays({name}, loggables, new_loggable)
