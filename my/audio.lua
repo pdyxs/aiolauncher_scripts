@@ -26,6 +26,10 @@ local buttons = {
     sonos = {
         label = "fa:speakers",
         callback = function() apps:launch("com.sonos.acr2") end
+    },
+    headphones = {
+        label = "fa:headphones",
+        callback = function() apps:launch("com.sonova.chb.control") end
     }
 }
 
@@ -47,6 +51,8 @@ function on_app_widget_updated(bridge)
         {"button", buttons.spotify.label, {expand=true}},
         {"spacer", 1},
         {"button", buttons.pocketcasts.label, {expand=true}},
+        {"spacer", 1},
+        {"button", buttons.headphones.label, { expand=false }},
         {"spacer", 1},
         {"button", buttons.sonos.label, { expand=false }},
     }
