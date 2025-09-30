@@ -332,11 +332,12 @@ end
 function get_plans_info()
     local parsed_plans = markdown_parser.get_list_items(DATA_PREFIX.."Plans.md")
     local incomplete = util.filter(parsed_plans, function(plan)
-        return not string.match(plan.text, "^✔")
+        return string.match(plan.text, "^%[ %]")
     end)
     local any_overdue = false
     local list = util.map(incomplete, function(p)
-        local item, overdue = plan_parser.parse_plan(p.text)
+        local text_without_marker = string.gsub(p.text, "^%[ %] ", "")
+        local item, overdue = plan_parser.parse_plan(text_without_marker)
         if overdue then
             any_overdue = true
         end
