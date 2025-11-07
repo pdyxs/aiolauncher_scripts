@@ -1,5 +1,3 @@
-package.path = package.path .. ";../my/core/?.lua;../lib/?.lua;./my/core/?.lua;./lib/?.lua"
-
 -- Load utils to extend string with split() and other methods
 require "utils"
 
@@ -8,8 +6,6 @@ _G.tasker = {
     run_task = function(self, name, params)
     end
 }
-
-require 'busted.runner'()
 
 describe("File Manager", function()
     local file_manager
