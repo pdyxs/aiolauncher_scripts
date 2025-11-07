@@ -600,7 +600,7 @@ function on_click(idx)
 end
 
 function on_dialog_action(result)
-    dialog_manager:handle_result(result)
+    dialog_manager:on_dialog_action(result)
 end
 
 function on_long_click(idx)

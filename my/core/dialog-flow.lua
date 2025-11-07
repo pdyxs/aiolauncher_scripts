@@ -110,7 +110,7 @@ function M.create_dialog_flow(on_complete)
         self.parse_result = M.open_dialog(dialog_config, self.results, self.loggables)
     end
 
-    function flow:handle_result(result)
+    function flow:on_dialog_action(result)
         result = self.parse_result(result)
         if result == -1 then
             self:handle_cancel()
