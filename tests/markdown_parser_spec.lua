@@ -295,6 +295,75 @@ describe("Markdown Parser", function()
             assert.are.equal("two", result.children[1].attributes.tag[2].children[1].text)
             assert.are.equal("three", result.children[1].attributes.tag[3].children[1].text)
         end)
+
+        it("parses tilde-prefixed attributes without children in brackets", function()
+            local content = "* Browse (~Expand, Open: browser)"
+            local result = parser.parse(content)
+
+            assert.are.equal("Browse", result.children[1].text)
+
+            -- ~Expand should be an attribute with empty children
+            assert.is_not_nil(result.children[1].attributes.expand)
+            assert.are.equal(1, #result.children[1].attributes.expand)
+            assert.is_nil(result.children[1].attributes.expand[1].name)
+            assert.are.equal(0, #result.children[1].attributes.expand[1].children)
+
+            -- Open: browser should be a normal attribute
+            assert.is_not_nil(result.children[1].attributes.open)
+            assert.are.equal(1, #result.children[1].attributes.open)
+            assert.is_nil(result.children[1].attributes.open[1].name)
+            assert.are.equal(1, #result.children[1].attributes.open[1].children)
+            assert.are.equal("browser", result.children[1].attributes.open[1].children[1].text)
+        end)
+
+        it("parses multiple tilde-prefixed attributes", function()
+            local content = "* Item (~Tag1, ~Tag2, Status: active)"
+            local result = parser.parse(content)
+
+            assert.are.equal("Item", result.children[1].text)
+
+            -- Both tilde attributes should exist
+            assert.is_not_nil(result.children[1].attributes.tag1)
+            assert.are.equal(1, #result.children[1].attributes.tag1)
+            assert.are.equal(0, #result.children[1].attributes.tag1[1].children)
+
+            assert.is_not_nil(result.children[1].attributes.tag2)
+            assert.are.equal(1, #result.children[1].attributes.tag2)
+            assert.are.equal(0, #result.children[1].attributes.tag2[1].children)
+
+            -- Normal attribute should work too
+            assert.is_not_nil(result.children[1].attributes.status)
+            assert.are.equal(1, #result.children[1].attributes.status)
+            assert.are.equal("active", result.children[1].attributes.status[1].children[1].text)
+        end)
+
+        it("parses tilde attributes in semicolon-separated groups", function()
+            local content = "* Item (~Flag1; Open: browser; ~Flag2)"
+            local result = parser.parse(content)
+
+            assert.are.equal("Item", result.children[1].text)
+
+            -- All attributes should be parsed
+            assert.is_not_nil(result.children[1].attributes.flag1)
+            assert.are.equal(0, #result.children[1].attributes.flag1[1].children)
+
+            assert.is_not_nil(result.children[1].attributes.open)
+            assert.are.equal("browser", result.children[1].attributes.open[1].children[1].text)
+
+            assert.is_not_nil(result.children[1].attributes.flag2)
+            assert.are.equal(0, #result.children[1].attributes.flag2[1].children)
+        end)
+
+        it("treats tilde attribute keywords as case-insensitive", function()
+            local content = "* Item (~Expand, ~EXPAND, ~ExPaNd)"
+            local result = parser.parse(content)
+
+            assert.are.equal("Item", result.children[1].text)
+
+            -- All three should be stored under lowercase "expand"
+            assert.is_not_nil(result.children[1].attributes.expand)
+            assert.are.equal(3, #result.children[1].attributes.expand)
+        end)
     end)
 
     describe("All: attribute inheritance", function()

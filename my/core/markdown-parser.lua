@@ -6,6 +6,7 @@
   - Bracket expansion: "Item (A, B)" -> Item with children A, B
   - Colon expansion: "Item: A, B" -> Item with children A, B
   - Attributes: Named lists that are stored separately (case-insensitive keywords)
+  - Tilde attributes: "Item (~Flag)" -> Attribute without children
   - "All:" special attribute for inheriting attributes/children
   - Line prefixes: checkboxes, icons, dates
   - Flexible whitespace: Extra spaces are ignored (except for hierarchy indentation)
@@ -42,11 +43,11 @@
   Example parsing:
 
   Input:
-    * [ ] :fa-heart: 2025-01-15 - Task (Option (One): A, B; Option (Two): C; Note: Important)
+    * [ ] :fa-heart: 2025-01-15 - Task (~Flag, Option (One): A, B; Option (Two): C; Note: Important)
       * Subtask
     * All:
       * Common child
-    * Second task
+    * Second task (~Important)
       * Explicit child
     * Color: Red
 
@@ -59,11 +60,14 @@
           icon = "heart",
           date = os.time({year = 2025, month = 1, day = 15}),
           attributes = {
-            Option = [
+            flag = [
+              {name = nil, children = []}
+            ],
+            option = [
               {name = "One", children = [{text = "A"}, {text = "B"}]},
               {name = "Two", children = [{text = "C"}]}
             ],
-            Note = [
+            note = [
               {name = nil, children = [{text = "Important"}]}
             ]
           },
@@ -74,6 +78,11 @@
         },
         {
           text = "Second task",
+          attributes = {
+            important = [
+              {name = nil, children = []}
+            ]
+          },
           children = [
             {text = "Common child"},
             {text = "Explicit child"}
@@ -226,9 +235,9 @@ function parse_text_expansions(text)
     if base_text and bracket_content then
         result.base_text = base_text:match("^%s*(.-)%s*$")
 
-        -- Check if bracket content has colons (attribute groups)
-        if bracket_content:find(":") then
-            -- Has colons, treat as attribute groups
+        -- Check if bracket content has colons or tildes (attribute groups)
+        if bracket_content:find(":") or bracket_content:find("~") then
+            -- Has colons or tildes, treat as attribute groups
             -- Split by semicolons for multiple groups (or treat as single group if no semicolons)
             local groups = {}
             if bracket_content:find(";") then
@@ -237,32 +246,35 @@ function parse_text_expansions(text)
                     table.insert(groups, group:match("^%s*(.-)%s*$"))
                 end
             else
-                -- Single group
-                table.insert(groups, bracket_content:match("^%s*(.-)%s*$"))
+                -- Single group - but we need to split by commas for tilde attributes mixed with colon attributes
+                -- Check if we have a mix of tilde and colon syntax
+                if bracket_content:find("~") and bracket_content:find(",") then
+                    -- Split by commas
+                    for group in (bracket_content .. ","):gmatch("([^,]+),") do
+                        table.insert(groups, group:match("^%s*(.-)%s*$"))
+                    end
+                else
+                    -- Single group
+                    table.insert(groups, bracket_content:match("^%s*(.-)%s*$"))
+                end
             end
 
             for _, group in ipairs(groups) do
-                -- Parse each group: "Keyword (Name): items" or "Keyword: items"
-                local keyword, name, items_str = group:match("^(.-)%s*%((.-)%)%s*:%s*(.+)$")
-                if keyword and name and items_str then
-                    -- "Option (One): A, B"
-                    local items = {}
-                    for item in (items_str .. ","):gmatch("([^,]+),") do
-                        item = item:match("^%s*(.-)%s*$")
-                        if item ~= "" then
-                            table.insert(items, item)
-                        end
-                    end
+                -- Check for tilde-prefixed attribute first: "~Expand"
+                local tilde_keyword = group:match("^~(.+)$")
+                if tilde_keyword then
+                    tilde_keyword = tilde_keyword:match("^%s*(.-)%s*$")
                     table.insert(result.expansions, {
                         type = "bracket_group",
-                        keyword = keyword,
-                        name = name,
-                        items = items
+                        keyword = tilde_keyword,
+                        name = nil,
+                        items = {}  -- Empty items for tilde attributes
                     })
                 else
-                    -- Try "Keyword: items" without name
-                    keyword, items_str = group:match("^(.-)%s*:%s*(.+)$")
-                    if keyword and items_str then
+                    -- Parse each group: "Keyword (Name): items" or "Keyword: items"
+                    local keyword, name, items_str = group:match("^(.-)%s*%((.-)%)%s*:%s*(.+)$")
+                    if keyword and name and items_str then
+                        -- "Option (One): A, B"
                         local items = {}
                         for item in (items_str .. ","):gmatch("([^,]+),") do
                             item = item:match("^%s*(.-)%s*$")
@@ -273,9 +285,27 @@ function parse_text_expansions(text)
                         table.insert(result.expansions, {
                             type = "bracket_group",
                             keyword = keyword,
-                            name = nil,
+                            name = name,
                             items = items
                         })
+                    else
+                        -- Try "Keyword: items" without name
+                        keyword, items_str = group:match("^(.-)%s*:%s*(.+)$")
+                        if keyword and items_str then
+                            local items = {}
+                            for item in (items_str .. ","):gmatch("([^,]+),") do
+                                item = item:match("^%s*(.-)%s*$")
+                                if item ~= "" then
+                                    table.insert(items, item)
+                                end
+                            end
+                            table.insert(result.expansions, {
+                                type = "bracket_group",
+                                keyword = keyword,
+                                name = nil,
+                                items = items
+                            })
+                        end
                     end
                 end
             end
