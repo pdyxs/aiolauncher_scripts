@@ -4,3 +4,4 @@
 
 # Machine-specific configuration
 CLAUDE.local.md
+.claude/settings.local.json
