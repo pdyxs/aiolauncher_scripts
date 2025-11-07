@@ -132,9 +132,19 @@ end
   @return table - Array of {line, indent_level, text}
 ]]
 function parse_lines(content)
-    -- TODO: Split content into lines
-    -- TODO: For each line, extract indent level and full text
-    return {}
+    local lines = {}
+    for line in content:gmatch("[^\r\n]+") do
+        -- Match bullet points with indent
+        local indent, text = line:match("^(%s*)[-*+]%s+(.+)")
+        if indent and text then
+            local indent_level = #indent
+            table.insert(lines, {
+                indent_level = indent_level,
+                text = text
+            })
+        end
+    end
+    return lines
 end
 
 --[[
@@ -150,11 +160,30 @@ function parse_line_prefixes(line)
         text = line      -- remaining text after prefixes
     }
 
-    -- TODO: Extract checkbox [ ] or [x]
-    -- TODO: Extract icon :fa-icon-name:
-    -- TODO: Extract date YYYY-MM-DD -
-    -- TODO: Set result.text to remaining text
+    local remaining = line
 
+    -- Extract checkbox [ ] or [x]
+    local checkbox_match = remaining:match("^%[([x%s])%]%s+(.*)$")
+    if checkbox_match then
+        result.checkbox = (checkbox_match == "x")
+        remaining = remaining:match("^%[[x%s]%]%s+(.*)$")
+    end
+
+    -- Extract icon :fa-icon-name:
+    local icon_match = remaining:match("^:fa%-([^:]+):%s+(.*)$")
+    if icon_match then
+        result.icon = icon_match
+        remaining = remaining:match("^:fa%-[^:]+:%s+(.*)$")
+    end
+
+    -- Extract date YYYY-MM-DD -
+    local date_match = remaining:match("^(%d%d%d%d%-%d%d%-%d%d)%s*%-%s+(.*)$")
+    if date_match then
+        result.date = date_match
+        remaining = remaining:match("^%d%d%d%d%-%d%d%-%d%d%s*%-%s+(.*)$")
+    end
+
+    result.text = remaining
     return result
 end
 
@@ -183,12 +212,135 @@ function parse_text_expansions(text)
         attribute_name = nil
     }
 
-    -- TODO: Check if line ends with colon (attribute marker)
-    -- TODO: Extract attribute keyword and optional name from brackets like "Options (Symptoms):"
-    -- TODO: Extract bracket content if present: (...)
-    -- TODO: Parse bracket content for semicolon-separated groups
-    -- TODO: Each group can be: "Keyword (Name): items" or "Keyword: items" or "items"
-    -- TODO: Parse colon expansion after text: "Text: A, B, C"
+    -- Check for bracket expansion first: "Text (A, B)" or "Text (X: A; Y: B)"
+    -- This needs to be checked before colon expansion to avoid matching colons inside brackets
+    local base_text, bracket_content = text:match("^(.-)%s*%((.*)%)%s*$")
+    if base_text and bracket_content then
+        result.base_text = base_text
+
+        -- Check if bracket content has semicolons (attribute groups)
+        if bracket_content:find(";") then
+            -- Split by semicolons for multiple attribute groups
+            for group in (bracket_content .. ";"):gmatch("([^;]+);") do
+                group = group:match("^%s*(.-)%s*$") -- trim
+
+                -- Parse each group: "Keyword (Name): items" or "Keyword: items"
+                local keyword, name, items_str = group:match("^(.-)%s*%((.-)%)%s*:%s*(.+)$")
+                if keyword and name and items_str then
+                    -- "Option (One): A, B"
+                    local items = {}
+                    for item in (items_str .. ","):gmatch("([^,]+),") do
+                        item = item:match("^%s*(.-)%s*$")
+                        if item ~= "" then
+                            table.insert(items, item)
+                        end
+                    end
+                    table.insert(result.expansions, {
+                        type = "bracket_group",
+                        keyword = keyword,
+                        name = name,
+                        items = items
+                    })
+                else
+                    -- Try "Keyword: items" without name
+                    keyword, items_str = group:match("^(.-)%s*:%s*(.+)$")
+                    if keyword and items_str then
+                        local items = {}
+                        for item in (items_str .. ","):gmatch("([^,]+),") do
+                            item = item:match("^%s*(.-)%s*$")
+                            if item ~= "" then
+                                table.insert(items, item)
+                            end
+                        end
+                        table.insert(result.expansions, {
+                            type = "bracket_group",
+                            keyword = keyword,
+                            name = nil,
+                            items = items
+                        })
+                    end
+                end
+            end
+        else
+            -- Simple bracket expansion: "Text (A, B, C)"
+            local items = {}
+            for item in (bracket_content .. ","):gmatch("([^,]+),") do
+                item = item:match("^%s*(.-)%s*$")
+                if item ~= "" then
+                    table.insert(items, item)
+                end
+            end
+            if #items > 0 then
+                table.insert(result.expansions, {type = "bracket_simple", items = items})
+            end
+        end
+        return result
+    end
+
+    -- Check if line ends with colon (attribute marker)
+    local attr_pattern = "^(.-)%s*:%s*$"
+    local attr_match = text:match(attr_pattern)
+
+    if attr_match then
+        -- This is an attribute
+        result.is_attribute = true
+
+        -- Check for brackets in attribute keyword: "Keyword (Name):"
+        local keyword, name = attr_match:match("^(.-)%s*%((.*)%)%s*$")
+        if keyword and name then
+            result.attribute_keyword = keyword
+            result.attribute_name = name
+            result.base_text = keyword
+        else
+            result.attribute_keyword = attr_match
+            result.base_text = attr_match
+        end
+        return result
+    end
+
+    -- Check for colon expansion: "Text: A, B, C"
+    local base, colon_items = text:match("^(.-)%s*:%s*(.+)$")
+    if base and colon_items then
+        -- Check if base has brackets - this creates an attribute with name
+        local keyword, name = base:match("^(.-)%s*%((.*)%)%s*$")
+        if keyword and name then
+            -- "Test (One, Two): A, B" -> attribute with keyword "Test", name "One, Two"
+            result.is_attribute = true
+            result.attribute_keyword = keyword
+            result.attribute_name = name
+            result.base_text = keyword
+
+            -- Parse the items after colon
+            local items = {}
+            for item in (colon_items .. ","):gmatch("([^,]+),") do
+                item = item:match("^%s*(.-)%s*$") -- trim whitespace
+                if item ~= "" then
+                    table.insert(items, item)
+                end
+            end
+            if #items > 0 then
+                table.insert(result.expansions, {type = "colon", items = items})
+            end
+        else
+            -- "Test: A, B, C" -> attribute without name
+            result.is_attribute = true
+            result.attribute_keyword = base
+            result.attribute_name = nil
+            result.base_text = base
+
+            local items = {}
+            for item in (colon_items .. ","):gmatch("([^,]+),") do
+                item = item:match("^%s*(.-)%s*$")
+                if item ~= "" then
+                    table.insert(items, item)
+                end
+            end
+            if #items > 0 then
+                table.insert(result.expansions, {type = "colon", items = items})
+            end
+        end
+        return result
+    end
 
     return result
 end
@@ -200,14 +352,92 @@ end
 ]]
 function parse_hierarchy(lines)
     local result = {}
-    local stack = {}  -- Track parent items at each indent level
     local last_item_at_level = {}
 
-    -- TODO: Similar to legacy parser, build hierarchy based on indent
-    -- TODO: For each line, create item with parse_line_prefixes
-    -- TODO: Parse text expansions with parse_text_expansions
-    -- TODO: Create children from expansions
-    -- TODO: Handle attributes separately
+    for _, line_data in ipairs(lines) do
+        local indent_level = line_data.indent_level
+        local text = line_data.text
+
+        -- Parse line prefixes (checkbox, icon, date)
+        local prefix_data = parse_line_prefixes(text)
+
+        -- Parse text expansions (brackets, colons, attributes)
+        local expansion_data = parse_text_expansions(prefix_data.text)
+
+        -- Create the item
+        local item = create_item(
+            expansion_data.base_text,
+            prefix_data.checkbox,
+            prefix_data.icon,
+            prefix_data.date
+        )
+
+        -- Mark if this is an attribute
+        item.is_attribute = expansion_data.is_attribute
+        item.attribute_keyword = expansion_data.attribute_keyword
+        item.attribute_name = expansion_data.attribute_name
+
+        -- Process expansions to create children or attributes
+        for _, exp in ipairs(expansion_data.expansions) do
+            if exp.type == "bracket_simple" then
+                -- Simple bracket expansion creates children
+                for _, exp_item in ipairs(exp.items) do
+                    add_child(item, create_item(exp_item))
+                end
+            elseif exp.type == "bracket_group" then
+                -- Bracket group creates attributes
+                local attr_children = {}
+                for _, exp_item in ipairs(exp.items) do
+                    table.insert(attr_children, create_item(exp_item))
+                end
+                add_attribute(item, exp.keyword, exp.name, attr_children)
+            elseif exp.type == "colon" then
+                -- Colon expansion - if item is attribute, these become children of attribute
+                for _, exp_item in ipairs(exp.items) do
+                    add_child(item, create_item(exp_item))
+                end
+            end
+        end
+
+        -- Clear deeper levels from tracking
+        for level = indent_level + 1, #last_item_at_level do
+            last_item_at_level[level] = nil
+        end
+
+        -- Add to hierarchy based on indent
+        if indent_level == 0 then
+            -- Top level item
+            table.insert(result, item)
+            last_item_at_level[0] = item
+        else
+            -- Find parent at previous level
+            local parent_item = nil
+            for level = indent_level - 1, 0, -1 do
+                if last_item_at_level[level] then
+                    parent_item = last_item_at_level[level]
+                    break
+                end
+            end
+
+            if parent_item then
+                -- Check if this is an attribute or a child
+                -- Special case: "All:" should be added as a child, not an attribute
+                if item.is_attribute and item.text ~= "All" then
+                    -- Add as attribute to parent
+                    add_attribute(parent_item, item.attribute_keyword, item.attribute_name, item.children or {})
+                    -- Don't add the item itself, just its content as attribute
+                else
+                    -- Add as regular child (including "All:" items)
+                    add_child(parent_item, item)
+                end
+            else
+                -- No valid parent found, treat as top level
+                table.insert(result, item)
+            end
+
+            last_item_at_level[indent_level] = item
+        end
+    end
 
     return result
 end
@@ -218,14 +448,133 @@ end
   @return table - Array of items with All: attributes applied
 ]]
 function apply_all_attributes(items)
-    -- TODO: Find all "All:" items at each level
-    -- TODO: Collect attributes and children from All: items
-    -- TODO: Apply to all siblings (items at same level)
-    -- TODO: Handle ordering: items before All: get its content, items after also get it
-    -- TODO: Recursively apply to children
-    -- TODO: Remove All: items from final output
+    if not items or #items == 0 then
+        return items
+    end
+
+    -- Find all "All:" items at this level
+    local all_items = {}
+    local all_positions = {}
+    local non_all_items = {}
+
+    for i, item in ipairs(items) do
+        if item.text == "All" and item.is_attribute then
+            table.insert(all_items, item)
+            table.insert(all_positions, i)
+        else
+            table.insert(non_all_items, item)
+        end
+    end
+
+    -- If there are All: items, apply their content to siblings
+    if #all_items > 0 then
+        -- Process each non-All item
+        for item_idx, item in ipairs(non_all_items) do
+            -- Determine original position of this item
+            local original_pos = 0
+            local count = 0
+            for i, check_item in ipairs(items) do
+                if check_item.text ~= "All" or not check_item.is_attribute then
+                    count = count + 1
+                    if count == item_idx then
+                        original_pos = i
+                        break
+                    end
+                end
+            end
+
+            -- Apply All: items based on position
+            for all_idx, all_item in ipairs(all_items) do
+                local all_pos = all_positions[all_idx]
+
+                if all_item.children then
+                    -- Items before All: get children appended
+                    -- Items after All: get children prepended
+                    if original_pos < all_pos then
+                        -- Append
+                        for _, child in ipairs(all_item.children) do
+                            local child_copy = copy_item(child)
+                            add_child(item, child_copy)
+                        end
+                    else
+                        -- Prepend (in reverse order to maintain correct sequence)
+                        if not item.children then
+                            item.children = {}
+                        end
+                        for i = #all_item.children, 1, -1 do
+                            local child_copy = copy_item(all_item.children[i])
+                            table.insert(item.children, 1, child_copy)
+                        end
+                    end
+                end
+
+                -- Apply All: attributes to sibling
+                if all_item.attributes then
+                    for keyword, attr_entries in pairs(all_item.attributes) do
+                        for _, attr_entry in ipairs(attr_entries) do
+                            -- Deep copy the attribute children
+                            local attr_children_copy = {}
+                            if attr_entry.children then
+                                for _, child in ipairs(attr_entry.children) do
+                                    table.insert(attr_children_copy, copy_item(child))
+                                end
+                            end
+                            add_attribute(item, keyword, attr_entry.name, attr_children_copy)
+                        end
+                    end
+                end
+            end
+        end
+
+        items = non_all_items
+    end
+
+    -- Recursively apply to children
+    for _, item in ipairs(items) do
+        if item.children then
+            item.children = apply_all_attributes(item.children)
+        end
+    end
 
     return items
+end
+
+-- Helper: Deep copy an item
+function copy_item(item)
+    local copy = {
+        text = item.text,
+        checkbox = item.checkbox,
+        icon = item.icon,
+        date = item.date
+    }
+
+    if item.children then
+        copy.children = {}
+        for _, child in ipairs(item.children) do
+            table.insert(copy.children, copy_item(child))
+        end
+    end
+
+    if item.attributes then
+        copy.attributes = {}
+        for keyword, attr_entries in pairs(item.attributes) do
+            copy.attributes[keyword] = {}
+            for _, attr_entry in ipairs(attr_entries) do
+                local children_copy = {}
+                if attr_entry.children then
+                    for _, child in ipairs(attr_entry.children) do
+                        table.insert(children_copy, copy_item(child))
+                    end
+                end
+                table.insert(copy.attributes[keyword], {
+                    name = attr_entry.name,
+                    children = children_copy
+                })
+            end
+        end
+    end
+
+    return copy
 end
 
 --[[
