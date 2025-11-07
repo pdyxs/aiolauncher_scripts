@@ -5,7 +5,7 @@
   support for:
   - Bracket expansion: "Item (A, B)" -> Item with children A, B
   - Colon expansion: "Item: A, B" -> Item with children A, B
-  - Attributes: Named lists that are stored separately
+  - Attributes: Named lists that are stored separately (case-insensitive keywords)
   - "All:" special attribute for inheriting attributes/children
   - Line prefixes: checkboxes, icons, dates
 
@@ -24,7 +24,7 @@
     icon = "icon-name" or nil,       -- FontAwesome icon name (without :fa- prefix)
     date = "YYYY-MM-DD" or nil,      -- ISO date string
     children = {...},                -- Array of child items (same structure)
-    attributes = {                   -- Dictionary of attributes, keyed by keyword
+    attributes = {                   -- Dictionary of attributes, keyed by keyword (lowercase)
       keyword1 = {                   -- Each keyword maps to array of attribute entries
         {name = "attr1", children = {...}},  -- Each entry has optional name and children
         {name = "attr2", children = {...}}
@@ -35,6 +35,8 @@
 
   Note: Attribute entries use "name" instead of "text" for clarity. The children
   array contains the actual items for that attribute instance.
+  Attribute keywords are case-insensitive and stored in lowercase (e.g., "Options"
+  and "options" both become "options").
 
   Example parsing:
 
@@ -110,10 +112,12 @@ function markdown_parser.parse(content)
             -- Add to attributes dictionary
             local keyword = item.attribute_keyword
             local name = item.attribute_name
-            if not result.attributes[keyword] then
-                result.attributes[keyword] = {}
+            -- Normalize keyword to lowercase for case-insensitive matching
+            local normalized_keyword = keyword:lower()
+            if not result.attributes[normalized_keyword] then
+                result.attributes[normalized_keyword] = {}
             end
-            table.insert(result.attributes[keyword], {
+            table.insert(result.attributes[normalized_keyword], {
                 name = name,
                 children = item.children or {}
             })
@@ -612,15 +616,17 @@ function add_attribute(item, keyword, name, children)
     if not item.attributes then
         item.attributes = {}
     end
-    if not item.attributes[keyword] then
-        item.attributes[keyword] = {}
+    -- Normalize keyword to lowercase for case-insensitive matching
+    local normalized_keyword = keyword:lower()
+    if not item.attributes[normalized_keyword] then
+        item.attributes[normalized_keyword] = {}
     end
     -- Create attribute entry with optional name and children
     local attr_entry = {
         name = name,
         children = children
     }
-    table.insert(item.attributes[keyword], attr_entry)
+    table.insert(item.attributes[normalized_keyword], attr_entry)
 end
 
 -- Export for file-manager compatibility

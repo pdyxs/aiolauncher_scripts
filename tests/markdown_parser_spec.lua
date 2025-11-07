@@ -124,18 +124,18 @@ describe("Markdown Parser", function()
             assert.is_not_nil(result.children[1].attributes)
 
             -- First attribute "One: A, B"
-            assert.is_not_nil(result.children[1].attributes.One)
-            assert.are.equal(1, #result.children[1].attributes.One)
-            local one_attr = result.children[1].attributes.One[1]
+            assert.is_not_nil(result.children[1].attributes.one)
+            assert.are.equal(1, #result.children[1].attributes.one)
+            local one_attr = result.children[1].attributes.one[1]
             assert.is_nil(one_attr.name)
             assert.are.equal(2, #one_attr.children)
             assert.are.equal("A", one_attr.children[1].text)
             assert.are.equal("B", one_attr.children[2].text)
 
             -- Second attribute "Two: C"
-            assert.is_not_nil(result.children[1].attributes.Two)
-            assert.are.equal(1, #result.children[1].attributes.Two)
-            local two_attr = result.children[1].attributes.Two[1]
+            assert.is_not_nil(result.children[1].attributes.two)
+            assert.are.equal(1, #result.children[1].attributes.two)
+            local two_attr = result.children[1].attributes.two[1]
             assert.is_nil(two_attr.name)
             assert.are.equal(1, #two_attr.children)
             assert.are.equal("C", two_attr.children[1].text)
@@ -158,9 +158,9 @@ describe("Markdown Parser", function()
             local content = "* Test: One, Two, Three"
             local result = parser.parse(content)
 
-            assert.is_not_nil(result.attributes.Test)
-            assert.are.equal(1, #result.attributes.Test)
-            local test_attr = result.attributes.Test[1]
+            assert.is_not_nil(result.attributes.test)
+            assert.are.equal(1, #result.attributes.test)
+            local test_attr = result.attributes.test[1]
             assert.is_nil(test_attr.name)
             assert.are.equal(3, #test_attr.children)
             assert.are.equal("One", test_attr.children[1].text)
@@ -174,10 +174,10 @@ describe("Markdown Parser", function()
             local result = parser.parse(content)
 
             -- This creates a top-level attribute with keyword "Test", name "One, Two"
-            assert.is_not_nil(result.attributes.Test)
-            assert.are.equal(1, #result.attributes.Test)
+            assert.is_not_nil(result.attributes.test)
+            assert.are.equal(1, #result.attributes.test)
 
-            local attr = result.attributes.Test[1]
+            local attr = result.attributes.test[1]
             assert.are.equal("One, Two", attr.name)
             assert.are.equal(2, #attr.children)
             assert.are.equal("A", attr.children[1].text)
@@ -193,16 +193,16 @@ describe("Markdown Parser", function()
 
             assert.are.equal("Task", result.children[1].text)
             assert.is_not_nil(result.children[1].attributes)
-            assert.is_not_nil(result.children[1].attributes.Option)
-            assert.are.equal(2, #result.children[1].attributes.Option)
+            assert.is_not_nil(result.children[1].attributes.option)
+            assert.are.equal(2, #result.children[1].attributes.option)
 
-            local first = result.children[1].attributes.Option[1]
+            local first = result.children[1].attributes.option[1]
             assert.are.equal("One", first.name)
             assert.are.equal(2, #first.children)
             assert.are.equal("A", first.children[1].text)
             assert.are.equal("B", first.children[2].text)
 
-            local second = result.children[1].attributes.Option[2]
+            local second = result.children[1].attributes.option[2]
             assert.are.equal("Two", second.name)
             assert.are.equal(1, #second.children)
             assert.are.equal("C", second.children[1].text)
@@ -216,10 +216,10 @@ describe("Markdown Parser", function()
 
             assert.are.equal("Item", result.children[1].text)
             assert.is_not_nil(result.children[1].attributes)
-            assert.is_not_nil(result.children[1].attributes.Options)
-            assert.are.equal(1, #result.children[1].attributes.Options)
+            assert.is_not_nil(result.children[1].attributes.options)
+            assert.are.equal(1, #result.children[1].attributes.options)
 
-            local attr_entry = result.children[1].attributes.Options[1]
+            local attr_entry = result.children[1].attributes.options[1]
             assert.is_nil(attr_entry.name)
             assert.are.equal(3, #attr_entry.children)
             assert.are.equal("A", attr_entry.children[1].text)
@@ -232,10 +232,10 @@ describe("Markdown Parser", function()
             local result = parser.parse(content)
 
             assert.is_not_nil(result.children[1].attributes)
-            assert.is_not_nil(result.children[1].attributes.Options)
-            assert.are.equal(1, #result.children[1].attributes.Options)
+            assert.is_not_nil(result.children[1].attributes.options)
+            assert.are.equal(1, #result.children[1].attributes.options)
 
-            local attr_entry = result.children[1].attributes.Options[1]
+            local attr_entry = result.children[1].attributes.options[1]
             assert.are.equal("Symptoms", attr_entry.name)
             assert.are.equal(2, #attr_entry.children)
             assert.are.equal("Fever", attr_entry.children[1].text)
@@ -249,37 +249,49 @@ describe("Markdown Parser", function()
             assert.are.equal(1, #result.children[1].children)
             assert.are.equal("Regular child", result.children[1].children[1].text)
 
-            assert.are.equal(1, #result.children[1].attributes.Options)
-            assert.are.equal(2, #result.children[1].attributes.Options[1].children)
+            assert.are.equal(1, #result.children[1].attributes.options)
+            assert.are.equal(2, #result.children[1].attributes.options[1].children)
         end)
 
         it("allows multiple attributes with same keyword", function()
             local content = "* Item\n  * Tag: urgent\n  * Tag: important"
             local result = parser.parse(content)
 
-            assert.are.equal(2, #result.children[1].attributes.Tag)
-            assert.are.equal(1, #result.children[1].attributes.Tag[1].children)
-            assert.are.equal("urgent", result.children[1].attributes.Tag[1].children[1].text)
-            assert.are.equal(1, #result.children[1].attributes.Tag[2].children)
-            assert.are.equal("important", result.children[1].attributes.Tag[2].children[1].text)
+            assert.are.equal(2, #result.children[1].attributes.tag)
+            assert.are.equal(1, #result.children[1].attributes.tag[1].children)
+            assert.are.equal("urgent", result.children[1].attributes.tag[1].children[1].text)
+            assert.are.equal(1, #result.children[1].attributes.tag[2].children)
+            assert.are.equal("important", result.children[1].attributes.tag[2].children[1].text)
         end)
 
         it("allows multiple attributes with same keyword but different names", function()
             local content = "* Item\n  * Option (One): A, B\n  * Option (Two): C"
             local result = parser.parse(content)
 
-            assert.are.equal(2, #result.children[1].attributes.Option)
+            assert.are.equal(2, #result.children[1].attributes.option)
 
-            local first_attr = result.children[1].attributes.Option[1]
+            local first_attr = result.children[1].attributes.option[1]
             assert.are.equal("One", first_attr.name)
             assert.are.equal(2, #first_attr.children)
             assert.are.equal("A", first_attr.children[1].text)
             assert.are.equal("B", first_attr.children[2].text)
 
-            local second_attr = result.children[1].attributes.Option[2]
+            local second_attr = result.children[1].attributes.option[2]
             assert.are.equal("Two", second_attr.name)
             assert.are.equal(1, #second_attr.children)
             assert.are.equal("C", second_attr.children[1].text)
+        end)
+
+        it("treats attribute keywords as case-insensitive", function()
+            local content = "* Item\n  * Tag: one\n  * TAG: two\n  * TaG: three"
+            local result = parser.parse(content)
+
+            -- All three should be stored under lowercase "tag"
+            assert.is_not_nil(result.children[1].attributes.tag)
+            assert.are.equal(3, #result.children[1].attributes.tag)
+            assert.are.equal("one", result.children[1].attributes.tag[1].children[1].text)
+            assert.are.equal("two", result.children[1].attributes.tag[2].children[1].text)
+            assert.are.equal("three", result.children[1].attributes.tag[3].children[1].text)
         end)
     end)
 
@@ -311,11 +323,11 @@ describe("Markdown Parser", function()
 
             assert.are.equal(2, #result.children)
 
-            assert.are.equal(1, #result.children[1].attributes.Options)
-            assert.are.equal(3, #result.children[1].attributes.Options[1].children)
+            assert.are.equal(1, #result.children[1].attributes.options)
+            assert.are.equal(3, #result.children[1].attributes.options[1].children)
 
-            assert.are.equal(1, #result.children[2].attributes.Options)
-            assert.are.equal(3, #result.children[2].attributes.Options[1].children)
+            assert.are.equal(1, #result.children[2].attributes.options)
+            assert.are.equal(3, #result.children[2].attributes.options[1].children)
         end)
 
         it("orders All: children correctly relative to explicit children", function()
@@ -404,29 +416,29 @@ describe("Markdown Parser", function()
 
             local phase_1 = project.children[1]
             assert.are.equal("Phase 1", phase_1.text)
-            assert.are.equal(1, #phase_1.attributes.Status)
-            assert.are.equal(1, #phase_1.attributes.Status[1].children)
-            assert.are.equal("active", phase_1.attributes.Status[1].children[1].text)
+            assert.are.equal(1, #phase_1.attributes.status)
+            assert.are.equal(1, #phase_1.attributes.status[1].children)
+            assert.are.equal("active", phase_1.attributes.status[1].children[1].text)
 
             local phase_2 = project.children[2]
             assert.are.equal("Phase 2", phase_2.text)
-            assert.are.equal(1, #phase_2.attributes.Status)
-            assert.are.equal(1, #phase_2.attributes.Status[1].children)
-            assert.are.equal("active", phase_2.attributes.Status[1].children[1].text)
+            assert.are.equal(1, #phase_2.attributes.status)
+            assert.are.equal(1, #phase_2.attributes.status[1].children)
+            assert.are.equal("active", phase_2.attributes.status[1].children[1].text)
 
             local task_one = project.children[3]
             assert.are.equal("Task one", task_one.text)
-            assert.are.equal(1, #task_one.attributes.Status)
-            assert.are.equal(1, #task_one.attributes.Status[1].children)
-            assert.are.equal("active", task_one.attributes.Status[1].children[1].text)
+            assert.are.equal(1, #task_one.attributes.status)
+            assert.are.equal(1, #task_one.attributes.status[1].children)
+            assert.are.equal("active", task_one.attributes.status[1].children[1].text)
             assert.are.equal(1, #task_one.children)
             assert.are.equal("Subtask", task_one.children[1].text)
 
             local task_two = project.children[4]
             assert.are.equal("Task two", task_two.text)
-            assert.are.equal(1, #task_two.attributes.Status)
-            assert.are.equal(1, #task_two.attributes.Status[1].children)
-            assert.are.equal("active", task_two.attributes.Status[1].children[1].text)
+            assert.are.equal(1, #task_two.attributes.status)
+            assert.are.equal(1, #task_two.attributes.status[1].children)
+            assert.are.equal("active", task_two.attributes.status[1].children[1].text)
         end)
     end)
 
