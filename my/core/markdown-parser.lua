@@ -97,6 +97,9 @@
     }
 ]]
 
+-- Load utility functions
+require("utils")
+
 local markdown_parser = {
     version = 1
 }
@@ -167,7 +170,7 @@ local function expand_inline_notations(nodes)
         -- Check for bracket expansion: "Text (A, B)" or "Text (X: A; Y: B)"
         local base_text, bracket_content = text:match("^(.-)%s*%((.*)%)%s*$")
         if base_text and bracket_content then
-            text = base_text:match("^%s*(.-)%s*$")
+            text = base_text:trim()
 
             -- Check if we have colons or tildes (attribute groups)
             if bracket_content:find(":") or bracket_content:find("~") then
@@ -175,16 +178,16 @@ local function expand_inline_notations(nodes)
                 local groups = {}
                 if bracket_content:find(";") then
                     for group in (bracket_content .. ";"):gmatch("([^;]+);") do
-                        table.insert(groups, group:match("^%s*(.-)%s*$"))
+                        table.insert(groups, group:trim())
                     end
                 else
                     -- Check if we need to split by commas (mixed tilde and colon)
                     if bracket_content:find("~") and bracket_content:find(",") then
                         for group in (bracket_content .. ","):gmatch("([^,]+),") do
-                            table.insert(groups, group:match("^%s*(.-)%s*$"))
+                            table.insert(groups, group:trim())
                         end
                     else
-                        table.insert(groups, bracket_content:match("^%s*(.-)%s*$"))
+                        table.insert(groups, bracket_content:trim())
                     end
                 end
 
@@ -198,7 +201,7 @@ local function expand_inline_notations(nodes)
             else
                 -- Simple bracket expansion: split by commas
                 for item in (bracket_content .. ","):gmatch("([^,]+),") do
-                    item = item:match("^%s*(.-)%s*$")
+                    item = item:trim()
                     if item ~= "" then
                         table.insert(new_children, {text = item, children = {}})
                     end
@@ -217,11 +220,11 @@ local function expand_inline_notations(nodes)
                                 base:match("%d%d%d%d%-%d%d%-%d%d%s*%-$")  -- date
             if base and colon_items and not should_skip then
                 -- Keep the colon in the text so Step 4 can identify it as an attribute
-                text = base:match("^%s*(.-)%s*$") .. ":"
+                text = base:trim() .. ":"
 
                 -- Split by commas
                 for item in (colon_items .. ","):gmatch("([^,]+),") do
-                    item = item:match("^%s*(.-)%s*$")
+                    item = item:trim()
                     if item ~= "" then
                         table.insert(new_children, {text = item, children = {}})
                     end
@@ -286,7 +289,7 @@ local function parse_line_prefixes(nodes)
         end
 
         -- Trim whitespace and update text
-        node.text = text:match("^%s*(.-)%s*$")
+        node.text = text:trim()
 
         -- Recursively process children
         if node.children and #node.children > 0 then
@@ -325,15 +328,17 @@ local function parse_attributes(nodes)
     end
 
     -- Now separate children from attributes at this level
+    -- Process All: incrementally as we go
     local regular_children = {}
     local attributes = {}
-    local all_nodes = {}  -- Track multiple All: nodes with their indices
+    local all_children = {}  -- Accumulated All: children
+    local all_attributes = {}  -- Accumulated All: attributes
 
     for i, node in ipairs(nodes) do
         -- Check for tilde-prefixed attribute: ~Keyword
         local tilde_keyword = node.text:match("^~(.+)$")
         if tilde_keyword then
-            tilde_keyword = tilde_keyword:match("^%s*(.-)%s*$"):lower()
+            tilde_keyword = tilde_keyword:trim():lower()
             if not attributes[tilde_keyword] then
                 attributes[tilde_keyword] = {}
             end
@@ -342,17 +347,49 @@ local function parse_attributes(nodes)
                 children = nil
             })
         -- Check for attribute ending with : (but with optional name in parens)
-        elseif node.text:match(":$") then
+        elseif node.text:ends_with(":") then
             local keyword, name = node.text:match("^(.-)%s*%((.*)%)%s*:$")
             if not keyword then
                 keyword = node.text:match("^(.-)%s*:$")
             end
 
-            keyword = keyword:match("^%s*(.-)%s*$"):lower()
+            keyword = keyword:trim():lower()
 
             -- Check for "All:" special case
             if keyword == "all" then
-                table.insert(all_nodes, {node = node, index = i})
+                -- Append to all previously processed siblings
+                for _, prev_child in ipairs(regular_children) do
+                    if node.children then
+                        if not prev_child.children then
+                            prev_child.children = {}
+                        end
+                        concat(prev_child.children, node.children)
+                    end
+                    if node.attributes then
+                        if not prev_child.attributes then
+                            prev_child.attributes = {}
+                        end
+                        for attr_keyword, entries in pairs(node.attributes) do
+                            if not prev_child.attributes[attr_keyword] then
+                                prev_child.attributes[attr_keyword] = {}
+                            end
+                            concat(prev_child.attributes[attr_keyword], entries)
+                        end
+                    end
+                end
+
+                -- Add to accumulated All: for future siblings
+                if node.children then
+                    concat(all_children, node.children)
+                end
+                if node.attributes then
+                    for attr_keyword, entries in pairs(node.attributes) do
+                        if not all_attributes[attr_keyword] then
+                            all_attributes[attr_keyword] = {}
+                        end
+                        concat(all_attributes[attr_keyword], entries)
+                    end
+                end
             else
                 if not attributes[keyword] then
                     attributes[keyword] = {}
@@ -363,57 +400,29 @@ local function parse_attributes(nodes)
                 })
             end
         else
-            -- Regular child - track its original index
-            node._original_index = i
-            table.insert(regular_children, node)
-        end
-    end
-
-    -- Handle All: inheritance from all All: nodes
-    if #all_nodes > 0 then
-        for _, child in ipairs(regular_children) do
-            for _, all_entry in ipairs(all_nodes) do
-                local all_node = all_entry.node
-                local all_index = all_entry.index
-
-                if all_node.children then
-                    if not child.children then
-                        child.children = {}
-                    end
-
-                    -- If child appeared BEFORE this All:, append All: children
-                    -- If child appeared AFTER this All:, prepend All: children
-                    if child._original_index < all_index then
-                        -- Append
-                        for _, all_child in ipairs(all_node.children) do
-                            table.insert(child.children, all_child)
-                        end
-                    else
-                        -- Prepend
-                        for i = #all_node.children, 1, -1 do
-                            table.insert(child.children, 1, all_node.children[i])
-                        end
-                    end
+            -- Regular child - apply accumulated All: first
+            if #all_children > 0 then
+                if not node.children then
+                    node.children = {}
                 end
-
-                -- Inherit All: attributes
-                if all_node.attributes then
-                    if not child.attributes then
-                        child.attributes = {}
+                -- Prepend all accumulated All: children
+                for i = #all_children, 1, -1 do
+                    table.insert(node.children, 1, all_children[i])
+                end
+            end
+            if next(all_attributes) then
+                if not node.attributes then
+                    node.attributes = {}
+                end
+                for attr_keyword, entries in pairs(all_attributes) do
+                    if not node.attributes[attr_keyword] then
+                        node.attributes[attr_keyword] = {}
                     end
-                    for keyword, entries in pairs(all_node.attributes) do
-                        if not child.attributes[keyword] then
-                            child.attributes[keyword] = {}
-                        end
-                        for _, entry in ipairs(entries) do
-                            table.insert(child.attributes[keyword], entry)
-                        end
-                    end
+                    concat(node.attributes[attr_keyword], entries)
                 end
             end
 
-            -- Clean up temporary field
-            child._original_index = nil
+            table.insert(regular_children, node)
         end
     end
 
