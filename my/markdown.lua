@@ -18,6 +18,8 @@ local components = {
 }
 
 local my_gui = nil
+local widget_bridges = {}  -- Maps widget names to their bridges
+local widget_ids = {}      -- Maps widget providers to their widget IDs
 
 function load_and_render()
     if not prefs.markdown_file_path then
@@ -38,10 +40,57 @@ function load_and_render()
     end
 end
 
+function setup_widgets(content)
+    -- Set up widgets from the Widgets attribute
+    if not content or not content.attributes or not content.attributes.widgets then
+        return
+    end
+
+    local widgets_entry = content.attributes.widgets[1]
+    if not widgets_entry or not widgets_entry.attributes then
+        return
+    end
+
+    -- Iterate through widget attributes (e.g., vivaldi, etc.)
+    for widget_name, widget_entries in pairs(widgets_entry.attributes) do
+        local widget_entry = widget_entries[1]
+        if widget_entry.children and #widget_entry.children > 0 then
+            local provider = widget_entry.children[1].text
+
+            -- Check if we already have this widget bound
+            local pref_key = "widget_id_" .. widget_name
+            if not widgets:bound(prefs[pref_key]) then
+                local id = widgets:setup(provider)
+                if id ~= nil then
+                    prefs[pref_key] = id
+                    widget_ids[provider] = id
+                end
+            else
+                widget_ids[provider] = prefs[pref_key]
+            end
+        end
+    end
+    
+    -- Request updates for all widgets
+    if content.attributes and content.attributes.widgets then
+        local widgets_entry = content.attributes.widgets[1]
+        if widgets_entry and widgets_entry.attributes then
+            for widget_name, _ in pairs(widgets_entry.attributes) do
+                local pref_key = "widget_id_" .. widget_name
+                if prefs[pref_key] then
+                    widgets:request_updates(prefs[pref_key])
+                end
+            end
+        end
+    end
+end
+
 function render(content)
     if not content or not content.attributes or not content.attributes.ui then
         return
     end
+
+    setup_widgets(content)
 
     local ui_items = content.attributes.ui
     if not ui_items or #ui_items == 0 then
@@ -125,10 +174,42 @@ function on_command(data)
 end
 
 function on_resume()
+    if not prefs.markdown_file_path then
+        return
+    end
+
     load_and_render()
     for _, component in ipairs(components) do
         if component.on_resume then
             component:on_resume()
+        end
+    end
+end
+
+function on_app_widget_updated(bridge)
+    if not prefs.markdown_file_path then
+        return
+    end
+
+    local content = file_manager:get(prefs.markdown_file_path..".md")
+    if not content or not content.attributes or not content.attributes.widgets then
+        return
+    end
+
+    local provider = bridge:provider()
+    local widgets_entry = content.attributes.widgets[1]
+
+    if widgets_entry and widgets_entry.attributes then
+        -- Find which widget name this provider corresponds to
+        for widget_name, widget_entries in pairs(widgets_entry.attributes) do
+            local widget_entry = widget_entries[1]
+            if widget_entry.children and #widget_entry.children > 0 then
+                local widget_provider = widget_entry.children[1].text
+                if widget_provider == provider then
+                    widget_bridges[widget_name] = bridge
+                    break
+                end
+            end
         end
     end
 end
@@ -179,17 +260,30 @@ function on_click(idx)
                             end
                         end
 
-                        -- Check for 'click' attribute - clicks a widget (stub)
+                        -- Check for 'click' attribute - clicks a widget
                         if item.attributes and item.attributes.click then
                             local click_entry = item.attributes.click[1]
                             if click_entry.children and #click_entry.children > 0 then
-                                -- TODO: Implement widget click functionality
-                                -- Format: widget_name, action (e.g., "Vivaldi, image_2")
-                                local widget_info = {}
-                                for _, child in ipairs(click_entry.children) do
-                                    table.insert(widget_info, child.text)
+                                -- First child is the widget name, remaining are click actions
+                                local widget_name = click_entry.children[1].text:lower()
+                                local bridge = widget_bridges[widget_name]
+
+                                if bridge then
+                                    -- Collect remaining children as click actions
+                                    local actions = {}
+                                    for i = 2, #click_entry.children do
+                                        table.insert(actions, click_entry.children[i].text)
+                                    end
+
+                                    -- Call click with actions
+                                    if #actions > 0 then
+                                        bridge:click(table.unpack(actions))
+                                    else
+                                        bridge:click()
+                                    end
+                                else
+                                    debug:toast("Widget '" .. widget_name .. "' not found")
                                 end
-                                -- Stub: debug:toast("Click widget: " .. table.concat(widget_info, ", "))
                                 return
                             end
                         end
