@@ -101,7 +101,7 @@
 require("utils")
 
 local markdown_parser = {
-    version = 1
+    version = 3
 }
 
 --[[
@@ -216,7 +216,7 @@ local function expand_inline_notations(nodes)
             -- Skip if base is empty, looks like an icon, checkbox, or date pattern
             local should_skip = not base or base == "" or
                                 base:match("^%[") or  -- checkbox
-                                base:match(":fa%-") or  -- icon
+                                base:match(":fa[%-_]") or  -- icon (fa- or fa_)
                                 base:match("%d%d%d%d%-%d%d%-%d%d%s*%-$")  -- date
             if base and colon_items and not should_skip then
                 -- Keep the colon in the text so Step 4 can identify it as an attribute
@@ -273,8 +273,8 @@ local function parse_line_prefixes(nodes)
             text = remaining
         end
 
-        -- Extract icon :fa-icon:
-        local icon_name, remaining = text:match("^:fa%-([^:]+):%s+(.*)$")
+        -- Extract icon :fa-icon: or :fa_icon:
+        local icon_name, remaining = text:match("^:fa[%-_]([^:]+):%s*(.*)$")
         if icon_name then
             node.icon = icon_name
             text = remaining
@@ -396,7 +396,8 @@ local function parse_attributes(nodes)
                 end
                 table.insert(attributes[keyword], {
                     name = name,
-                    children = node.children
+                    children = node.children,
+                    attributes = node.attributes
                 })
             end
         else

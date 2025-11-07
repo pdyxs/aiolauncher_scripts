@@ -653,6 +653,135 @@ describe("Markdown Parser", function()
         end)
     end)
 
+    describe("Real-world examples", function()
+        it("parses items with icons but no text", function()
+            local content = "* :fa-heart: (Click: action)"
+            local result = parser.parse(content)
+
+            assert.are.equal(1, #result.children)
+            local item = result.children[1]
+
+            -- Should have icon extracted
+            assert.are.equal("heart", item.icon)
+            -- Text should be empty after icon extraction
+            assert.are.equal("", item.text)
+            -- Should have Click attribute from bracket expansion
+            assert.is_not_nil(item.attributes)
+            assert.is_not_nil(item.attributes.click)
+            assert.are.equal("action", item.attributes.click[1].children[1].text)
+            -- No regular children (only attributes)
+            assert.is_nil(item.children)
+        end)
+
+        it("parses items with underscore icons", function()
+            local content = "* :fa_robot: (Open: app)"
+            local result = parser.parse(content)
+
+            assert.are.equal(1, #result.children)
+            local item = result.children[1]
+
+            -- Should have icon extracted (fa_ format)
+            assert.are.equal("robot", item.icon)
+            assert.are.equal("", item.text)
+            assert.is_not_nil(item.attributes.open)
+            assert.are.equal("app", item.attributes.open[1].children[1].text)
+        end)
+
+        it("parses nested attributes (attributes with attributes)", function()
+            local content = [[* Widgets:
+  * Vivaldi: com.vivaldi.browser]]
+            local result = parser.parse(content)
+
+            -- Should have no top-level children
+            assert.are.equal(0, #result.children)
+
+            -- Should have Widgets as top-level attribute
+            assert.is_not_nil(result.attributes.widgets)
+            assert.are.equal(1, #result.attributes.widgets)
+
+            -- Widgets attribute entry has no children because Vivaldi: is also an attribute
+            local widgets_entry = result.attributes.widgets[1]
+            assert.is_nil(widgets_entry.children)
+
+            -- Widgets should have Vivaldi as a nested attribute
+            -- (attributes of the attribute entry node)
+            assert.is_not_nil(widgets_entry.attributes)
+            assert.is_not_nil(widgets_entry.attributes.vivaldi)
+            assert.are.equal("com.vivaldi.browser", widgets_entry.attributes.vivaldi[1].children[1].text)
+        end)
+
+        it("parses a widget configuration structure like Browse.md", function()
+            -- Based on actual Browse.md structure with:
+            -- - Top-level attributes (Widgets, UI)
+            -- - Nested children with icons
+            -- - Mix of tilde and bracket attributes
+            -- - Complex nested structures
+            local content = [[* Widgets:
+  * Vivaldi: com.vivaldi.browser/org.chromium.chrome.browser.searchwidget.SearchWidgetProvider
+* UI:
+  * :fa-browser: (Open: info.plateaukao.einkbro)
+  * :fa-robot: (~Expand, Open: com.anthropic.claude)
+  * :fa-qrcode: (Click: Vivaldi image_2)]]
+
+            local result = parser.parse(content)
+
+            -- Should have no top-level children
+            assert.are.equal(0, #result.children)
+
+            -- Should have two top-level attributes: widgets and ui
+            assert.is_not_nil(result.attributes)
+            assert.is_not_nil(result.attributes.widgets)
+            assert.is_not_nil(result.attributes.ui)
+
+            -- Check Widgets attribute - it should have NO children (since Vivaldi: is also an attribute)
+            -- The Widgets: node itself has attributes nested under it
+            assert.are.equal(1, #result.attributes.widgets)
+            local widgets_entry = result.attributes.widgets[1]
+            assert.is_nil(widgets_entry.name)
+            -- Vivaldi: should be a nested attribute, not a child
+            assert.is_nil(widgets_entry.children)
+
+            -- Check UI attribute - should have children (the icon items)
+            assert.are.equal(1, #result.attributes.ui)
+            local ui_entry = result.attributes.ui[1]
+            assert.is_nil(ui_entry.name)
+            assert.are.equal(3, #ui_entry.children)
+
+            -- First UI item: browser icon with Open attribute
+            local browser_item = ui_entry.children[1]
+            assert.are.equal("browser", browser_item.icon)
+            assert.are.equal("", browser_item.text)
+            assert.is_nil(browser_item.children)
+            assert.is_not_nil(browser_item.attributes)
+            assert.is_not_nil(browser_item.attributes.open)
+            assert.are.equal("info.plateaukao.einkbro", browser_item.attributes.open[1].children[1].text)
+
+            -- Second UI item: robot icon with ~Expand and Open attributes
+            local robot_item = ui_entry.children[2]
+            assert.are.equal("robot", robot_item.icon)
+            assert.are.equal("", robot_item.text)
+            assert.is_nil(robot_item.children)
+            assert.is_not_nil(robot_item.attributes)
+            -- Should have both expand (from ~Expand) and open attributes
+            assert.is_not_nil(robot_item.attributes.expand)
+            assert.are.equal(1, #robot_item.attributes.expand)
+            assert.is_nil(robot_item.attributes.expand[1].children)
+            assert.is_not_nil(robot_item.attributes.open)
+            assert.are.equal("com.anthropic.claude", robot_item.attributes.open[1].children[1].text)
+
+            -- Third UI item: qrcode icon with Click attribute
+            local qr_item = ui_entry.children[3]
+            assert.are.equal("qrcode", qr_item.icon)
+            assert.are.equal("", qr_item.text)
+            assert.is_nil(qr_item.children)
+            assert.is_not_nil(qr_item.attributes)
+            assert.is_not_nil(qr_item.attributes.click)
+            -- "Vivaldi image_2" is a single item (no comma), so 1 child
+            assert.are.equal(1, #qr_item.attributes.click[1].children)
+            assert.are.equal("Vivaldi image_2", qr_item.attributes.click[1].children[1].text)
+        end)
+    end)
+
     describe("File manager compatibility", function()
         it("has version property", function()
             assert.is_not_nil(parser.version)
