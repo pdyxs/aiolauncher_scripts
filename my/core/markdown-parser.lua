@@ -127,9 +127,14 @@ function markdown_parser.parse(content)
             if not result.attributes[normalized_keyword] then
                 result.attributes[normalized_keyword] = {}
             end
+            -- Set children to nil if not present or empty
+            local attr_children = item.children
+            if not attr_children or #attr_children == 0 then
+                attr_children = nil
+            end
             table.insert(result.attributes[normalized_keyword], {
                 name = name,
-                children = item.children or {}
+                children = attr_children
             })
         else
             -- Add to children array
@@ -228,6 +233,19 @@ function parse_text_expansions(text)
         attribute_keyword = nil,
         attribute_name = nil
     }
+
+    -- Check for tilde-prefixed attribute first: "~Expand"
+    -- This creates an attribute without children
+    local tilde_keyword = text:match("^~(.+)$")
+    if tilde_keyword then
+        tilde_keyword = tilde_keyword:match("^%s*(.-)%s*$")
+        result.is_attribute = true
+        result.attribute_keyword = tilde_keyword
+        result.attribute_name = nil
+        result.base_text = tilde_keyword
+        -- No expansions for tilde attributes
+        return result
+    end
 
     -- Check for bracket expansion first: "Text (A, B)" or "Text (X: A; Y: B)"
     -- This needs to be checked before colon expansion to avoid matching colons inside brackets
@@ -666,9 +684,14 @@ function add_attribute(item, keyword, name, children)
         item.attributes[normalized_keyword] = {}
     end
     -- Create attribute entry with optional name and children
+    -- Set children to nil if empty array
+    local attr_children = children
+    if children and #children == 0 then
+        attr_children = nil
+    end
     local attr_entry = {
         name = name,
-        children = children
+        children = attr_children
     }
     table.insert(item.attributes[normalized_keyword], attr_entry)
 end

@@ -302,11 +302,11 @@ describe("Markdown Parser", function()
 
             assert.are.equal("Browse", result.children[1].text)
 
-            -- ~Expand should be an attribute with empty children
+            -- ~Expand should be an attribute with nil children
             assert.is_not_nil(result.children[1].attributes.expand)
             assert.are.equal(1, #result.children[1].attributes.expand)
             assert.is_nil(result.children[1].attributes.expand[1].name)
-            assert.are.equal(0, #result.children[1].attributes.expand[1].children)
+            assert.is_nil(result.children[1].attributes.expand[1].children)
 
             -- Open: browser should be a normal attribute
             assert.is_not_nil(result.children[1].attributes.open)
@@ -325,11 +325,11 @@ describe("Markdown Parser", function()
             -- Both tilde attributes should exist
             assert.is_not_nil(result.children[1].attributes.tag1)
             assert.are.equal(1, #result.children[1].attributes.tag1)
-            assert.are.equal(0, #result.children[1].attributes.tag1[1].children)
+            assert.is_nil(result.children[1].attributes.tag1[1].children)
 
             assert.is_not_nil(result.children[1].attributes.tag2)
             assert.are.equal(1, #result.children[1].attributes.tag2)
-            assert.are.equal(0, #result.children[1].attributes.tag2[1].children)
+            assert.is_nil(result.children[1].attributes.tag2[1].children)
 
             -- Normal attribute should work too
             assert.is_not_nil(result.children[1].attributes.status)
@@ -345,13 +345,13 @@ describe("Markdown Parser", function()
 
             -- All attributes should be parsed
             assert.is_not_nil(result.children[1].attributes.flag1)
-            assert.are.equal(0, #result.children[1].attributes.flag1[1].children)
+            assert.is_nil(result.children[1].attributes.flag1[1].children)
 
             assert.is_not_nil(result.children[1].attributes.open)
             assert.are.equal("browser", result.children[1].attributes.open[1].children[1].text)
 
             assert.is_not_nil(result.children[1].attributes.flag2)
-            assert.are.equal(0, #result.children[1].attributes.flag2[1].children)
+            assert.is_nil(result.children[1].attributes.flag2[1].children)
         end)
 
         it("treats tilde attribute keywords as case-insensitive", function()
@@ -363,6 +363,46 @@ describe("Markdown Parser", function()
             -- All three should be stored under lowercase "expand"
             assert.is_not_nil(result.children[1].attributes.expand)
             assert.are.equal(3, #result.children[1].attributes.expand)
+        end)
+
+        it("parses tilde-prefixed attributes as child items", function()
+            local content = "* Item\n  * ~Expand"
+            local result = parser.parse(content)
+
+            assert.are.equal("Item", result.children[1].text)
+
+            -- ~Expand should be an attribute with nil children
+            assert.is_not_nil(result.children[1].attributes.expand)
+            assert.are.equal(1, #result.children[1].attributes.expand)
+            assert.is_nil(result.children[1].attributes.expand[1].name)
+            assert.is_nil(result.children[1].attributes.expand[1].children)
+
+            -- Should not appear as a regular child
+            assert.is_nil(result.children[1].children)
+        end)
+
+        it("parses multiple tilde attributes as child items with other attributes", function()
+            local content = "* Item\n  * ~Flag1\n  * Status: active\n  * ~Flag2"
+            local result = parser.parse(content)
+
+            assert.are.equal("Item", result.children[1].text)
+
+            -- Both tilde attributes should exist
+            assert.is_not_nil(result.children[1].attributes.flag1)
+            assert.are.equal(1, #result.children[1].attributes.flag1)
+            assert.is_nil(result.children[1].attributes.flag1[1].children)
+
+            assert.is_not_nil(result.children[1].attributes.flag2)
+            assert.are.equal(1, #result.children[1].attributes.flag2)
+            assert.is_nil(result.children[1].attributes.flag2[1].children)
+
+            -- Normal attribute should work too
+            assert.is_not_nil(result.children[1].attributes.status)
+            assert.are.equal(1, #result.children[1].attributes.status)
+            assert.are.equal("active", result.children[1].attributes.status[1].children[1].text)
+
+            -- No regular children
+            assert.is_nil(result.children[1].children)
         end)
     end)
 

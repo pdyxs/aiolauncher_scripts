@@ -1,8 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wsl bash:*)",
-      "Bash(wsl busted:*)"
+      "Bash(wsl grep -n \"#.*children\" tests/markdown_parser_spec.lua)",
+      "Bash(wsl head:*)"
     ],
     "deny": [],
     "ask": []
