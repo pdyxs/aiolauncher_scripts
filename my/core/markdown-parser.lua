@@ -61,7 +61,7 @@
           date = os.time({year = 2025, month = 1, day = 15}),
           attributes = {
             flag = [
-              {name = nil, children = []}
+              {name = nil, children = nil}
             ],
             option = [
               {name = "One", children = [{text = "A"}, {text = "B"}]},
@@ -80,7 +80,7 @@
           text = "Second task",
           attributes = {
             important = [
-              {name = nil, children = []}
+              {name = nil, children = nil}
             ]
           },
           children = [
@@ -102,598 +102,346 @@ local markdown_parser = {
 }
 
 --[[
-  Parse markdown content into a hierarchical structure
-  @param content string - The markdown content to parse
-  @return table - Wrapper object with {children = [...], attributes = {...}}
+  STEP 1: Parse lines and create rough hierarchy (indentation only)
+
+  Converts markdown text into a tree structure based purely on indentation.
+  Each node has: {text = "...", children = [...]}
 ]]
-function markdown_parser.parse(content)
-    local lines = parse_lines(content)
-    local raw_items = parse_hierarchy(lines)
-    local items_with_all = apply_all_attributes(raw_items)
-
-    -- Separate top-level items from attributes
-    local result = {
-        children = {},
-        attributes = {}
-    }
-
-    for _, item in ipairs(items_with_all) do
-        if item.is_attribute then
-            -- Add to attributes dictionary
-            local keyword = item.attribute_keyword
-            local name = item.attribute_name
-            -- Normalize keyword to lowercase for case-insensitive matching
-            local normalized_keyword = keyword:lower()
-            if not result.attributes[normalized_keyword] then
-                result.attributes[normalized_keyword] = {}
-            end
-            -- Set children to nil if not present or empty
-            local attr_children = item.children
-            if not attr_children or #attr_children == 0 then
-                attr_children = nil
-            end
-            table.insert(result.attributes[normalized_keyword], {
-                name = name,
-                children = attr_children
-            })
-        else
-            -- Add to children array
-            table.insert(result.children, item)
-        end
-    end
-
-    return result
-end
-
---[[
-  Split content into lines with metadata
-  @param content string - The markdown content
-  @return table - Array of {line, indent_level, text}
-]]
-function parse_lines(content)
+local function build_hierarchy_from_indentation(content)
     local lines = {}
+
+    -- Parse all bullet lines with their indentation
     for line in content:gmatch("[^\r\n]+") do
-        -- Match bullet points with indent
         local indent, text = line:match("^(%s*)[-*+]%s+(.+)")
         if indent and text then
-            local indent_level = #indent
             table.insert(lines, {
-                indent_level = indent_level,
+                indent_level = #indent,
                 text = text
             })
         end
     end
-    return lines
+
+    -- Build tree structure
+    local root = {children = {}}
+    local stack = {{item = root, level = -1}}
+
+    for _, line in ipairs(lines) do
+        local node = {
+            text = line.text,
+            children = {}
+        }
+
+        -- Pop stack until we find the parent
+        while #stack > 0 and stack[#stack].level >= line.indent_level do
+            table.remove(stack)
+        end
+
+        -- Add to parent
+        local parent = stack[#stack].item
+        table.insert(parent.children, node)
+
+        -- Push onto stack
+        table.insert(stack, {item = node, level = line.indent_level})
+    end
+
+    return root.children
 end
 
 --[[
-  Parse a single line to extract prefix metadata and core text
-  @param line string - The line to parse
-  @return table - {checkbox, icon, date (os.time object), text}
+  STEP 2: Expand single-line notations to hierarchical form
+
+  Converts patterns like:
+  - "Item (A, B)" -> Item with children A, B
+  - "Item: A, B" -> Item with children A, B
+  - "Item (~Flag, Option: X)" -> Item with children ~Flag and Option: X
+
+  This is done recursively on the tree.
 ]]
-function parse_line_prefixes(line)
-    local result = {
-        checkbox = nil,  -- true, false, or nil
-        icon = nil,      -- "icon-name" or nil
-        date = nil,      -- "YYYY-MM-DD" or nil
-        text = line      -- remaining text after prefixes
-    }
+local function expand_inline_notations(nodes)
+    local result = {}
 
-    local remaining = line
+    for _, node in ipairs(nodes) do
+        local text = node.text
+        local new_children = {}
 
-    -- Extract checkbox [ ] or [x]
-    local checkbox_match = remaining:match("^%[([x%s])%]%s+(.*)$")
-    if checkbox_match then
-        result.checkbox = (checkbox_match == "x")
-        remaining = remaining:match("^%[[x%s]%]%s+(.*)$")
-    end
+        -- Check for bracket expansion: "Text (A, B)" or "Text (X: A; Y: B)"
+        local base_text, bracket_content = text:match("^(.-)%s*%((.*)%)%s*$")
+        if base_text and bracket_content then
+            text = base_text:match("^%s*(.-)%s*$")
 
-    -- Extract icon :fa-icon-name:
-    local icon_match = remaining:match("^:fa%-([^:]+):%s+(.*)$")
-    if icon_match then
-        result.icon = icon_match
-        remaining = remaining:match("^:fa%-[^:]+:%s+(.*)$")
-    end
-
-    -- Extract date YYYY-MM-DD -
-    local date_match = remaining:match("^(%d%d%d%d%-%d%d%-%d%d)%s*%-%s+(.*)$")
-    if date_match then
-        -- Parse date string into components and convert to os.time object
-        local year, month, day = date_match:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
-        result.date = os.time({year = tonumber(year), month = tonumber(month), day = tonumber(day)})
-        remaining = remaining:match("^%d%d%d%d%-%d%d%-%d%d%s*%-%s+(.*)$")
-    end
-
-    -- Trim leading and trailing whitespace from final text
-    result.text = remaining:match("^%s*(.-)%s*$")
-    return result
-end
-
---[[
-  Parse text and extract inline expansions (brackets and colons)
-  @param text string - The text to parse
-  @return table - {base_text, expansions, is_attribute, attribute_keyword, attribute_name}
-
-  expansions = {
-    {type = "bracket_simple", items = {"A", "B"}},  -- From (A, B)
-    {type = "bracket_group", keyword = "X", name = "Y", items = {"C", "D"}},  -- From X (Y): C, D
-    {type = "colon", items = {"E", "F"}}  -- From : E, F
-  }
-
-  For attributes (lines ending with :):
-    is_attribute = true
-    attribute_keyword = "Options"  -- The main keyword
-    attribute_name = "Symptoms"    -- Optional name from brackets (or nil)
-]]
-function parse_text_expansions(text)
-    local result = {
-        base_text = text,
-        expansions = {},
-        is_attribute = false,
-        attribute_keyword = nil,
-        attribute_name = nil
-    }
-
-    -- Check for tilde-prefixed attribute first: "~Expand"
-    -- This creates an attribute without children
-    local tilde_keyword = text:match("^~(.+)$")
-    if tilde_keyword then
-        tilde_keyword = tilde_keyword:match("^%s*(.-)%s*$")
-        result.is_attribute = true
-        result.attribute_keyword = tilde_keyword
-        result.attribute_name = nil
-        result.base_text = tilde_keyword
-        -- No expansions for tilde attributes
-        return result
-    end
-
-    -- Check for bracket expansion first: "Text (A, B)" or "Text (X: A; Y: B)"
-    -- This needs to be checked before colon expansion to avoid matching colons inside brackets
-    local base_text, bracket_content = text:match("^(.-)%s*%((.*)%)%s*$")
-    if base_text and bracket_content then
-        result.base_text = base_text:match("^%s*(.-)%s*$")
-
-        -- Check if bracket content has colons or tildes (attribute groups)
-        if bracket_content:find(":") or bracket_content:find("~") then
-            -- Has colons or tildes, treat as attribute groups
-            -- Split by semicolons for multiple groups (or treat as single group if no semicolons)
-            local groups = {}
-            if bracket_content:find(";") then
-                -- Multiple groups separated by semicolons
-                for group in (bracket_content .. ";"):gmatch("([^;]+);") do
-                    table.insert(groups, group:match("^%s*(.-)%s*$"))
-                end
-            else
-                -- Single group - but we need to split by commas for tilde attributes mixed with colon attributes
-                -- Check if we have a mix of tilde and colon syntax
-                if bracket_content:find("~") and bracket_content:find(",") then
-                    -- Split by commas
-                    for group in (bracket_content .. ","):gmatch("([^,]+),") do
+            -- Check if we have colons or tildes (attribute groups)
+            if bracket_content:find(":") or bracket_content:find("~") then
+                -- Split by semicolons for multiple groups, or by commas for single group
+                local groups = {}
+                if bracket_content:find(";") then
+                    for group in (bracket_content .. ";"):gmatch("([^;]+);") do
                         table.insert(groups, group:match("^%s*(.-)%s*$"))
                     end
                 else
-                    -- Single group
-                    table.insert(groups, bracket_content:match("^%s*(.-)%s*$"))
-                end
-            end
-
-            for _, group in ipairs(groups) do
-                -- Check for tilde-prefixed attribute first: "~Expand"
-                local tilde_keyword = group:match("^~(.+)$")
-                if tilde_keyword then
-                    tilde_keyword = tilde_keyword:match("^%s*(.-)%s*$")
-                    table.insert(result.expansions, {
-                        type = "bracket_group",
-                        keyword = tilde_keyword,
-                        name = nil,
-                        items = {}  -- Empty items for tilde attributes
-                    })
-                else
-                    -- Parse each group: "Keyword (Name): items" or "Keyword: items"
-                    local keyword, name, items_str = group:match("^(.-)%s*%((.-)%)%s*:%s*(.+)$")
-                    if keyword and name and items_str then
-                        -- "Option (One): A, B"
-                        local items = {}
-                        for item in (items_str .. ","):gmatch("([^,]+),") do
-                            item = item:match("^%s*(.-)%s*$")
-                            if item ~= "" then
-                                table.insert(items, item)
-                            end
+                    -- Check if we need to split by commas (mixed tilde and colon)
+                    if bracket_content:find("~") and bracket_content:find(",") then
+                        for group in (bracket_content .. ","):gmatch("([^,]+),") do
+                            table.insert(groups, group:match("^%s*(.-)%s*$"))
                         end
-                        table.insert(result.expansions, {
-                            type = "bracket_group",
-                            keyword = keyword,
-                            name = name,
-                            items = items
-                        })
                     else
-                        -- Try "Keyword: items" without name
-                        keyword, items_str = group:match("^(.-)%s*:%s*(.+)$")
-                        if keyword and items_str then
-                            local items = {}
-                            for item in (items_str .. ","):gmatch("([^,]+),") do
-                                item = item:match("^%s*(.-)%s*$")
-                                if item ~= "" then
-                                    table.insert(items, item)
-                                end
-                            end
-                            table.insert(result.expansions, {
-                                type = "bracket_group",
-                                keyword = keyword,
-                                name = nil,
-                                items = items
-                            })
-                        end
+                        table.insert(groups, bracket_content:match("^%s*(.-)%s*$"))
                     end
                 end
-            end
-        else
-            -- Simple bracket expansion: "Text (A, B, C)"
-            local items = {}
-            for item in (bracket_content .. ","):gmatch("([^,]+),") do
-                item = item:match("^%s*(.-)%s*$")
-                if item ~= "" then
-                    table.insert(items, item)
-                end
-            end
-            if #items > 0 then
-                table.insert(result.expansions, {type = "bracket_simple", items = items})
-            end
-        end
-        return result
-    end
 
-    -- Check if line ends with colon (attribute marker)
-    local attr_pattern = "^(.-)%s*:%s*$"
-    local attr_match = text:match(attr_pattern)
-
-    if attr_match then
-        -- This is an attribute
-        result.is_attribute = true
-
-        -- Check for brackets in attribute keyword: "Keyword (Name):"
-        local keyword, name = attr_match:match("^(.-)%s*%((.*)%)%s*$")
-        if keyword and name then
-            result.attribute_keyword = keyword
-            result.attribute_name = name
-            result.base_text = keyword
-        else
-            result.attribute_keyword = attr_match
-            result.base_text = attr_match
-        end
-        return result
-    end
-
-    -- Check for colon expansion: "Text: A, B, C"
-    local base, colon_items = text:match("^(.-)%s*:%s*(.+)$")
-    if base and colon_items then
-        -- Check if base has brackets - this creates an attribute with name
-        local keyword, name = base:match("^(.-)%s*%((.*)%)%s*$")
-        if keyword and name then
-            -- "Test (One, Two): A, B" -> attribute with keyword "Test", name "One, Two"
-            result.is_attribute = true
-            result.attribute_keyword = keyword
-            result.attribute_name = name
-            result.base_text = keyword
-
-            -- Parse the items after colon
-            local items = {}
-            for item in (colon_items .. ","):gmatch("([^,]+),") do
-                item = item:match("^%s*(.-)%s*$") -- trim whitespace
-                if item ~= "" then
-                    table.insert(items, item)
-                end
-            end
-            if #items > 0 then
-                table.insert(result.expansions, {type = "colon", items = items})
-            end
-        else
-            -- "Test: A, B, C" -> attribute without name
-            result.is_attribute = true
-            result.attribute_keyword = base
-            result.attribute_name = nil
-            result.base_text = base
-
-            local items = {}
-            for item in (colon_items .. ","):gmatch("([^,]+),") do
-                item = item:match("^%s*(.-)%s*$")
-                if item ~= "" then
-                    table.insert(items, item)
-                end
-            end
-            if #items > 0 then
-                table.insert(result.expansions, {type = "colon", items = items})
-            end
-        end
-        return result
-    end
-
-    return result
-end
-
---[[
-  Build hierarchical structure from flat list of lines
-  @param lines table - Array of {indent_level, text} from parse_lines
-  @return table - Array of items with children
-]]
-function parse_hierarchy(lines)
-    local result = {}
-    local last_item_at_level = {}
-
-    for _, line_data in ipairs(lines) do
-        local indent_level = line_data.indent_level
-        local text = line_data.text
-
-        -- Parse line prefixes (checkbox, icon, date)
-        local prefix_data = parse_line_prefixes(text)
-
-        -- Parse text expansions (brackets, colons, attributes)
-        local expansion_data = parse_text_expansions(prefix_data.text)
-
-        -- Create the item
-        local item = create_item(
-            expansion_data.base_text,
-            prefix_data.checkbox,
-            prefix_data.icon,
-            prefix_data.date
-        )
-
-        -- Mark if this is an attribute
-        item.is_attribute = expansion_data.is_attribute
-        item.attribute_keyword = expansion_data.attribute_keyword
-        item.attribute_name = expansion_data.attribute_name
-
-        -- Process expansions to create children or attributes
-        for _, exp in ipairs(expansion_data.expansions) do
-            if exp.type == "bracket_simple" then
-                -- Simple bracket expansion creates children
-                for _, exp_item in ipairs(exp.items) do
-                    add_child(item, create_item(exp_item))
-                end
-            elseif exp.type == "bracket_group" then
-                -- Bracket group creates attributes
-                local attr_children = {}
-                for _, exp_item in ipairs(exp.items) do
-                    table.insert(attr_children, create_item(exp_item))
-                end
-                add_attribute(item, exp.keyword, exp.name, attr_children)
-            elseif exp.type == "colon" then
-                -- Colon expansion - if item is attribute, these become children of attribute
-                for _, exp_item in ipairs(exp.items) do
-                    add_child(item, create_item(exp_item))
-                end
-            end
-        end
-
-        -- Clear deeper levels from tracking
-        for level = indent_level + 1, #last_item_at_level do
-            last_item_at_level[level] = nil
-        end
-
-        -- Add to hierarchy based on indent
-        if indent_level == 0 then
-            -- Top level item
-            table.insert(result, item)
-            last_item_at_level[0] = item
-        else
-            -- Find parent at previous level
-            local parent_item = nil
-            for level = indent_level - 1, 0, -1 do
-                if last_item_at_level[level] then
-                    parent_item = last_item_at_level[level]
-                    break
-                end
-            end
-
-            if parent_item then
-                -- Check if this is an attribute or a child
-                -- Special case: "All:" should be added as a child, not an attribute
-                if item.is_attribute and item.text ~= "All" then
-                    -- Add as attribute to parent
-                    add_attribute(parent_item, item.attribute_keyword, item.attribute_name, item.children or {})
-                    -- Don't add the item itself, just its content as attribute
-                else
-                    -- Add as regular child (including "All:" items)
-                    add_child(parent_item, item)
+                -- Each group becomes a child - recursively expand them
+                for _, group in ipairs(groups) do
+                    local child_nodes = expand_inline_notations({{text = group, children = {}}})
+                    for _, child_node in ipairs(child_nodes) do
+                        table.insert(new_children, child_node)
+                    end
                 end
             else
-                -- No valid parent found, treat as top level
-                table.insert(result, item)
+                -- Simple bracket expansion: split by commas
+                for item in (bracket_content .. ","):gmatch("([^,]+),") do
+                    item = item:match("^%s*(.-)%s*$")
+                    if item ~= "" then
+                        table.insert(new_children, {text = item, children = {}})
+                    end
+                end
             end
-
-            last_item_at_level[indent_level] = item
         end
+
+        -- Check for colon expansion: "Text: A, B, C" (but not if it ends with just ":")
+        -- Also skip if it looks like a line prefix pattern (icon, checkbox, date)
+        if #new_children == 0 then
+            local base, colon_items = text:match("^(.-)%s*:%s*(.+)$")
+            -- Skip if base is empty, looks like an icon, checkbox, or date pattern
+            local should_skip = not base or base == "" or
+                                base:match("^%[") or  -- checkbox
+                                base:match(":fa%-") or  -- icon
+                                base:match("%d%d%d%d%-%d%d%-%d%d%s*%-$")  -- date
+            if base and colon_items and not should_skip then
+                -- Keep the colon in the text so Step 4 can identify it as an attribute
+                text = base:match("^%s*(.-)%s*$") .. ":"
+
+                -- Split by commas
+                for item in (colon_items .. ","):gmatch("([^,]+),") do
+                    item = item:match("^%s*(.-)%s*$")
+                    if item ~= "" then
+                        table.insert(new_children, {text = item, children = {}})
+                    end
+                end
+            end
+        end
+
+        -- Create the expanded node
+        local expanded_node = {
+            text = text,
+            children = {}
+        }
+
+        -- Add expanded children first, then original children
+        for _, child in ipairs(new_children) do
+            table.insert(expanded_node.children, child)
+        end
+
+        -- Recursively expand original children
+        for _, child in ipairs(node.children) do
+            local expanded_children = expand_inline_notations({child})
+            for _, ec in ipairs(expanded_children) do
+                table.insert(expanded_node.children, ec)
+            end
+        end
+
+        table.insert(result, expanded_node)
     end
 
     return result
 end
 
 --[[
-  Apply 'All:' attributes to siblings at the same level
-  @param items table - Array of items from parse_hierarchy
-  @return table - Array of items with All: attributes applied
+  STEP 3: Handle text parsing (icons, checkboxes, dates)
+
+  Parses line prefixes from the text field and moves them to dedicated fields.
 ]]
-function apply_all_attributes(items)
-    if not items or #items == 0 then
-        return items
-    end
+local function parse_line_prefixes(nodes)
+    for _, node in ipairs(nodes) do
+        local text = node.text
 
-    -- Find all "All:" items at this level
-    local all_items = {}
-    local all_positions = {}
-    local non_all_items = {}
-
-    for i, item in ipairs(items) do
-        if item.text == "All" and item.is_attribute then
-            table.insert(all_items, item)
-            table.insert(all_positions, i)
-        else
-            table.insert(non_all_items, item)
-        end
-    end
-
-    -- If there are All: items, apply their content to siblings
-    if #all_items > 0 then
-        -- Process each non-All item
-        for item_idx, item in ipairs(non_all_items) do
-            -- Determine original position of this item
-            local original_pos = 0
-            local count = 0
-            for i, check_item in ipairs(items) do
-                if check_item.text ~= "All" or not check_item.is_attribute then
-                    count = count + 1
-                    if count == item_idx then
-                        original_pos = i
-                        break
-                    end
-                end
-            end
-
-            -- Apply All: items based on position
-            for all_idx, all_item in ipairs(all_items) do
-                local all_pos = all_positions[all_idx]
-
-                if all_item.children then
-                    -- Items before All: get children appended
-                    -- Items after All: get children prepended
-                    if original_pos < all_pos then
-                        -- Append
-                        for _, child in ipairs(all_item.children) do
-                            local child_copy = copy_item(child)
-                            add_child(item, child_copy)
-                        end
-                    else
-                        -- Prepend (in reverse order to maintain correct sequence)
-                        if not item.children then
-                            item.children = {}
-                        end
-                        for i = #all_item.children, 1, -1 do
-                            local child_copy = copy_item(all_item.children[i])
-                            table.insert(item.children, 1, child_copy)
-                        end
-                    end
-                end
-
-                -- Apply All: attributes to sibling
-                if all_item.attributes then
-                    for keyword, attr_entries in pairs(all_item.attributes) do
-                        for _, attr_entry in ipairs(attr_entries) do
-                            -- Deep copy the attribute children
-                            local attr_children_copy = {}
-                            if attr_entry.children then
-                                for _, child in ipairs(attr_entry.children) do
-                                    table.insert(attr_children_copy, copy_item(child))
-                                end
-                            end
-                            add_attribute(item, keyword, attr_entry.name, attr_children_copy)
-                        end
-                    end
-                end
-            end
+        -- Extract checkbox [x] or [ ]
+        local checkbox_char, remaining = text:match("^%[([x%s])%]%s+(.*)$")
+        if checkbox_char then
+            node.checkbox = (checkbox_char:lower() == "x")
+            text = remaining
         end
 
-        items = non_all_items
-    end
+        -- Extract icon :fa-icon:
+        local icon_name, remaining = text:match("^:fa%-([^:]+):%s+(.*)$")
+        if icon_name then
+            node.icon = icon_name
+            text = remaining
+        end
 
-    -- Recursively apply to children
-    for _, item in ipairs(items) do
-        if item.children then
-            item.children = apply_all_attributes(item.children)
+        -- Extract date YYYY-MM-DD -
+        local date_str, remaining = text:match("^(%d%d%d%d%-%d%d%-%d%d)%s*%-%s+(.*)$")
+        if date_str then
+            local year, month, day = date_str:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+            node.date = os.time({year = tonumber(year), month = tonumber(month), day = tonumber(day)})
+            text = remaining
+        end
+
+        -- Trim whitespace and update text
+        node.text = text:match("^%s*(.-)%s*$")
+
+        -- Recursively process children
+        if node.children and #node.children > 0 then
+            parse_line_prefixes(node.children)
         end
     end
-
-    return items
 end
 
--- Helper: Deep copy an item
-function copy_item(item)
-    local copy = {
-        text = item.text,
-        checkbox = item.checkbox,
-        icon = item.icon,
-        date = item.date
-    }
+--[[
+  STEP 4: Parse attributes and handle 'All:'
 
-    if item.children then
-        copy.children = {}
-        for _, child in ipairs(item.children) do
-            table.insert(copy.children, copy_item(child))
+  Identifies which nodes are attributes (ending with : or starting with ~),
+  separates them from regular children, and handles All: inheritance.
+]]
+local function parse_attributes(nodes)
+    -- First, recursively process all children
+    for _, node in ipairs(nodes) do
+        if node.children and #node.children > 0 then
+            local processed_children, child_attributes = parse_attributes(node.children)
+
+            -- Set children to nil if empty
+            if #processed_children == 0 then
+                node.children = nil
+            else
+                node.children = processed_children
+            end
+
+            -- Add attributes to this node
+            if child_attributes and next(child_attributes) then
+                node.attributes = child_attributes
+            end
+        else
+            -- No children, set to nil
+            node.children = nil
         end
     end
 
-    if item.attributes then
-        copy.attributes = {}
-        for keyword, attr_entries in pairs(item.attributes) do
-            copy.attributes[keyword] = {}
-            for _, attr_entry in ipairs(attr_entries) do
-                local children_copy = {}
-                if attr_entry.children then
-                    for _, child in ipairs(attr_entry.children) do
-                        table.insert(children_copy, copy_item(child))
-                    end
+    -- Now separate children from attributes at this level
+    local regular_children = {}
+    local attributes = {}
+    local all_nodes = {}  -- Track multiple All: nodes with their indices
+
+    for i, node in ipairs(nodes) do
+        -- Check for tilde-prefixed attribute: ~Keyword
+        local tilde_keyword = node.text:match("^~(.+)$")
+        if tilde_keyword then
+            tilde_keyword = tilde_keyword:match("^%s*(.-)%s*$"):lower()
+            if not attributes[tilde_keyword] then
+                attributes[tilde_keyword] = {}
+            end
+            table.insert(attributes[tilde_keyword], {
+                name = nil,
+                children = nil
+            })
+        -- Check for attribute ending with : (but with optional name in parens)
+        elseif node.text:match(":$") then
+            local keyword, name = node.text:match("^(.-)%s*%((.*)%)%s*:$")
+            if not keyword then
+                keyword = node.text:match("^(.-)%s*:$")
+            end
+
+            keyword = keyword:match("^%s*(.-)%s*$"):lower()
+
+            -- Check for "All:" special case
+            if keyword == "all" then
+                table.insert(all_nodes, {node = node, index = i})
+            else
+                if not attributes[keyword] then
+                    attributes[keyword] = {}
                 end
-                table.insert(copy.attributes[keyword], {
-                    name = attr_entry.name,
-                    children = children_copy
+                table.insert(attributes[keyword], {
+                    name = name,
+                    children = node.children
                 })
             end
+        else
+            -- Regular child - track its original index
+            node._original_index = i
+            table.insert(regular_children, node)
         end
     end
 
-    return copy
+    -- Handle All: inheritance from all All: nodes
+    if #all_nodes > 0 then
+        for _, child in ipairs(regular_children) do
+            for _, all_entry in ipairs(all_nodes) do
+                local all_node = all_entry.node
+                local all_index = all_entry.index
+
+                if all_node.children then
+                    if not child.children then
+                        child.children = {}
+                    end
+
+                    -- If child appeared BEFORE this All:, append All: children
+                    -- If child appeared AFTER this All:, prepend All: children
+                    if child._original_index < all_index then
+                        -- Append
+                        for _, all_child in ipairs(all_node.children) do
+                            table.insert(child.children, all_child)
+                        end
+                    else
+                        -- Prepend
+                        for i = #all_node.children, 1, -1 do
+                            table.insert(child.children, 1, all_node.children[i])
+                        end
+                    end
+                end
+
+                -- Inherit All: attributes
+                if all_node.attributes then
+                    if not child.attributes then
+                        child.attributes = {}
+                    end
+                    for keyword, entries in pairs(all_node.attributes) do
+                        if not child.attributes[keyword] then
+                            child.attributes[keyword] = {}
+                        end
+                        for _, entry in ipairs(entries) do
+                            table.insert(child.attributes[keyword], entry)
+                        end
+                    end
+                end
+            end
+
+            -- Clean up temporary field
+            child._original_index = nil
+        end
+    end
+
+    return regular_children, attributes
 end
 
 --[[
-  Helper: Create a new item structure
+  Main parse function
+  @param content string - The markdown content to parse
+  @return table - Wrapper object with {children = [...], attributes = {...}}
 ]]
-function create_item(text, checkbox, icon, date)
+function markdown_parser.parse(content)
+    -- Step 1: Build hierarchy from indentation
+    local tree = build_hierarchy_from_indentation(content)
+
+    -- Step 2: Expand inline notations (brackets, colons)
+    tree = expand_inline_notations(tree)
+
+    -- Step 3: Parse line prefixes (checkboxes, icons, dates)
+    parse_line_prefixes(tree)
+
+    -- Step 4: Parse attributes and handle All:
+    local children, attributes = parse_attributes(tree)
+
     return {
-        text = text or "",
-        checkbox = checkbox,
-        icon = icon,
-        date = date,
-        children = nil,   -- Will be set to {} when first child is added
-        attributes = nil  -- Will be set to {} when first attribute is added
+        children = children,
+        attributes = attributes
     }
-end
-
---[[
-  Helper: Add a child to an item
-]]
-function add_child(item, child)
-    if not item.children then
-        item.children = {}
-    end
-    table.insert(item.children, child)
-end
-
---[[
-  Helper: Add an attribute to an item
-  @param item table - The item to add attribute to
-  @param keyword string - The attribute keyword (e.g., "Options")
-  @param name string|nil - Optional attribute name (e.g., "Symptoms")
-  @param children table - Array of child items for this attribute
-]]
-function add_attribute(item, keyword, name, children)
-    if not item.attributes then
-        item.attributes = {}
-    end
-    -- Normalize keyword to lowercase for case-insensitive matching
-    local normalized_keyword = keyword:lower()
-    if not item.attributes[normalized_keyword] then
-        item.attributes[normalized_keyword] = {}
-    end
-    -- Create attribute entry with optional name and children
-    -- Set children to nil if empty array
-    local attr_children = children
-    if children and #children == 0 then
-        attr_children = nil
-    end
-    local attr_entry = {
-        name = name,
-        children = attr_children
-    }
-    table.insert(item.attributes[normalized_keyword], attr_entry)
 end
 
 -- Export for file-manager compatibility
