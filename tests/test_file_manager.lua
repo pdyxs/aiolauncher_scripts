@@ -1,9 +1,9 @@
-package.path = package.path .. ";../my/core/?.lua;../lib/?.lua"
+package.path = package.path .. ";../my/core/?.lua;../lib/?.lua;./my/core/?.lua;./lib/?.lua"
 
 -- Load utils to extend string with split() and other methods
 require "utils"
 
--- Mock modules required by markdown-manager
+-- Mock modules required by file-manager
 _G.tasker = {
     run_task = function(self, name, params)
     end
@@ -11,8 +11,8 @@ _G.tasker = {
 
 require 'busted.runner'()
 
-describe("Markdown Manager", function()
-    local markdown_manager
+describe("File Manager", function()
+    local file_manager
     local parser
     local manager
     local test_filepath = "test.md"
@@ -28,20 +28,20 @@ describe("Markdown Manager", function()
     before_each(function()
         tasker_spy:clear()
         package.loaded.prefs = {}
-        markdown_manager = require "markdown-manager"
+        file_manager = require "file-manager"
         parser = {
             version = 1,
             parse = function(content)
                 return parsed_prefix .. content
             end
         }
-        manager = markdown_manager.create()
+        manager = file_manager.create()
     end)
 
     after_each(function()
-        package.loaded['markdown-manager'] = nil
+        package.loaded['file-manager'] = nil
         package.loaded.prefs = {}
-        markdown_manager = nil
+        file_manager = nil
         parser = nil
         manager = nil
     end)

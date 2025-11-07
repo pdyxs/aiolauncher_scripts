@@ -4,14 +4,13 @@
 -- author = "Paul Sztajer"
 -- version = "0.1"
 
-local md_manager = require "my.core.markdown-manager"
 local dialog_flow = require "core.dialog-flow"
 
 local dialog_manager = dialog_flow.create_dialog_flow(function() end)
-local markdown_manager = md_manager.create()
+local file_manager = (require "my.core.file-manager").create()
 
 local components = {
-    markdown_manager,
+    file_manager,
     dialog_manager
 }
 

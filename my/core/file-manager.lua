@@ -1,15 +1,15 @@
-local markdown_manager = {}
+local file_manager = {}
 local prefs = require "prefs"
 
 local COMMAND_DELIM = ":"
 
-function markdown_manager.create()
+function file_manager.create()
     local manager = {
         loading = {}
     }
 
     function manager:load(filepath, callback, parser)
-        local cache = prefs.markdown_manager_cache or {}
+        local cache = prefs.file_manager_cache or {}
         local last_updated = 0
 
         if cache[filepath] then
@@ -30,7 +30,7 @@ function markdown_manager.create()
     end
 
     function manager:get(filepath)
-        local cache = prefs.markdown_manager_cache or {}
+        local cache = prefs.file_manager_cache or {}
         if cache[filepath] then    
             return cache[filepath].data
         end
@@ -51,13 +51,13 @@ function markdown_manager.create()
             local parser = self.loading[filepath].parser
             local content = parser.parse(table.concat(parts, COMMAND_DELIM, 4))
 
-            local cache = prefs.markdown_manager_cache or {}
+            local cache = prefs.file_manager_cache or {}
             cache[filepath] = {
                 data = content,
                 last_updated = lastUpdated,
                 parser_version = parser.version
             }
-            prefs.markdown_manager_cache = cache
+            prefs.file_manager_cache = cache
 
             callback(content)
         end
@@ -66,4 +66,4 @@ function markdown_manager.create()
     return manager
 end
 
-return markdown_manager
+return file_manager
