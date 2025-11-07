@@ -8,6 +8,7 @@
   - Attributes: Named lists that are stored separately (case-insensitive keywords)
   - "All:" special attribute for inheriting attributes/children
   - Line prefixes: checkboxes, icons, dates
+  - Flexible whitespace: Extra spaces are ignored (except for hierarchy indentation)
 
   Parser Return Structure:
 
@@ -187,7 +188,8 @@ function parse_line_prefixes(line)
         remaining = remaining:match("^%d%d%d%d%-%d%d%-%d%d%s*%-%s+(.*)$")
     end
 
-    result.text = remaining
+    -- Trim leading and trailing whitespace from final text
+    result.text = remaining:match("^%s*(.-)%s*$")
     return result
 end
 
@@ -220,14 +222,24 @@ function parse_text_expansions(text)
     -- This needs to be checked before colon expansion to avoid matching colons inside brackets
     local base_text, bracket_content = text:match("^(.-)%s*%((.*)%)%s*$")
     if base_text and bracket_content then
-        result.base_text = base_text
+        result.base_text = base_text:match("^%s*(.-)%s*$")
 
-        -- Check if bracket content has semicolons (attribute groups)
-        if bracket_content:find(";") then
-            -- Split by semicolons for multiple attribute groups
-            for group in (bracket_content .. ";"):gmatch("([^;]+);") do
-                group = group:match("^%s*(.-)%s*$") -- trim
+        -- Check if bracket content has colons (attribute groups)
+        if bracket_content:find(":") then
+            -- Has colons, treat as attribute groups
+            -- Split by semicolons for multiple groups (or treat as single group if no semicolons)
+            local groups = {}
+            if bracket_content:find(";") then
+                -- Multiple groups separated by semicolons
+                for group in (bracket_content .. ";"):gmatch("([^;]+);") do
+                    table.insert(groups, group:match("^%s*(.-)%s*$"))
+                end
+            else
+                -- Single group
+                table.insert(groups, bracket_content:match("^%s*(.-)%s*$"))
+            end
 
+            for _, group in ipairs(groups) do
                 -- Parse each group: "Keyword (Name): items" or "Keyword: items"
                 local keyword, name, items_str = group:match("^(.-)%s*%((.-)%)%s*:%s*(.+)$")
                 if keyword and name and items_str then

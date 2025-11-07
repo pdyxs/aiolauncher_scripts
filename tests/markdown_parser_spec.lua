@@ -442,6 +442,103 @@ describe("Markdown Parser", function()
         end)
     end)
 
+    describe("Whitespace handling", function()
+        it("ignores extra whitespace around bullet markers", function()
+            local content = "   *   [ ]    One\n         *   Two   (Tag: A  , B  )\n         * Three"
+            local result = parser.parse(content)
+
+            assert.are.equal(1, #result.children)
+            assert.are.equal("One", result.children[1].text)
+            assert.is_false(result.children[1].checkbox)
+            assert.are.equal(2, #result.children[1].children)
+            assert.are.equal("Two", result.children[1].children[1].text)
+            assert.are.equal("Three", result.children[1].children[2].text)
+
+            -- Check that attributes are parsed despite extra whitespace
+            assert.is_not_nil(result.children[1].children[1].attributes.tag)
+            assert.are.equal(2, #result.children[1].children[1].attributes.tag[1].children)
+            assert.are.equal("A", result.children[1].children[1].attributes.tag[1].children[1].text)
+            assert.are.equal("B", result.children[1].children[1].attributes.tag[1].children[2].text)
+        end)
+
+        it("treats different indentation levels consistently", function()
+            local normal = "* One\n  * Two\n  * Three"
+            local spaced = "* One\n    * Two\n    * Three"
+
+            local result_normal = parser.parse(normal)
+            local result_spaced = parser.parse(spaced)
+
+            -- Both should have the same structure
+            assert.are.equal(1, #result_normal.children)
+            assert.are.equal(1, #result_spaced.children)
+            assert.are.equal(2, #result_normal.children[1].children)
+            assert.are.equal(2, #result_spaced.children[1].children)
+            assert.are.equal("Two", result_normal.children[1].children[1].text)
+            assert.are.equal("Two", result_spaced.children[1].children[1].text)
+        end)
+
+        it("trims whitespace from item text", function()
+            local content = "*   Item with spaces   "
+            local result = parser.parse(content)
+
+            assert.are.equal("Item with spaces", result.children[1].text)
+        end)
+
+        it("trims whitespace from attribute items", function()
+            local content = "* Tag:  one  ,  two  ,  three  "
+            local result = parser.parse(content)
+
+            assert.are.equal(3, #result.attributes.tag[1].children)
+            assert.are.equal("one", result.attributes.tag[1].children[1].text)
+            assert.are.equal("two", result.attributes.tag[1].children[2].text)
+            assert.are.equal("three", result.attributes.tag[1].children[3].text)
+        end)
+
+        it("trims whitespace from bracket expansion items", function()
+            local content = "* Test (  One  ,  Two  ,  Three  )"
+            local result = parser.parse(content)
+
+            assert.are.equal(3, #result.children[1].children)
+            assert.are.equal("One", result.children[1].children[1].text)
+            assert.are.equal("Two", result.children[1].children[2].text)
+            assert.are.equal("Three", result.children[1].children[3].text)
+        end)
+
+        it("handles extra whitespace in icon parsing", function()
+            local content = "*   :fa-heart:   Item with icon"
+            local result = parser.parse(content)
+
+            assert.are.equal("heart", result.children[1].icon)
+            assert.are.equal("Item with icon", result.children[1].text)
+        end)
+
+        it("handles extra whitespace in date parsing", function()
+            local content = "*   2025-01-15   -   Item with date"
+            local result = parser.parse(content)
+
+            assert.are.equal("2025-01-15", result.children[1].date)
+            assert.are.equal("Item with date", result.children[1].text)
+        end)
+
+        it("handles extra whitespace in checkbox parsing", function()
+            local content = "*   [ ]   Task with checkbox"
+            local result = parser.parse(content)
+
+            assert.is_false(result.children[1].checkbox)
+            assert.are.equal("Task with checkbox", result.children[1].text)
+        end)
+
+        it("handles extra whitespace in all prefixes combined", function()
+            local content = "*   [x]   :fa-star:   2025-12-25   -   Complex task"
+            local result = parser.parse(content)
+
+            assert.is_true(result.children[1].checkbox)
+            assert.are.equal("star", result.children[1].icon)
+            assert.are.equal("2025-12-25", result.children[1].date)
+            assert.are.equal("Complex task", result.children[1].text)
+        end)
+    end)
+
     describe("File manager compatibility", function()
         it("has version property", function()
             assert.is_not_nil(parser.version)
