@@ -7,7 +7,7 @@
 local dialog_flow = require "core.dialog-flow"
 
 local dialog_manager = dialog_flow.create_dialog_flow(function() end)
-local file_manager = (require "my.core.file-manager").create()
+local file_manager = (require "core.file-manager").create()
 
 local components = {
     file_manager,
