@@ -23,7 +23,7 @@
     text = "Item text",              -- The main text of the item
     checkbox = true/false/nil,       -- Checkbox state (nil if no checkbox)
     icon = "icon-name" or nil,       -- FontAwesome icon name (without :fa- prefix)
-    date = "YYYY-MM-DD" or nil,      -- ISO date string
+    date = os.time(...) or nil,      -- Date object created from YYYY-MM-DD string
     children = {...},                -- Array of child items (same structure)
     attributes = {                   -- Dictionary of attributes, keyed by keyword (lowercase)
       keyword1 = {                   -- Each keyword maps to array of attribute entries
@@ -57,7 +57,7 @@
           text = "Task",
           checkbox = false,
           icon = "heart",
-          date = "2025-01-15",
+          date = os.time({year = 2025, month = 1, day = 15}),
           attributes = {
             Option = [
               {name = "One", children = [{text = "A"}, {text = "B"}]},
@@ -155,7 +155,7 @@ end
 --[[
   Parse a single line to extract prefix metadata and core text
   @param line string - The line to parse
-  @return table - {checkbox, icon, date, text}
+  @return table - {checkbox, icon, date (os.time object), text}
 ]]
 function parse_line_prefixes(line)
     local result = {
@@ -184,7 +184,9 @@ function parse_line_prefixes(line)
     -- Extract date YYYY-MM-DD -
     local date_match = remaining:match("^(%d%d%d%d%-%d%d%-%d%d)%s*%-%s+(.*)$")
     if date_match then
-        result.date = date_match
+        -- Parse date string into components and convert to os.time object
+        local year, month, day = date_match:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+        result.date = os.time({year = tonumber(year), month = tonumber(month), day = tonumber(day)})
         remaining = remaining:match("^%d%d%d%d%-%d%d%-%d%d%s*%-%s+(.*)$")
     end
 
