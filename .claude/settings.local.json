@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wsl bash:*)"
+      "Bash(wsl bash:*)",
+      "Bash(wsl busted:*)"
     ],
     "deny": [],
     "ask": []
