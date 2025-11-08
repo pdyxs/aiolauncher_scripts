@@ -87,6 +87,7 @@ end
 
 function render(content)
     if not content or not content.attributes or not content.attributes.ui then
+        ui:show_text("No UI defined in markdown file")
         return
     end
 
@@ -94,12 +95,14 @@ function render(content)
 
     local ui_items = content.attributes.ui
     if not ui_items or #ui_items == 0 then
+        ui:show_text("No UI items defined")
         return
     end
 
     -- Get the first UI attribute entry
     local ui_entry = ui_items[1]
     if not ui_entry.children then
+        ui:show_text("No UI item children defined")
         return
     end
 
@@ -143,6 +146,8 @@ function on_settings()
             handle_result = function(results)
                 local file_path = results[#results]
                 prefs.markdown_file_path = file_path
+                file_manager:clear_cache()
+                prefs.render_error = nil
                 load_and_render()
             end
         }

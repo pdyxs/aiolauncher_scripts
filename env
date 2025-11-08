@@ -1,2 +1,6 @@
 REPOS="dev my"
 SCRIPTS_DIR="/sdcard/Android/data/ru.execbit.aiolauncher/files/"
+
+# Community scripts to copy (space-separated list of script names without .lua extension)
+# Example: COMMUNITY_SCRIPTS="calendar-progress-widget todoist-app-widget"
+COMMUNITY_SCRIPTS="birthdays-widget solar-cycle-widget"

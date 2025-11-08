@@ -8,6 +8,11 @@ function file_manager.create()
         loading = {}
     }
 
+    function manager:clear_cache()
+        prefs.file_manager_cache = {}
+        self.loading = {}
+    end
+
     function manager:load(filepath, callback, parser)
         local cache = prefs.file_manager_cache or {}
         local last_updated = 0
@@ -47,6 +52,9 @@ function file_manager.create()
         if parts[1] == "MarkdownData" then
             local filepath = parts[2]
             local lastUpdated = tonumber(parts[3])
+            if (not self.loading[filepath]) then
+                return
+            end
             local callback = self.loading[filepath].callback
             local parser = self.loading[filepath].parser
             local content = parser.parse(table.concat(parts, COMMAND_DELIM, 4))
