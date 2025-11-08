@@ -85,7 +85,15 @@ function setup_widgets(content)
     end
 end
 
+function on_edit_mode_button_click(index)
+    if index == 1 then
+        obsidian.open_file(table.concat(prefs.markdown_file_path:split("/"), "/", 3))
+    end
+end
+
 function render(content)
+    ui:set_edit_mode_buttons({"fa:file"})
+
     if not content or not content.attributes or not content.attributes.ui then
         ui:show_text("No UI defined in markdown file")
         return
