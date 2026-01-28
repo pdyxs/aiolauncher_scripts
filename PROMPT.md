@@ -46,8 +46,10 @@ The search script can use two functions to display search results:
 
 * `search:show_buttons(names, [colors], [top])` - show buttons in the search results, the first parameter is table of button names, second - table of button colors in format `#XXXXXX`, `top` - whether the results need to be shown at the top (false by default);
 * `search:show_lines(lines, [colors], [top])` - show text lines in the search results;
-* `search:show_progress(names, progresses, [colors], [top])` - show progress bars in the search results, the first parameter is a table of names, the second is a table of progress bars (from 1 to 100);
+* `search:show_progress(names, progresses, [colors], [top])` - show progress bars in the search results, the first parameter is a table of names, the second is a table of progress bars;
 * `search:show_chart(points, format, [title], [show_grid], [top])` - show chart in the search results, parameters are analogous to `ui:show_chart()`.
+
+Keep in mind that regardless of how many items you display in the search results, only the first three lines will be shown.
 
 When user click on a result, one of the following functions will be executed:
 
@@ -398,6 +400,19 @@ When you click on any menu item, the collback `on_context_menu_click(idx)` will 
 
 The result of executing a shell command is sent to the `on_shell_result(string)` or `on_shell_result_$id(string)` callback.
 
+* `system:network_state()` — returns a table with current network info:
+
+```lua
+local s = system:network_state()
+-- s.connected : boolean
+-- s.type      : "wifi" | "mobile" | "none"
+-- s.class     : "WiFi" | "2G" | "3G" | "4G" | "5G" | ""
+-- s.ssid      : Wi-Fi SSID or ""
+-- s.operator  : mobile operator name or ""
+-- s.metered   : boolean (true if the active network is metered)
+-- s.roaming   : boolean (true if the active network is in roaming)
+```
+
 * `system:show_notify(table)` - show system notifycation;
 * `system:cancel_notify()` - cancel notification.
 
@@ -445,8 +460,21 @@ Intent table format (all fields are optional):
 * `aio:do_action(string)` - performs an AIO action ([more](https://aiolauncher.app/api.html));
 * `aio:actions()` - returns a list of available actions;
 * `aio:settings()` - returns a list of available AIO Settings sections;
-* `aio:open_settings([section])` - open AIO Settings or AIO Settings section;
 * `aio:add_todo(icon, text)` - add a TODO item with the specified Fontawesome icon and text.
+* `aio:open_settings([section])` - open AIO Settings or AIO Settings section;
+* `aio:open_notifications_panel()` - opens the system notifications panel (same as swiping down the status bar);
+* `aio:open_side_menu()` - opens the launcher’s app drawer;
+* `aio:open_search([query])` - opens the launcher search screen; if `query` is provided, the search field will be pre-filled with this text;
+* `aio:launcher_info()` - returns basic information about the AIO Launcher build:
+
+```lua
+local info = aio:launcher_info()
+-- info.package    : package name (e.g. "ru.execbit.aiolauncher")
+-- info.version    : version name (e.g. "6.0.1")
+-- info.code       : version code (longVersionCode)
+-- info.build_type : build type (e.g. "release", "debug", "beta")
+-- info.beta       : true if this is not a "release" build
+```
 
 Format of table elements returned by `aio:available_widgets()`:
 
@@ -496,7 +524,7 @@ Format of table elements returned by `aio:colors()`:
 Possible values for the `aio:do_action()` function:
 
 ```
-apps_menu:[mode_or_script_name]
+apps_menu:[style_or_script_name]
 screen_off
 screen_off_root
 refresh
@@ -517,17 +545,28 @@ one_handed
 add_note:[text]
 add_task:[text]:[YYYY-MM-DD-HH-MM]
 add_purchase:[amount][currency]:[comment]
+add_calendar_event
+start_timer:<milliseconds>
+start_record
+stop_record
+player_previous
+player_next
+player_pause
+clear_notifications
 private_mode
 settings
 ui_settings
 quick_menu
 desktop_lock
+cloud_backup
 theme:<name>
 save_profile:<name>
 restore_profile:<name>
 iconpack:<package_name>
 add_widget:<name>:[position]
 remove_widget:<position>
+fold_widget:<position>
+unfold_widget:<position>
 ```
 
 To accept a value sent by the `send_message` function, the receiving script must implement a callback `on_message(value)`.
@@ -601,17 +640,52 @@ Any application-related events (installation, removal, name change, etc.) will c
 
 ## Network
 
-* `http:get(url, [id])` - executes an HTTP GET request, `id` - the request identifier string (see below);
-* `http:post(url, body, media_type, [id])` - executes an HTTP POST request;
-* `http:put(url, body, media_type, [id])` - executes an HTTP request;
-* `http:delete(url, [id])` - executes an HTTP DELETE request;
-* `http:set_headers(table)` - sets the headers for **all** subsequent network requests; the argument is a table with strings like "Cache-Control: no-cache".
+* `http:get(url, [id])` — executes an HTTP **GET** request.
+* `http:post(url, body, media_type, [id])` — executes an HTTP **POST** request.
+* `http:put(url, body, media_type, [id])` — executes an HTTP **PUT** request.
+* `http:delete(url, [id])` — executes an HTTP **DELETE** request.
+* `http:set_headers(table)` — sets custom headers for **all subsequent** requests; the argument is a table of strings in the form `"Header-Name: value"`.
 
-These functions do not return any value, but instead call the `on_network_result(string, [code])` callback. The first argument is the body of the response, the second (optional) is the code (200, 404, etc.).
+These functions do not return values directly. After a request finishes, one of the callbacks below will be invoked.
 
-If `id` was specified in the request, then the function will call `on_network_result_$id(string, [code])` instead of the callback described above. That is, if the id is "server1", then the callback will look like `on_network_result_server1(string, [code])`.
+### Response callbacks
 
-If there is a problem with the network, the `on_network_error_$id` callback will be called. But it does not have to be processed.
+If no `id` was provided, the callback is:
+
+```
+on_network_result(body, code, headers)
+```
+
+If an `id` was provided, the callback name becomes:
+
+```
+on_network_result_<id>(body, code, headers)
+```
+
+Callback parameters:
+
+* **body** — string containing the response body;
+* **code** — HTTP status code (200, 404, etc.);
+* **headers** — Lua table containing response headers.
+
+Header names are lowercase (`"content-type"`, `"location"`).
+If a header has multiple values, they are joined with `", "`.
+
+### Error callbacks
+
+If a network error occurs, one of the following callbacks is invoked:
+
+```
+on_network_error(error_message)
+```
+
+or, if an `id` was provided:
+
+```
+on_network_error_<id>(error_message)
+```
+
+Handling this callback is optional.
 
 ## Calendar
 
@@ -672,6 +746,59 @@ Contacts table format:
 The function `phone:request_permission()` calls `on_permission_granted()` callback if the user agrees to grant permission.
 
 Upon the first launch of the application, contacts may not yet be loaded, so in the scripts, you can use the `on_contacts_loaded()` callback, which will be called after the contacts are fully loaded.
+
+## Countries
+
+* `countries:get(code)` - returns country by 2-letter ISO code (case-insensitive) or nil;
+* `countries:get_by_alpha3(code)` - returns country by 3-letter ISO code or nil;
+* `countries:get_by_name(name)` - returns first match by name (partial, case-insensitive) or nil;
+* `countries:search(query)` - returns list of matching countries (sorted by name);
+* `countries:by_region(region)` - returns list of countries in a region (sorted by name);
+* `countries:by_dial_code(code)` - returns list of countries by dial code (e.g., "+1" or "1");
+* `countries:regions()` - returns list of region names (sorted);
+* `countries:count()` - returns total number of countries;
+* `countries:all()` - returns full list of countries.
+
+Country table format:
+
+```
+`name` - country name;
+`alpha2` - 2-letter ISO code;
+`alpha3` - 3-letter ISO code;
+`country_code` - numeric country code;
+`iso_3166` - ISO 3166-2 code;
+`region` - region name;
+`sub_region` - sub-region name;
+`intermediate_region` - intermediate region name;
+`region_code` - region code;
+`sub_region_code` - sub-region code;
+`intermediate_region_code` - intermediate region code;
+`dial_code` - international dial code;
+`geonameid` - GeoNames ID;
+`capital` - capital city;
+`currency` - currency name;
+`language_codes` - comma-separated language codes;
+`area_km2` - area in square kilometers;
+`gdp` - GDP in USD;
+`bounding_box` - table with bounding box coordinates.
+```
+
+Bounding box format:
+
+```
+`sw_lat` - southwest latitude;
+`sw_lon` - southwest longitude;
+`ne_lat` - northeast latitude;
+`ne_lon` - northeast longitude.
+```
+
+Notes:
+
+* Country codes are case-insensitive
+* Search queries support partial matching
+* All arrays are sorted by country name
+* Empty strings are returned for missing optional fields
+* The database contains 240+ countries and territories
 
 ## Tasks
 
@@ -748,7 +875,8 @@ All data are returned in `on_cloud_result(meta, content)`. The first argument is
 * `profiles:dump(name)` - saves a new profile with the specified name;
 * `profiles:restore(name)` - restores the saved profile;
 * `profiles:dump_json()` - creates a new profile but instead of saving it, returns it as a JSON string;
-* `profiles:restore_json(json)` - restores a profile previously saved using `dump_json()`.
+* `profiles:restore_json(json)` - restores a profile previously saved using `dump_json()`;
+* `profiles:current()` - returns current profile name.
 
 ## Reading notifications
 
@@ -788,11 +916,52 @@ Keep in mind that the AIO Launcher also request current notifications every time
 
 ## Files
 
-* `files:read(name)` - returns file contents or `nil` if file does not exist;
-* `files:write(name, string)` - writes `string` to file (creates file if file does not exist);
-* `files:delete(name)` - deletes the file;
+*Available from: 4.1.3*
 
-All files are created in the subdirectory `/sdcard/Android/data/ru.execbit.aiolauncher/files/scripts` without ability to create subdirectories.
+* `files:read(name)` — returns file contents or `nil` if the file does not exist.
+* `files:write(name, string)` — writes a string to a file (creates it if needed).
+* `files:delete(name)` — deletes the file.
+
+All files created by scripts are stored in:
+
+```
+/sdcard/Android/data/ru.execbit.aiolauncher/files/scripts
+```
+
+Subdirectories are not supported.
+
+## External files
+
+*Available from: 6.0.2*
+
+Scripts may request a system file picker:
+
+* `files:pick_file([mime])` — opens the picker (e.g. `"image/*"`, `"text/*"`, `"*/*"`).
+
+After the user selects a file, the callback is invoked:
+
+```
+on_file_picked(uri, name)
+```
+
+* `uri` — Android content URI of the selected file.
+* `name` — display name returned by the system.
+
+### Reading uri
+
+* `files:read_uri(uri)` — reads the contents of a file referenced by a content URI.
+  Returns a string or `nil` if the file cannot be read as text.
+
+Example:
+
+```lua
+files:pick_file()
+
+function on_file_picked(uri, name)
+    local content = files:read_uri(uri)
+    ui:show_text(content or "Cannot read file: " .. name)
+end
+```
 
 ## Functions
 
@@ -2079,4 +2248,3 @@ Generate a **single, runnable Lua script** for AIO Launcher (LuaJ 3.0.1, Lua 5.2
 Metadata header MUST use double quotes like `-- key = "value"`. Single quotes in metadata are not allowed under any circumstances.
 If you decide to use an API in your script that requires an API key, make sure to include code that asks the user for the key (via a dialog) and saves it for future use.
 **Output must be only Lua code, without Markdown fences or explanations.**
-
