@@ -91,7 +91,6 @@ function on_edit_mode_button_click(index)
 end
 
 function render(content)
-    ui:show_text(prefs.markdown_file_uri)
     ui:set_edit_mode_buttons({ "fa:file" })
 
     if not content or not content.attributes or not content.attributes.ui then
@@ -146,6 +145,7 @@ function render(content)
 end
 
 function on_settings()
+    prefs = {}
     files:pick_file("text/markdown")
 end
 
@@ -180,10 +180,6 @@ function on_command(data)
 end
 
 function on_resume()
-    if not prefs.markdown_file_path then
-        return
-    end
-
     load_and_render()
     for _, component in ipairs(components) do
         if component.on_resume then
@@ -193,10 +189,6 @@ function on_resume()
 end
 
 function on_app_widget_updated(bridge)
-    if not prefs.markdown_file_path then
-        return
-    end
-
     local content = get_parsed_file_content()
     if not content or not content.attributes or not content.attributes.widgets then
         return
@@ -280,7 +272,6 @@ function on_click(idx)
 end
 
 function get_item_with_label(label)
-    if not prefs.markdown_file_path then return end
     local content = get_parsed_file_content()
     if content and content.attributes and content.attributes.ui then
         local ui_entry = content.attributes.ui[1]
@@ -319,7 +310,7 @@ function on_long_click(idx)
 
     local elem_text = element[2]
     local item = get_item_with_label(elem_text)
-    if item.attributes and item.attributes.long then
+    if item and item.attributes and item.attributes.long then
         run_actions_from_attributes(item.attributes.long[1])
     end
 

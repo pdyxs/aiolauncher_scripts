@@ -270,8 +270,15 @@ local function parse_line_prefixes(nodes)
     for _, node in ipairs(nodes) do
         local text = node.text
 
+        -- Extract link [[Link]] (before checkbox to avoid [[ being parsed as [x] or [ ])
+        local pre_link, link_name, post_link = text:match("^(.-)%[%[(.-)%]%](.*)$")
+        if link_name then
+            node.link = link_name
+            text = (pre_link .. post_link):trim()
+        end
+
         -- Extract checkbox [x] or [ ]
-        local checkbox_char, remaining = text:match("^%[([x%s])%]%s+(.*)$")
+        local checkbox_char, remaining = text:match("^%[([x%s])%]%s*(.*)$")
         if checkbox_char then
             node.checkbox = (checkbox_char:lower() == "x")
             text = remaining
