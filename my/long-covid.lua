@@ -20,9 +20,9 @@ local obsidian = require "core.obsidian"
 local dialog_manager = dialog_flow.create_dialog_flow(function() render_widget() end)
 
 -- Colors for monochrome display
-local COLOR_PRIMARY = "#333333"    -- Darkest
-local COLOR_SECONDARY = "#666666"  -- Middle
-local COLOR_TERTIARY = "#BBBBBB"   -- Lightest
+local COLOR_PRIMARY = "#333333"   -- Darkest
+local COLOR_SECONDARY = "#666666" -- Middle
+local COLOR_TERTIARY = "#BBBBBB"  -- Lightest
 
 local OBSIDIAN_FILEPATH = "Long Covid/Data/"
 
@@ -63,8 +63,8 @@ function handle_capacity_click(button)
             end,
             handle_result = function(results)
                 logger.log_events_to_spreadsheet({
-                    {"Capacity", button.name},
-                    {"Relative Capacity", results[#results].option}
+                    { "Capacity",          button.name },
+                    { "Relative Capacity", results[#results].option }
                 })
                 render_widget()
             end
@@ -128,13 +128,13 @@ function create_dialogs_for_items(name, get_items, override_log)
         end
 
         logger.log_to_spreadsheet(
-            util.concat_arrays({name}, loggables, new_loggable)
+            util.concat_arrays({ name }, loggables, new_loggable)
         )
     end
     return {
         main = {
             type = "radio",
-            title = "Log "..name,
+            title = "Log " .. name,
             get_options = function()
                 local items = get_items()
                 local options = util.map(items, function(i) return get_modified_item_text(name, i) end)
@@ -150,13 +150,13 @@ function create_dialogs_for_items(name, get_items, override_log)
                 if result.value == OTHER_TEXT then
                     return dialogs.custom_input
                 end
-                
+
                 local log = result.value
 
                 if result.meta.detail then
-                    log = {log, result.meta.detail}
+                    log = { log, result.meta.detail }
                 end
-                
+
                 if result.meta.specifiers.Options then
                     return dialogs.options, log
                 end
@@ -169,8 +169,8 @@ function create_dialogs_for_items(name, get_items, override_log)
 
         custom_input = {
             type = "edit",
-            title = "Custom "..name,
-            prompt = "Enter "..name:lower().." name:",
+            title = "Custom " .. name,
+            prompt = "Enter " .. name:lower() .. " name:",
             default_text = "",
             handle_result = function(results, dialogs, loggables)
                 return do_log(loggables, results[#results])
@@ -193,7 +193,7 @@ function create_dialogs_for_items(name, get_items, override_log)
             title = "Todos",
             get_options = function(results)
                 local item_name = results[#results].value
-                local parsed_todos = markdown_parser.get_list_items(DATA_PREFIX..item_name..".md")
+                local parsed_todos = markdown_parser.get_list_items(DATA_PREFIX .. item_name .. ".md")
                 local completions = logger.log_count(name, item_name)
                 return todo_parser.parse_todo_list(parsed_todos, completions, get_current_capacity())
             end,
@@ -215,13 +215,13 @@ local dialog_buttons = util.map(
                     title = "Log Energy Level",
                     get_options = function()
                         return {
-                            "1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average", 
-                            "5 - Average", "6 - Above average", "7 - Good", "8 - Very good", 
+                            "1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average",
+                            "5 - Average", "6 - Above average", "7 - Good", "8 - Very good",
                             "9 - Excellent", "10 - Peak energy"
                         }
                     end,
                     handle_result = function(results)
-                        logger.log_to_spreadsheet({"Energy", results[#results].index})
+                        logger.log_to_spreadsheet({ "Energy", results[#results].index })
                         render_widget()
                     end
                 }
@@ -236,16 +236,16 @@ local dialog_buttons = util.map(
                     prompt = "Enter note:",
                     default_text = "",
                     handle_result = function(results)
-                        logger.log_to_spreadsheet({"Note", results[#results]})
+                        logger.log_to_spreadsheet({ "Note", results[#results] })
                     end
                 }
             }
         },
         log_symptoms = {
             label = "fa:heart-pulse",
-            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Symptoms.md") end,
+            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Symptoms.md") end,
             dialogs = create_dialogs_for_items(
-                SYMPTOM, 
+                SYMPTOM,
                 function() return prefs.symptom_items end,
                 function(loggable)
                     local dialog = {
@@ -267,7 +267,7 @@ local dialog_buttons = util.map(
                                 severity = severity - 1
                             end
                             logger.log_to_spreadsheet(
-                                util.concat_arrays({SYMPTOM}, loggables, {severity})
+                                util.concat_arrays({ SYMPTOM }, loggables, { severity })
                             )
                             setup_symptoms()
                         end
@@ -279,23 +279,23 @@ local dialog_buttons = util.map(
 
         log_activity = {
             label = "fa:running",
-            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Activities.md") end,
+            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Activities.md") end,
             dialogs = create_dialogs_for_items(ACTIVITY, function() return prefs.activity_items end)
         },
 
         log_intervention = {
             label = "fa:pills",
-            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Interventions.md") end,
+            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Interventions.md") end,
             dialogs = create_dialogs_for_items(INTERVENTION, function() return prefs.intervention_items end),
         },
 
         plans = {
             label = "fa:calendar",
-            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH.."Plans.md") end,
+            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Plans.md") end,
             dialogs = {
                 main = {
-                    type="list",
-                    title="Plans",
+                    type = "list",
+                    title = "Plans",
                     get_lines = function()
                         return prefs.plans.list
                     end,
@@ -304,8 +304,8 @@ local dialog_buttons = util.map(
                 }
             }
         }
-    }, 
-    function(btn) 
+    },
+    function(btn)
         btn.callback = function(button) dialog_manager:start(button.dialogs) end
         return btn
     end
@@ -330,7 +330,7 @@ function setup_symptoms()
 end
 
 function get_plans_info()
-    local parsed_plans = markdown_parser.get_list_items(DATA_PREFIX.."Plans.md")
+    local parsed_plans = markdown_parser.get_list_items(DATA_PREFIX .. "Plans.md")
     local incomplete = util.filter(parsed_plans, function(plan)
         return string.match(plan.text, "^%[ %]")
     end)
@@ -350,19 +350,19 @@ function get_loggable_symptom_items()
     local items = get_loggable_items("Symptoms")
 
     local tracking_symptoms = get_tracking_symptoms()
-    for _,symptom in pairs(tracking_symptoms) do
+    for _, symptom in pairs(tracking_symptoms) do
         local found = false
         -- try to find each tracking symptom
-        for _,item in pairs(items) do
+        for _, item in pairs(items) do
             if item.value == symptom then
                 found = true
-                item.meta.specifiers.Required = {"now"}
+                item.meta.specifiers.Required = { "now" }
             end
         end
 
         --custom symptom
         if not found then
-            table.insert(items, {value=symptom, meta={ specifiers={Required={"now"}} }})
+            table.insert(items, { value = symptom, meta = { specifiers = { Required = { "now" } } } })
         end
     end
 
@@ -370,12 +370,12 @@ function get_loggable_symptom_items()
 end
 
 function get_loggable_items(filename)
-    local parsed = markdown_parser.get_list_items(DATA_PREFIX..filename..".md")
+    local parsed = markdown_parser.get_list_items(DATA_PREFIX .. filename .. ".md")
     return util.map(parsed, item_parser.parse_item)
 end
 
 function are_any_required(event, items)
-    for _,item in ipairs(items) do
+    for _, item in ipairs(items) do
         if is_item_required(event, item) then
             return true
         end
@@ -418,7 +418,7 @@ function is_item_required(event, item)
     if util.contains(requiredParams, "now") then
         return true
     end
-    
+
     if util.contains(requiredParams, "daily") or time_utils.is_day_of_week(now, requiredParams) then
         return not time_utils.is_same_calendar_day(last_logged, now)
     end
@@ -432,7 +432,8 @@ end
 
 function get_tracking_symptoms()
     local tracking_symptoms = {}
-    for value,data in pairs(prefs.logs["Symptom"].values) do
+    local symptomValues = (prefs.logs and prefs.logs["Symptom"] and prefs.logs["Symptom"].values) or {}
+    for value, data in pairs(symptomValues) do
         if is_symptom_tracking(value) then
             table.insert(tracking_symptoms, value)
         end
@@ -442,7 +443,8 @@ end
 
 function get_tracking_custom_symptoms(default_symptoms)
     local tracking_symptoms = {}
-    for value,data in pairs(prefs.logs["Symptom"].values) do
+    local symptomValues = (prefs.logs and prefs.logs["Symptom"] and prefs.logs["Symptom"].values) or {}
+    for value, data in pairs(symptomValues) do
         if not util.contains(default_symptoms, value) and is_symptom_tracking(value) then
             table.insert(tracking_symptoms, value)
         end
@@ -545,12 +547,12 @@ end
 
 function render_select_capacity()
     -- Show all buttons when no capacity is set
-    my_gui = gui{
-        {"button", get_capacity_button_display(capacity_buttons.recovering), {color = COLOR_PRIMARY, gravity = "center_h"}},
-        {"spacer", 1},
-        {"button", get_capacity_button_display(capacity_buttons.maintaining), {color = COLOR_PRIMARY, gravity = "anchor_prev"}},
-        {"spacer", 1},
-        {"button", get_capacity_button_display(capacity_buttons.engaging), {color = COLOR_PRIMARY, gravity = "anchor_prev"}}
+    my_gui = gui {
+        { "button", get_capacity_button_display(capacity_buttons.recovering),  { color = COLOR_PRIMARY, gravity = "center_h" } },
+        { "spacer", 1 },
+        { "button", get_capacity_button_display(capacity_buttons.maintaining), { color = COLOR_PRIMARY, gravity = "anchor_prev" } },
+        { "spacer", 1 },
+        { "button", get_capacity_button_display(capacity_buttons.engaging),    { color = COLOR_PRIMARY, gravity = "anchor_prev" } }
     }
     my_gui.render()
 end
@@ -568,15 +570,15 @@ function render_capacity_selected()
     end
 
     if selected_button then
-        my_gui = gui{
-            {"button", selected_button.label, {color = COLOR_TERTIARY}},
-            {"button", dialog_buttons.log_energy.label, {color = get_energy_button_color()}},
-            {"button", dialog_buttons.plans.label, {color = get_plans_button_color()}},
-            {"spacer", 6},
-            {"button", dialog_buttons.log_note.label, {color = COLOR_TERTIARY, gravity="center_h"}},
-            {"button", dialog_buttons.log_symptoms.label, {color = get_symptoms_color(), gravity="anchor_prev"}},
-            {"button", dialog_buttons.log_activity.label, {color = get_activity_button_color(), gravity="right"}},
-            {"button", dialog_buttons.log_intervention.label, {color = get_interventions_button_color()}},
+        my_gui = gui {
+            { "button", selected_button.label,                 { color = COLOR_TERTIARY } },
+            { "button", dialog_buttons.log_energy.label,       { color = get_energy_button_color() } },
+            { "button", dialog_buttons.plans.label,            { color = get_plans_button_color() } },
+            { "spacer", 6 },
+            { "button", dialog_buttons.log_note.label,         { color = COLOR_TERTIARY, gravity = "center_h" } },
+            { "button", dialog_buttons.log_symptoms.label,     { color = get_symptoms_color(), gravity = "anchor_prev" } },
+            { "button", dialog_buttons.log_activity.label,     { color = get_activity_button_color(), gravity = "right" } },
+            { "button", dialog_buttons.log_intervention.label, { color = get_interventions_button_color() } },
         }
         my_gui.render()
     end
