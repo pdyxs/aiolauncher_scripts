@@ -268,37 +268,45 @@ function on_click(idx)
     local element = my_gui.ui[idx]
     if not element then return end
 
+    local elem_text = element[2]
+    local item = get_item_with_label(elem_text)
+    run_actions_from_attributes(item)
+
+    for _, component in ipairs(components) do
+        if component.on_click then
+            component:on_click(element, idx)
+        end
+    end
+end
+
+function get_item_with_label(label)
     if not prefs.markdown_file_path then return end
     local content = get_parsed_file_content()
     if content and content.attributes and content.attributes.ui then
         local ui_entry = content.attributes.ui[1]
         if ui_entry and ui_entry.children then
-            local elem_text = element[2]
-
             -- Find the matching UI item by button label
             for _, item in ipairs(ui_entry.children) do
                 if item.icon then
                     local button_label = "fa:" .. item.icon:gsub("_", "-")
-                    if matches_button_label(elem_text, button_label) then
-                        -- Found matching item, handle the click based on attributes
-                        if item.attributes then
-                            for action_name, action_fn in pairs(actions) do
-                                if item.attributes[action_name] then
-                                    for _, entry in ipairs(item.attributes[action_name]) do
-                                        action_fn(entry)
-                                    end
-                                end
-                            end
-                        end
+                    if matches_button_label(label, button_label) then
+                        return item
                     end
                 end
             end
         end
     end
+end
 
-    for _, component in ipairs(components) do
-        if component.on_click then
-            component:on_click(element, idx)
+function run_actions_from_attributes(node)
+    if not node or not node.attributes then
+        return
+    end
+    for action_name, action_fn in pairs(actions) do
+        if node.attributes[action_name] then
+            for _, entry in ipairs(node.attributes[action_name]) do
+                action_fn(entry)
+            end
         end
     end
 end
@@ -308,6 +316,12 @@ function on_long_click(idx)
 
     local element = my_gui.ui[idx]
     if not element then return end
+
+    local elem_text = element[2]
+    local item = get_item_with_label(elem_text)
+    if item.attributes and item.attributes.long then
+        run_actions_from_attributes(item.attributes.long[1])
+    end
 
     for _, component in ipairs(components) do
         if component.on_long_click then
