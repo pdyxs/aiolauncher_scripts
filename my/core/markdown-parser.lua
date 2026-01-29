@@ -219,9 +219,9 @@ local function expand_inline_notations(nodes)
             local base, colon_items = text:match("^(.-)%s*:%s*(.+)$")
             -- Skip if base is empty, looks like an icon, checkbox, or date pattern
             local should_skip = not base or base == "" or
-                base:match("^%[") or                                     -- checkbox
-                base:match(":fa[%-_]") or                                -- icon (fa- or fa_)
-                base:match("%d%d%d%d%-%d%d%-%d%d%s*%-$")                 -- date
+                base:match("^%[") or                     -- checkbox
+                base:match(":fa[%-_]") or                -- icon (fa- or fa_)
+                base:match("%d%d%d%d%-%d%d%-%d%d%s*%-$") -- date
             if base and colon_items and not should_skip then
                 -- Keep the colon in the text so Step 4 can identify it as an attribute
                 text = base:trim() .. ":"
@@ -357,7 +357,7 @@ local function parse_attributes(nodes)
                 keyword = node.text:match("^(.-)%s*:$")
             end
 
-            keyword = keyword:trim():lower()
+            keyword = keyword:gsub("%s+", ""):lower()
 
             -- Check for "All:" special case
             if keyword == "all" then

@@ -235,7 +235,7 @@ actions = {
         local file_name = node.children[1].text
         obsidian.open_file(file_name)
     end,
-    click = function(node)
+    clickwidget = function(node)
         if node.children and #node.children > 0 then
             -- First child is the widget name, remaining are click actions
             local widget_name = node.children[1].text:lower()
