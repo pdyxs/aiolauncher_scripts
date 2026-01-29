@@ -19,6 +19,31 @@ local my_gui = nil
 local widget_bridges = {} -- Maps widget names to their bridges
 local widget_ids = {}     -- Maps widget providers to their widget IDs
 
+local selecting_link_name = nil
+local selecting_link_callback = nil
+
+function linked_file_uri_pref(name)
+    return "linked_file_" .. name .. "_uri"
+end
+
+function load_linked_file(name)
+    local uri = prefs[linked_file_uri_pref(name)]
+    if not uri then return end
+    local content = files:read_uri(uri)
+    return markdown_parser.parse(content)
+end
+
+function load_or_select_linked_file(name, func)
+    local content = load_linked_file(name)
+    if content then
+        if func then func(content) end
+    else
+        selecting_link_name = name
+        selecting_link_callback = func
+        files:pick_file("text/markdown")
+    end
+end
+
 function get_parsed_file_content()
     return prefs.parsed_content
 end
@@ -150,9 +175,17 @@ function on_settings()
 end
 
 function on_file_picked(uri, name)
-    prefs.markdown_file_uri = uri
-    prefs.markdown_file_name = name
-    load_and_render()
+    if not selecting_link_name then
+        prefs.markdown_file_uri = uri
+        prefs.markdown_file_name = name
+        load_and_render()
+        return
+    end
+
+    prefs[linked_file_uri_pref(selecting_link_name)] = uri
+    load_or_select_linked_file(selecting_link_name, selecting_link_callback)
+    selecting_link_name = nil
+    selecting_link_callback = nil
 end
 
 function on_dialog_action(result)
@@ -219,6 +252,12 @@ function matches_button_label(elem_text, button_label)
 end
 
 actions = {
+    log = function(node)
+        local link = node.children[1].link
+        load_or_select_linked_file(link, function(content)
+            debug:dialog("Hello")
+        end)
+    end,
     open = function(node)
         local package_name = node.children[1].text
         apps:launch(package_name)
