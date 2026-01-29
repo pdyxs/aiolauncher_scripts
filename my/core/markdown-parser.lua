@@ -113,6 +113,10 @@ local markdown_parser = {
 local function build_hierarchy_from_indentation(content)
     local lines = {}
 
+    if not content then
+        return nil
+    end
+
     -- Parse all bullet lines with their indentation
     for line in content:gmatch("[^\r\n]+") do
         local indent, text = line:match("^(%s*)[-*+]%s+(.+)")
@@ -125,8 +129,8 @@ local function build_hierarchy_from_indentation(content)
     end
 
     -- Build tree structure
-    local root = {children = {}}
-    local stack = {{item = root, level = -1}}
+    local root = { children = {} }
+    local stack = { { item = root, level = -1 } }
 
     for _, line in ipairs(lines) do
         local node = {
@@ -144,7 +148,7 @@ local function build_hierarchy_from_indentation(content)
         table.insert(parent.children, node)
 
         -- Push onto stack
-        table.insert(stack, {item = node, level = line.indent_level})
+        table.insert(stack, { item = node, level = line.indent_level })
     end
 
     return root.children
@@ -193,7 +197,7 @@ local function expand_inline_notations(nodes)
 
                 -- Each group becomes a child - recursively expand them
                 for _, group in ipairs(groups) do
-                    local child_nodes = expand_inline_notations({{text = group, children = {}}})
+                    local child_nodes = expand_inline_notations({ { text = group, children = {} } })
                     for _, child_node in ipairs(child_nodes) do
                         table.insert(new_children, child_node)
                     end
@@ -203,7 +207,7 @@ local function expand_inline_notations(nodes)
                 for item in (bracket_content .. ","):gmatch("([^,]+),") do
                     item = item:trim()
                     if item ~= "" then
-                        table.insert(new_children, {text = item, children = {}})
+                        table.insert(new_children, { text = item, children = {} })
                     end
                 end
             end
@@ -215,9 +219,9 @@ local function expand_inline_notations(nodes)
             local base, colon_items = text:match("^(.-)%s*:%s*(.+)$")
             -- Skip if base is empty, looks like an icon, checkbox, or date pattern
             local should_skip = not base or base == "" or
-                                base:match("^%[") or  -- checkbox
-                                base:match(":fa[%-_]") or  -- icon (fa- or fa_)
-                                base:match("%d%d%d%d%-%d%d%-%d%d%s*%-$")  -- date
+                base:match("^%[") or                                     -- checkbox
+                base:match(":fa[%-_]") or                                -- icon (fa- or fa_)
+                base:match("%d%d%d%d%-%d%d%-%d%d%s*%-$")                 -- date
             if base and colon_items and not should_skip then
                 -- Keep the colon in the text so Step 4 can identify it as an attribute
                 text = base:trim() .. ":"
@@ -226,7 +230,7 @@ local function expand_inline_notations(nodes)
                 for item in (colon_items .. ","):gmatch("([^,]+),") do
                     item = item:trim()
                     if item ~= "" then
-                        table.insert(new_children, {text = item, children = {}})
+                        table.insert(new_children, { text = item, children = {} })
                     end
                 end
             end
@@ -245,7 +249,7 @@ local function expand_inline_notations(nodes)
 
         -- Recursively expand original children
         for _, child in ipairs(node.children) do
-            local expanded_children = expand_inline_notations({child})
+            local expanded_children = expand_inline_notations({ child })
             for _, ec in ipairs(expanded_children) do
                 table.insert(expanded_node.children, ec)
             end
@@ -284,7 +288,7 @@ local function parse_line_prefixes(nodes)
         local date_str, remaining = text:match("^(%d%d%d%d%-%d%d%-%d%d)%s*%-%s+(.*)$")
         if date_str then
             local year, month, day = date_str:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
-            node.date = os.time({year = tonumber(year), month = tonumber(month), day = tonumber(day)})
+            node.date = os.time({ year = tonumber(year), month = tonumber(month), day = tonumber(day) })
             text = remaining
         end
 
@@ -331,8 +335,8 @@ local function parse_attributes(nodes)
     -- Process All: incrementally as we go
     local regular_children = {}
     local attributes = {}
-    local all_children = {}  -- Accumulated All: children
-    local all_attributes = {}  -- Accumulated All: attributes
+    local all_children = {}   -- Accumulated All: children
+    local all_attributes = {} -- Accumulated All: attributes
 
     for i, node in ipairs(nodes) do
         -- Check for tilde-prefixed attribute: ~Keyword
@@ -346,7 +350,7 @@ local function parse_attributes(nodes)
                 name = nil,
                 children = nil
             })
-        -- Check for attribute ending with : (but with optional name in parens)
+            -- Check for attribute ending with : (but with optional name in parens)
         elseif node.text:ends_with(":") then
             local keyword, name = node.text:match("^(.-)%s*%((.*)%)%s*:$")
             if not keyword then

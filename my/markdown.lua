@@ -10,33 +10,32 @@ local obsidian = require "core.obsidian"
 local prefs = require "prefs"
 
 local dialog_manager = dialog_flow.create_dialog_flow(function() end)
-local file_manager = (require "core.file-manager").create()
 
 local components = {
-    file_manager,
     dialog_manager
 }
 
 local my_gui = nil
-local widget_bridges = {}  -- Maps widget names to their bridges
-local widget_ids = {}      -- Maps widget providers to their widget IDs
+local widget_bridges = {} -- Maps widget names to their bridges
+local widget_ids = {}     -- Maps widget providers to their widget IDs
+
+function get_parsed_file_content()
+    return prefs.parsed_content
+end
 
 function load_and_render()
-    if not prefs.markdown_file_path then
+    if not prefs.markdown_file_uri then
+        ui:show_text("No markdown file URI set")
         return
     end
-    local file_path = prefs.markdown_file_path
-    file_manager:load(file_path..".md", render, markdown_parser)
+    ui:show_text("Loading file")
+    local content = files:read_uri(prefs.markdown_file_uri)
+    ui:show_text("Parsing file")
+    local parsed_content = markdown_parser.parse(content)
+    prefs.parsed_content = parsed_content
 
-    if prefs.render_error then
-        return
-    end
-
-    local content = file_manager:get(file_path..".md")
-    if content then
-        prefs.render_error = true
-        render(content)
-        prefs.render_error = nil
+    if parsed_content then
+        render(parsed_content)
     end
 end
 
@@ -70,7 +69,7 @@ function setup_widgets(content)
             end
         end
     end
-    
+
     -- Request updates for all widgets
     if content.attributes and content.attributes.widgets then
         local widgets_entry = content.attributes.widgets[1]
@@ -87,12 +86,13 @@ end
 
 function on_edit_mode_button_click(index)
     if index == 1 then
-        obsidian.open_file(table.concat(prefs.markdown_file_path:split("/"), "/", 3))
+        obsidian.open_file(prefs.markdown_file_name)
     end
 end
 
 function render(content)
-    ui:set_edit_mode_buttons({"fa:file"})
+    ui:show_text(prefs.markdown_file_uri)
+    ui:set_edit_mode_buttons({ "fa:file" })
 
     if not content or not content.attributes or not content.attributes.ui then
         ui:show_text("No UI defined in markdown file")
@@ -131,12 +131,12 @@ function render(content)
                 button_options.expand = true
             end
 
-            table.insert(gui_elements, {"button", "fa:" .. icon_name, button_options})
+            table.insert(gui_elements, { "button", "fa:" .. icon_name, button_options })
         end
 
         -- Add spacer between buttons (but not after the last one)
         if i < #ui_entry.children then
-            table.insert(gui_elements, {"spacer", 1})
+            table.insert(gui_elements, { "spacer", 1 })
         end
     end
 
@@ -146,20 +146,13 @@ function render(content)
 end
 
 function on_settings()
-    dialog_manager:start({
-        main = {
-            type = "edit",
-            title = "Choose a Markdown File",
-            default_text = prefs.markdown_file_path or "Documents/",
-            handle_result = function(results)
-                local file_path = results[#results]
-                prefs.markdown_file_path = file_path
-                file_manager:clear_cache()
-                prefs.render_error = nil
-                load_and_render()
-            end
-        }
-    })
+    files:pick_file("text/markdown")
+end
+
+function on_file_picked(uri, name)
+    prefs.markdown_file_uri = uri
+    prefs.markdown_file_name = name
+    load_and_render()
 end
 
 function on_dialog_action(result)
@@ -204,7 +197,7 @@ function on_app_widget_updated(bridge)
         return
     end
 
-    local content = file_manager:get(prefs.markdown_file_path..".md")
+    local content = get_parsed_file_content()
     if not content or not content.attributes or not content.attributes.widgets then
         return
     end
@@ -233,6 +226,42 @@ function matches_button_label(elem_text, button_label)
     return button_label == elem_text or elem_text:find(escaped_label)
 end
 
+actions = {
+    open = function(node)
+        local package_name = node.children[1].text
+        apps:launch(package_name)
+    end,
+    obsidian = function(node)
+        local file_name = node.children[1].text
+        obsidian.open_file(file_name)
+    end,
+    click = function(node)
+        if node.children and #node.children > 0 then
+            -- First child is the widget name, remaining are click actions
+            local widget_name = node.children[1].text:lower()
+            local bridge = widget_bridges[widget_name]
+
+            if bridge then
+                -- Collect remaining children as click actions
+                local actions = {}
+                for i = 2, #node.children do
+                    table.insert(actions, node.children[i].text)
+                end
+
+                -- Call click with actions
+                if #actions > 0 then
+                    bridge:click(table.unpack(actions))
+                else
+                    bridge:click()
+                end
+            else
+                debug:toast("Widget '" .. widget_name .. "' not found")
+            end
+            return
+        end
+    end,
+}
+
 function on_click(idx)
     if not my_gui then return end
 
@@ -240,7 +269,7 @@ function on_click(idx)
     if not element then return end
 
     if not prefs.markdown_file_path then return end
-    local content = file_manager:get(prefs.markdown_file_path..".md")
+    local content = get_parsed_file_content()
     if content and content.attributes and content.attributes.ui then
         local ui_entry = content.attributes.ui[1]
         if ui_entry and ui_entry.children then
@@ -252,56 +281,15 @@ function on_click(idx)
                     local button_label = "fa:" .. item.icon:gsub("_", "-")
                     if matches_button_label(elem_text, button_label) then
                         -- Found matching item, handle the click based on attributes
-
-                        -- Check for 'open' attribute - opens an app
-                        if item.attributes and item.attributes.open then
-                            local open_entry = item.attributes.open[1]
-                            if open_entry.children and #open_entry.children > 0 then
-                                local package_name = open_entry.children[1].text
-                                apps:launch(package_name)
-                                return
-                            end
-                        end
-
-                        -- Check for 'obsidian' attribute - opens Obsidian file
-                        if item.attributes and item.attributes.obsidian then
-                            local obsidian_entry = item.attributes.obsidian[1]
-                            if obsidian_entry.children and #obsidian_entry.children > 0 then
-                                local file_path = obsidian_entry.children[1].text
-                                obsidian.open_file(file_path)
-                                return
-                            end
-                        end
-
-                        -- Check for 'click' attribute - clicks a widget
-                        if item.attributes and item.attributes.click then
-                            local click_entry = item.attributes.click[1]
-                            if click_entry.children and #click_entry.children > 0 then
-                                -- First child is the widget name, remaining are click actions
-                                local widget_name = click_entry.children[1].text:lower()
-                                local bridge = widget_bridges[widget_name]
-
-                                if bridge then
-                                    -- Collect remaining children as click actions
-                                    local actions = {}
-                                    for i = 2, #click_entry.children do
-                                        table.insert(actions, click_entry.children[i].text)
+                        if item.attributes then
+                            for action_name, action_fn in pairs(actions) do
+                                if item.attributes[action_name] then
+                                    for _, entry in ipairs(item.attributes[action_name]) do
+                                        action_fn(entry)
                                     end
-
-                                    -- Call click with actions
-                                    if #actions > 0 then
-                                        bridge:click(table.unpack(actions))
-                                    else
-                                        bridge:click()
-                                    end
-                                else
-                                    debug:toast("Widget '" .. widget_name .. "' not found")
                                 end
-                                return
                             end
                         end
-
-                        return
                     end
                 end
             end
@@ -317,7 +305,7 @@ end
 
 function on_long_click(idx)
     if not my_gui then return end
-    
+
     local element = my_gui.ui[idx]
     if not element then return end
 
