@@ -19,6 +19,8 @@ local my_gui = nil
 local widget_bridges = {} -- Maps widget names to their bridges
 local widget_ids = {}     -- Maps widget providers to their widget IDs
 
+local parsed_content = nil
+
 local selecting_link_name = nil
 local selecting_link_callback = nil
 
@@ -45,7 +47,7 @@ function load_or_select_linked_file(name, func)
 end
 
 function get_parsed_file_content()
-    return prefs.parsed_content
+    return parsed_content
 end
 
 function load_and_render()
@@ -56,8 +58,7 @@ function load_and_render()
     ui:show_text("Loading file")
     local content = files:read_uri(prefs.markdown_file_uri)
     ui:show_text("Parsing file")
-    local parsed_content = markdown_parser.parse(content)
-    prefs.parsed_content = parsed_content
+    parsed_content = markdown_parser.parse(content)
 
     if parsed_content then
         render(parsed_content)
@@ -197,6 +198,7 @@ function on_dialog_action(result)
 end
 
 function on_load()
+    load_and_render()
     for _, component in ipairs(components) do
         if component.on_load then
             component:on_load()
