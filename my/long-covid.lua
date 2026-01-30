@@ -117,41 +117,75 @@ local ACTIVITY = "Activity"
 local INTERVENTION = "Intervention"
 local SYMPTOM = "Symptom"
 
+function execute_log(name, loggables, new_loggable)
+    if type(new_loggable) == "string" then
+        new_loggable = { new_loggable }
+    end
+
+    logger.log_to_spreadsheet(
+        util.concat_arrays({ name }, loggables, new_loggable)
+    )
+end
+
+function execute_logs(name, loggables, new_loggables)
+    local logs = util.map(new_loggables, function(loggable)
+        if type(loggable) == "string" then
+            loggable = { loggable }
+        end
+        return util.concat_arrays({ name }, loggables, loggable)
+    end)
+
+    logger.log_events_to_spreadsheet(logs)
+end
+
+function get_loggable(result)
+    local log = result.value
+
+    if result.meta.detail then
+        log = { log, result.meta.detail }
+    end
+    return log
+end
+
+function handle_main_dialog_result(results, dialogs, loggables, name, override_log, override_logs)
+    local result = results[#results]
+    if result.value == OTHER_TEXT then
+        return dialogs.custom_input
+    end
+
+    local log = get_loggable(result)
+
+    if result.meta.specifiers.Options then
+        return dialogs.options, log
+    end
+    if result.meta.is_link then
+        return dialogs.todo, log
+    end
+
+    if result.meta.children and #result.meta.children > 0 then
+        local childlogs = util.map(result.meta.children, get_loggable)
+        if override_logs then return override_logs(childlogs) end
+        return execute_logs(name, loggables, childlogs)
+    end
+
+    if override_log then return override_logs(log) end
+    return execute_log(name, loggables, log)
+end
+
 function create_dialogs_for_items(name, get_items, override_log, override_logs)
     local do_log = function(loggables, new_loggable)
         if override_log then
             return override_log(new_loggable)
         end
 
-        if type(new_loggable) == "string" then
-            new_loggable = { new_loggable }
-        end
-
-        logger.log_to_spreadsheet(
-            util.concat_arrays({ name }, loggables, new_loggable)
-        )
+        execute_log(name, loggables, { new_loggable })
     end
     local do_logs = function(loggables, new_loggables)
         if override_logs then
             return override_logs(new_loggables)
         end
 
-        local logs = util.map(new_loggables, function(loggable)
-            if type(loggable) == "string" then
-                loggable = { loggable }
-            end
-            return util.concat_arrays({ name }, loggables, loggable)
-        end)
-
-        logger.log_events_to_spreadsheet(logs)
-    end
-    local get_loggable = function(result)
-        local log = result.value
-
-        if result.meta.detail then
-            log = { log, result.meta.detail }
-        end
-        return log
+        execute_logs(name, loggables, new_loggables)
     end
     return {
         main = {
@@ -168,26 +202,7 @@ function create_dialogs_for_items(name, get_items, override_log, override_logs)
                 return options, values, metas
             end,
             handle_result = function(results, dialogs, loggables)
-                local result = results[#results]
-                if result.value == OTHER_TEXT then
-                    return dialogs.custom_input
-                end
-
-                local log = get_loggable(result)
-
-                if result.meta.specifiers.Options then
-                    return dialogs.options, log
-                end
-                if result.meta.is_link then
-                    return dialogs.todo, log
-                end
-
-                if result.meta.children and #result.meta.children > 0 then
-                    local childlogs = util.map(result.meta.children, get_loggable)
-                    return do_logs(loggables, childlogs)
-                end
-
-                return do_log(loggables, log)
+                return handle_main_dialog_result(results, dialogs, loggables, name, override_log, override_logs)
             end
         },
 
@@ -296,28 +311,10 @@ function setup_loggables()
     prefs.activity_items = get_loggable_items("Activities")
     prefs.intervention_items = get_loggable_items("Interventions")
     setup_symptoms()
-    prefs.plans = get_plans_info()
 end
 
 function setup_symptoms()
     prefs.symptom_items = get_loggable_symptom_items()
-end
-
-function get_plans_info()
-    local parsed_plans = markdown_parser.get_list_items(DATA_PREFIX .. "Plans.md")
-    local incomplete = util.filter(parsed_plans, function(plan)
-        return string.match(plan.text, "^%[ %]")
-    end)
-    local any_overdue = false
-    local list = util.map(incomplete, function(p)
-        local text_without_marker = string.gsub(p.text, "^%[ %] ", "")
-        local item, overdue = plan_parser.parse_plan(text_without_marker)
-        if overdue then
-            any_overdue = true
-        end
-        return item
-    end)
-    return { list = list, any_overdue = any_overdue }
 end
 
 function get_loggable_symptom_items()
@@ -572,6 +569,8 @@ function render_select_capacity()
     my_gui.render()
 end
 
+local latest_intervention = nil
+
 function render_capacity_selected()
     local current_capacity = get_current_capacity()
 
@@ -585,7 +584,7 @@ function render_capacity_selected()
     end
 
     if selected_button then
-        local latest_intervention = get_latest_required(INTERVENTION, prefs.intervention_items)
+        latest_intervention = get_latest_required(INTERVENTION, prefs.intervention_items)
 
         local buildingGui = {
             { "button", selected_button.label,                 { color = COLOR_TERTIARY } },
@@ -595,8 +594,11 @@ function render_capacity_selected()
         }
 
         if latest_intervention then
-            table.insert(buildingGui, { "button", latest_intervention.text, { color = COLOR_PRIMARY } })
+            table.insert(buildingGui, { "spacer", 1 })
+            table.insert(buildingGui,
+                { "text", latest_intervention.text, { color = COLOR_PRIMARY, gravity = "center_v" } })
         end
+
         my_gui = gui(buildingGui)
         my_gui.render()
     end
@@ -615,6 +617,16 @@ function on_click(idx)
 
     local element = my_gui.ui[idx]
     if not element then return end
+
+    local elem_text = element[2]
+    if latest_intervention and elem_text == latest_intervention.text then
+        local next, log = handle_main_dialog_result({ latest_intervention }, dialog_buttons.log_intervention.dialogs, {},
+            INTERVENTION)
+        if (log) then
+            dialog_manager:start(dialog_buttons.log_intervention.dialogs, next, { latest_intervention }, { log })
+        end
+        return
+    end
 
     ui_core.handle_button_click(element, util.tables_to_array(capacity_buttons, dialog_buttons))
 end

@@ -49,7 +49,7 @@ function M.open_checkbox_dialog(dialog_config, results, loggables)
         if result == -1 then
             return -1
         end
-        return { indices=result, options=util.map(result, function(r) return options[r] end), all_options=options }
+        return { indices = result, options = util.map(result, function(r) return options[r] end), all_options = options }
     end
 end
 
@@ -61,7 +61,7 @@ function M.open_radio_dialog(dialog_config, results, loggables)
         if type(result) ~= "number" or result < 1 then
             return -1
         end
-        local ret = { index=result, option=options[result] }
+        local ret = { index = result, option = options[result] }
         if values ~= nil then
             ret.value = values[result]
         end
@@ -95,10 +95,16 @@ function M.create_dialog_flow(on_complete)
         parse_result = nil
     }
 
-    function flow:start(config)
+    function flow:start(config, start, results, loggables)
         self:clear()
         self.config = config
-        self:push_dialog(self.config.main)
+        self.results = results or {}
+        self.loggables = loggables or {}
+        if start then
+            self:push_dialog(start)
+        else
+            self:push_dialog(self.config.main)
+        end
     end
 
     function flow:push_dialog(dialog_config)

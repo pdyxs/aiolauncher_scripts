@@ -75,7 +75,7 @@ function M.store_log(event, value, detail)
     logs[event].values[value].count = (logs[event].values[value].count or 0) + 1
     logs[event].values[value].last_logged = time_utils.get_current_timestamp()
 
-    if detail ~= "" then
+    if detail ~= "" and detail ~= nil then
         logs[event].values[value].last_detail = detail
 
         if not logs[event].values[value].details then
