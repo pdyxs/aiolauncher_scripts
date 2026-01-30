@@ -13,7 +13,7 @@ local prefs = require "prefs"
 --   detail - Optional additional information (e.g., severity, options, notes)
 --   ui_callback - Function to call for user feedback (optional)
 function M.log_to_spreadsheet(event, ui_callback)
-    return M.log_events_to_spreadsheet({event}, ui_callback)
+    return M.log_events_to_spreadsheet({ event }, ui_callback)
 end
 
 function M.log_events_to_spreadsheet(events, ui_callback)
@@ -26,9 +26,9 @@ function M.log_events_to_spreadsheet(events, ui_callback)
     end, events)
 
     local str = table.concat(
-        map(function(event) 
-            return timestamp.."¦"..table.concat(event, "¦")
-        end, events), 
+        map(function(event)
+            return timestamp .. "¦" .. table.concat(event, "¦")
+        end, events),
         "\n"
     )
 
@@ -39,7 +39,7 @@ function M.log_events_to_spreadsheet(events, ui_callback)
 
     local success, error_msg = pcall(function()
         tasker:run_task("LongCovid_Log", {
-            data=str
+            data = str
         })
     end)
 
@@ -50,7 +50,7 @@ function M.log_events_to_spreadsheet(events, ui_callback)
 
     local message = "✓ Logged:"
     for k, event in pairs(data) do
-        message = message.."\n"..table.concat(event, " - ")
+        message = message .. "\n" .. table.concat(event, " - ")
         M.store_log(event[1], event[2], event[3])
     end
 
@@ -61,15 +61,15 @@ function M.store_log(event, value, detail)
     local logs = prefs.logs or {}
 
     if not logs[event] then
-        logs[event] = {count = 0, values = {}}
+        logs[event] = { count = 0, values = {} }
     end
 
     logs[event].count = (logs[event].count or 0) + 1
     logs[event].last_logged = time_utils.get_current_timestamp()
     logs[event].last_value = value
-    
+
     if not logs[event].values[value] then
-        logs[event].values[value] = { count = 0 }
+        logs[event].values[value] = { count = 0, details = {} }
     end
 
     logs[event].values[value].count = (logs[event].values[value].count or 0) + 1
@@ -77,6 +77,17 @@ function M.store_log(event, value, detail)
 
     if detail ~= "" then
         logs[event].values[value].last_detail = detail
+
+        if not logs[event].values[value].details then
+            logs[event].values[value].details = {}
+        end
+
+        if not logs[event].values[value].details[detail] then
+            logs[event].values[value].details[detail] = { count = 0 }
+        end
+
+        logs[event].values[value].details[detail].count = (logs[event].values[value].details[detail].count or 0) + 1
+        logs[event].values[value].details[detail].last_logged = time_utils.get_current_timestamp()
     end
 
     prefs.logs = logs
@@ -97,7 +108,7 @@ function M.log_count(event, value)
     return prefs.logs[event].values[value].count
 end
 
-function M.last_logged(event, value)
+function M.last_logged(event, value, detail)
     if prefs.logs == nil or prefs.logs[event] == nil then
         return 0
     end
@@ -109,7 +120,16 @@ function M.last_logged(event, value)
     if prefs.logs[event].values[value] == nil then
         return 0
     end
-    return prefs.logs[event].values[value].last_logged
+
+    if detail == nil then
+        return prefs.logs[event].values[value].last_logged
+    end
+
+    if prefs.logs[event].values[value].details == nil or prefs.logs[event].values[value].details[detail] == nil then
+        return 0
+    end
+
+    return prefs.logs[event].values[value].details[detail].last_logged
 end
 
 function M.last_value(event)

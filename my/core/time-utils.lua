@@ -41,7 +41,7 @@ function M.is_day_of_week(timestamp, days_array)
     local weekday = date.wday -- 1=Sunday, 2=Monday, ..., 7=Saturday
 
     -- Convert numeric weekday to day name
-    local day_names = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"}
+    local day_names = { "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" }
     local actual_day = day_names[weekday]
 
     -- Check if actual day matches any in the array
@@ -87,6 +87,38 @@ function M.format_time_ago(timestamp)
     else
         local days_ago = math.floor(hours_ago / 24)
         return days_ago .. "d ago"
+    end
+end
+
+function M.parse_time(str)
+    local h, m = str:match("^(%d+):(%d%d)$")
+    if h then
+        return tonumber(h), tonumber(m)
+    end
+    return nil, nil
+end
+
+function M.is_after_time(timestamp, time_str)
+    local h, m = M.parse_time(time_str)
+    if not h then return false end
+    local d = os.date("*t", timestamp)
+    return d.hour > h or (d.hour == h and d.min >= m)
+end
+
+function M.is_in_time_range(timestamp, range_str)
+    local start_str, end_str = range_str:match("^([%d:]+)-([%d:]+)$")
+    if not start_str then return false end
+    local sh, sm = M.parse_time(start_str)
+    local eh, em = M.parse_time(end_str)
+    if not sh or not eh then return false end
+    local d = os.date("*t", timestamp)
+    local cur = d.hour * 60 + d.min
+    local s = sh * 60 + sm
+    local e = eh * 60 + em
+    if s <= e then
+        return cur >= s and cur <= e
+    else
+        return cur >= s or cur <= e
     end
 end
 

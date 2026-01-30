@@ -1,4 +1,5 @@
 local item_parser = {}
+local util = require "core.util"
 
 function item_parser.parse_item(item)
     local text = item.text
@@ -12,9 +13,10 @@ function item_parser.parse_item(item)
 
     local value = text
 
-    local specifiers = item_parser.extract_specifiers(item)
-    
-    local meta = { is_link = is_link, specifiers=specifiers }
+    local specifiers, children = item_parser.extract_specifiers(item)
+    children = util.map(children, item_parser.parse_item)
+
+    local meta = { is_link = is_link, specifiers = specifiers }
 
     local main_text, extracted_detail = text:match("^(.+)%s+%((.+)%)$")
     if main_text and extracted_detail then
@@ -22,7 +24,12 @@ function item_parser.parse_item(item)
         meta.detail = extracted_detail
     end
 
-    return { value=value, text=text, meta=meta }
+    if #children > 0 then
+        text = text .. " (" .. #children .. ")"
+        meta.children = children
+    end
+
+    return { value = value, text = text, meta = meta }
 end
 
 -- Extracts specifiers and their parameters from an item's children
@@ -31,9 +38,10 @@ function item_parser.extract_specifiers(item)
     local specifiers = {}
 
     if not item.children then
-        return specifiers
+        return specifiers, {}
     end
 
+    local children = {}
     for _, child in ipairs(item.children) do
         local text = child.text or ""
 
@@ -51,7 +59,7 @@ function item_parser.extract_specifiers(item)
                 end
                 specifiers[specifier_name] = params
 
-            -- Format 2: Parameters as children
+                -- Format 2: Parameters as children
             elseif child.children then
                 local params = {}
                 for _, param_child in ipairs(child.children) do
@@ -61,14 +69,16 @@ function item_parser.extract_specifiers(item)
                 end
                 specifiers[specifier_name] = params
 
-            -- Empty specifier
+                -- Empty specifier
             else
                 specifiers[specifier_name] = {}
             end
+        else
+            table.insert(children, child)
         end
     end
 
-    return specifiers
+    return specifiers, children
 end
 
 return item_parser

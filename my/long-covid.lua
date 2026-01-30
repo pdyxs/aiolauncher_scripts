@@ -117,7 +117,7 @@ local ACTIVITY = "Activity"
 local INTERVENTION = "Intervention"
 local SYMPTOM = "Symptom"
 
-function create_dialogs_for_items(name, get_items, override_log)
+function create_dialogs_for_items(name, get_items, override_log, override_logs)
     local do_log = function(loggables, new_loggable)
         if override_log then
             return override_log(new_loggable)
@@ -130,6 +130,28 @@ function create_dialogs_for_items(name, get_items, override_log)
         logger.log_to_spreadsheet(
             util.concat_arrays({ name }, loggables, new_loggable)
         )
+    end
+    local do_logs = function(loggables, new_loggables)
+        if override_logs then
+            return override_logs(new_loggables)
+        end
+
+        local logs = util.map(new_loggables, function(loggable)
+            if type(loggable) == "string" then
+                loggable = { loggable }
+            end
+            return util.concat_arrays({ name }, loggables, loggable)
+        end)
+
+        logger.log_events_to_spreadsheet(logs)
+    end
+    local get_loggable = function(result)
+        local log = result.value
+
+        if result.meta.detail then
+            log = { log, result.meta.detail }
+        end
+        return log
     end
     return {
         main = {
@@ -151,11 +173,7 @@ function create_dialogs_for_items(name, get_items, override_log)
                     return dialogs.custom_input
                 end
 
-                local log = result.value
-
-                if result.meta.detail then
-                    log = { log, result.meta.detail }
-                end
+                local log = get_loggable(result)
 
                 if result.meta.specifiers.Options then
                     return dialogs.options, log
@@ -163,6 +181,12 @@ function create_dialogs_for_items(name, get_items, override_log)
                 if result.meta.is_link then
                     return dialogs.todo, log
                 end
+
+                if result.meta.children and #result.meta.children > 0 then
+                    local childlogs = util.map(result.meta.children, get_loggable)
+                    return do_logs(loggables, childlogs)
+                end
+
                 return do_log(loggables, log)
             end
         },
@@ -207,40 +231,6 @@ end
 
 local dialog_buttons = util.map(
     {
-        log_energy = {
-            label = "fa:bolt",
-            dialogs = {
-                main = {
-                    type = "radio",
-                    title = "Log Energy Level",
-                    get_options = function()
-                        return {
-                            "1 - Completely drained", "2 - Very low", "3 - Low", "4 - Below average",
-                            "5 - Average", "6 - Above average", "7 - Good", "8 - Very good",
-                            "9 - Excellent", "10 - Peak energy"
-                        }
-                    end,
-                    handle_result = function(results)
-                        logger.log_to_spreadsheet({ "Energy", results[#results].index })
-                        render_widget()
-                    end
-                }
-            }
-        },
-        log_note = {
-            label = "fa:note-sticky",
-            dialogs = {
-                main = {
-                    type = "edit",
-                    title = "Log note",
-                    prompt = "Enter note:",
-                    default_text = "",
-                    handle_result = function(results)
-                        logger.log_to_spreadsheet({ "Note", results[#results] })
-                    end
-                }
-            }
-        },
         log_symptoms = {
             label = "fa:heart-pulse",
             long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Symptoms.md") end,
@@ -288,22 +278,6 @@ local dialog_buttons = util.map(
             long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Interventions.md") end,
             dialogs = create_dialogs_for_items(INTERVENTION, function() return prefs.intervention_items end),
         },
-
-        plans = {
-            label = "fa:calendar",
-            long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Plans.md") end,
-            dialogs = {
-                main = {
-                    type = "list",
-                    title = "Plans",
-                    get_lines = function()
-                        return prefs.plans.list
-                    end,
-                    handle_result = function()
-                    end
-                }
-            }
-        }
     },
     function(btn)
         btn.callback = function(button) dialog_manager:start(button.dialogs) end
@@ -315,7 +289,7 @@ local dialog_buttons = util.map(
 
 local REQUIRED_ITEM = "‼️"
 local COMPLETED_ITEM = "✓"
-local LINKED_ITEM = "♾️"
+local LINKED_ITEM = "⚟"
 local OPTIONS = "⚟"
 
 function setup_loggables()
@@ -383,6 +357,37 @@ function are_any_required(event, items)
     return false
 end
 
+function get_latest_required(event, items)
+    local best = nil
+    local best_start = nil
+
+    for _, item in ipairs(items) do
+        if is_item_required(event, item) then
+            local start_minutes = nil
+            if item.meta.specifiers.Required then
+                for _, param in ipairs(item.meta.specifiers.Required) do
+                    local p = param:lower()
+                    local range_start = p:match("^(%d+:%d%d)%-%d+:%d%d$")
+                    local time_str = range_start or p:match("^%d+:%d%d$")
+                    if time_str then
+                        local h, m = time_utils.parse_time(time_str)
+                        if h then
+                            start_minutes = h * 60 + m
+                        end
+                    end
+                end
+            end
+
+            if best == nil or (start_minutes ~= nil and (best_start == nil or start_minutes < best_start)) then
+                best = item
+                best_start = start_minutes
+            end
+        end
+    end
+
+    return best
+end
+
 function get_modified_item_text(event, item)
     local text = item.text
     if is_item_required(event, item) then
@@ -397,7 +402,7 @@ function get_modified_item_text(event, item)
         text = text .. " " .. OPTIONS
     end
 
-    local last_logged = logger.last_logged(event, item.value)
+    local last_logged = logger.last_logged(event, item.value, item.meta.detail)
     local now = time_utils.get_current_timestamp()
     if time_utils.is_same_calendar_day(last_logged, now) then
         text = text .. " " .. COMPLETED_ITEM
@@ -413,18 +418,28 @@ function is_item_required(event, item)
 
     local requiredParams = util.map(item.meta.specifiers.Required, function(i) return i:lower() end)
     local now = time_utils.get_current_timestamp()
-    local last_logged = logger.last_logged(event, item.value)
+    local last_logged = logger.last_logged(event, item.value, item.meta.detail)
+
+    -- Extract time constraint if present
+    local time_ok = true
+    for _, param in ipairs(requiredParams) do
+        if param:match("^%d+:%d%d%-%d+:%d%d$") then
+            time_ok = time_utils.is_in_time_range(now, param)
+        elseif param:match("^%d+:%d%d$") then
+            time_ok = time_utils.is_after_time(now, param)
+        end
+    end
 
     if util.contains(requiredParams, "now") then
-        return true
+        return time_ok
     end
 
     if util.contains(requiredParams, "daily") or time_utils.is_day_of_week(now, requiredParams) then
-        return not time_utils.is_same_calendar_day(last_logged, now)
+        return time_ok and not time_utils.is_same_calendar_day(last_logged, now)
     end
 
     if util.contains(requiredParams, "weekly") then
-        return not time_utils.is_same_week(last_logged, now)
+        return time_ok and not time_utils.is_same_week(last_logged, now)
     end
 
     return false
@@ -570,16 +585,19 @@ function render_capacity_selected()
     end
 
     if selected_button then
-        my_gui = gui {
+        local latest_intervention = get_latest_required(INTERVENTION, prefs.intervention_items)
+
+        local buildingGui = {
             { "button", selected_button.label,                 { color = COLOR_TERTIARY } },
-            { "button", dialog_buttons.log_energy.label,       { color = get_energy_button_color() } },
-            { "button", dialog_buttons.plans.label,            { color = get_plans_button_color() } },
-            { "spacer", 6 },
-            { "button", dialog_buttons.log_note.label,         { color = COLOR_TERTIARY, gravity = "center_h" } },
             { "button", dialog_buttons.log_symptoms.label,     { color = get_symptoms_color(), gravity = "anchor_prev" } },
-            { "button", dialog_buttons.log_activity.label,     { color = get_activity_button_color(), gravity = "right" } },
+            { "button", dialog_buttons.log_activity.label,     { color = get_activity_button_color(), gravity = "center_h" } },
             { "button", dialog_buttons.log_intervention.label, { color = get_interventions_button_color() } },
         }
+
+        if latest_intervention then
+            table.insert(buildingGui, { "button", latest_intervention.text, { color = COLOR_PRIMARY } })
+        end
+        my_gui = gui(buildingGui)
         my_gui.render()
     end
 end
