@@ -447,6 +447,13 @@ end
   @return table - Wrapper object with {children = [...], attributes = {...}}
 ]]
 function markdown_parser.parse(content)
+    if not content then
+        return {
+            children = {},
+            attributes = {}
+        }
+    end
+
     -- Step 1: Build hierarchy from indentation
     local tree = build_hierarchy_from_indentation(content)
 

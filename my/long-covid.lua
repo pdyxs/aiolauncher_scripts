@@ -125,6 +125,7 @@ function execute_log(name, loggables, new_loggable)
     logger.log_to_spreadsheet(
         util.concat_arrays({ name }, loggables, new_loggable)
     )
+    render_widget()
 end
 
 function execute_logs(name, loggables, new_loggables)
@@ -136,6 +137,7 @@ function execute_logs(name, loggables, new_loggables)
     end)
 
     logger.log_events_to_spreadsheet(logs)
+    render_widget()
 end
 
 function get_loggable(result)
@@ -165,6 +167,7 @@ function handle_main_dialog_result(results, dialogs, loggables, name, override_l
     if result.meta.children and #result.meta.children > 0 then
         local childlogs = util.map(result.meta.children, get_loggable)
         if override_logs then return override_logs(childlogs) end
+        logger.store_log(name, result.value, result.meta.detail)
         return execute_logs(name, loggables, childlogs)
     end
 
