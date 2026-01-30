@@ -240,8 +240,7 @@ function create_dialogs_for_items(name, get_items, override_log, override_logs)
                 return todo_parser.parse_todo_list(parsed_todos, completions, get_current_capacity())
             end,
             handle_result = function(results, dialogs, loggables)
-                local perc = string.format("%.0f%%", (#results[#results].indices / #results[#results].all_options) * 100)
-                return do_log(loggables, perc)
+                return do_logs(loggables, #results[#results].options)
             end
         }
     }
