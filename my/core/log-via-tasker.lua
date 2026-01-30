@@ -57,6 +57,34 @@ function M.log_events_to_spreadsheet(events, ui_callback)
     ui_callback(message)
 end
 
+function M.store_ignore(event, value, detail)
+    local logs = prefs.logs or {}
+
+    if not logs[event] then
+        logs[event] = { count = 0, values = {} }
+    end
+
+    if not logs[event].values[value] then
+        logs[event].values[value] = { count = 0, details = {} }
+    end
+
+    if detail ~= "" and detail ~= nil then
+        if not logs[event].values[value].details then
+            logs[event].values[value].details = {}
+        end
+
+        if not logs[event].values[value].details[detail] then
+            logs[event].values[value].details[detail] = { count = 0 }
+        end
+
+        logs[event].values[value].details[detail].last_ignored = time_utils.get_current_timestamp()
+    else
+        logs[event].values[value].last_ignored = time_utils.get_current_timestamp()
+    end
+
+    prefs.logs = logs
+end
+
 function M.store_log(event, value, detail)
     local logs = prefs.logs or {}
 
@@ -91,6 +119,26 @@ function M.store_log(event, value, detail)
     end
 
     prefs.logs = logs
+end
+
+function M.last_ignored(event, value, detail)
+    if prefs.logs == nil or prefs.logs[event] == nil then
+        return 0
+    end
+
+    if value == nil or prefs.logs[event].values[value] == nil then
+        return 0
+    end
+
+    if detail == nil or detail == "" then
+        return prefs.logs[event].values[value].last_ignored
+    end
+
+    if prefs.logs[event].values[value].details == nil or prefs.logs[event].values[value].details[detail] == nil then
+        return 0
+    end
+
+    return prefs.logs[event].values[value].details[detail].last_ignored
 end
 
 function M.log_count(event, value)

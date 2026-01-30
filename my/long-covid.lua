@@ -359,7 +359,7 @@ function get_latest_required(event, items)
     local best_start = nil
 
     for _, item in ipairs(items) do
-        if is_item_required(event, item) then
+        if is_item_required(event, item) and not is_item_ignored(event, item) then
             local start_minutes = nil
             if item.meta.specifiers.Required then
                 for _, param in ipairs(item.meta.specifiers.Required) do
@@ -406,6 +406,12 @@ function get_modified_item_text(event, item)
     end
 
     return text
+end
+
+function is_item_ignored(event, item)
+    local last_ignored = logger.last_ignored(event, item.value, item.meta.detail)
+    local now = time_utils.get_current_timestamp()
+    return time_utils.is_same_calendar_day(last_ignored, now)
 end
 
 function is_item_required(event, item)
@@ -570,6 +576,7 @@ function render_select_capacity()
 end
 
 local latest_intervention = nil
+local latest_activity = nil
 
 function render_capacity_selected()
     local current_capacity = get_current_capacity()
@@ -585,18 +592,25 @@ function render_capacity_selected()
 
     if selected_button then
         latest_intervention = get_latest_required(INTERVENTION, prefs.intervention_items)
+        latest_activity = get_latest_required(ACTIVITY, prefs.activity_items)
 
         local buildingGui = {
-            { "button", selected_button.label,                 { color = COLOR_TERTIARY } },
-            { "button", dialog_buttons.log_symptoms.label,     { color = get_symptoms_color(), gravity = "anchor_prev" } },
-            { "button", dialog_buttons.log_activity.label,     { color = get_activity_button_color(), gravity = "center_h" } },
-            { "button", dialog_buttons.log_intervention.label, { color = get_interventions_button_color() } },
+            { "button", selected_button.label,             { color = COLOR_TERTIARY } },
+            { "button", dialog_buttons.log_symptoms.label, { color = get_symptoms_color(), gravity = "anchor_prev" } },
+            { "button", dialog_buttons.log_activity.label, { color = get_activity_button_color() } },
         }
 
-        if latest_intervention then
-            table.insert(buildingGui, { "spacer", 1 })
+        if latest_activity then
             table.insert(buildingGui,
-                { "text", latest_intervention.text, { color = COLOR_PRIMARY, gravity = "center_v" } })
+                { "text", latest_activity.text, { margin = "4dp", color = COLOR_PRIMARY, gravity = "center_v|anchor_prev" } })
+        end
+
+        table.insert(buildingGui,
+            { "button", dialog_buttons.log_intervention.label, { color = get_interventions_button_color(), gravity = "right" } })
+
+        if latest_intervention then
+            table.insert(buildingGui,
+                { "text", latest_intervention.text, { margin = "4dp", color = COLOR_PRIMARY, gravity = "center_v" } })
         end
 
         my_gui = gui(buildingGui)
@@ -628,6 +642,15 @@ function on_click(idx)
         return
     end
 
+    if latest_activity and elem_text == latest_activity.text then
+        local next, log = handle_main_dialog_result({ latest_activity }, dialog_buttons.log_activity.dialogs, {},
+            ACTIVITY)
+        if (log) then
+            dialog_manager:start(dialog_buttons.log_intervention.dialogs, next, { latest_activity }, { log })
+        end
+        return
+    end
+
     ui_core.handle_button_click(element, util.tables_to_array(capacity_buttons, dialog_buttons))
 end
 
@@ -640,6 +663,19 @@ function on_long_click(idx)
 
     local element = my_gui.ui[idx]
     if not element then return end
+
+    local elem_text = element[2]
+    if latest_intervention and elem_text == latest_intervention.text then
+        logger.store_ignore(INTERVENTION, latest_intervention.value, latest_intervention.detail)
+        render_widget()
+        return
+    end
+
+    if latest_activity and elem_text == latest_activity.text then
+        logger.store_ignore(ACTIVITY, latest_activity.value, latest_activity.detail)
+        render_widget()
+        return
+    end
 
     ui_core.handle_button_long_click(element, util.tables_to_array(capacity_buttons, dialog_buttons))
 end
