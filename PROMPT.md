@@ -465,6 +465,7 @@ Intent table format (all fields are optional):
 * `aio:open_notifications_panel()` - opens the system notifications panel (same as swiping down the status bar);
 * `aio:open_side_menu()` - opens the launcher’s app drawer;
 * `aio:open_search([query])` - opens the launcher search screen; if `query` is provided, the search field will be pre-filled with this text;
+* `aio:show_toast(string)` - shows informational message in Android style;
 * `aio:launcher_info()` - returns basic information about the AIO Launcher build:
 
 ```lua

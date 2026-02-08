@@ -29,6 +29,8 @@ The type of script is determined by the line (meta tag) at the beginning of the 
 ### 6.3.0
 
 * Added modules: `timers`, `player`, `currencies`, `finance`, `recorder`
+* Added `aio:show_toast()` function
+* `dialogs` module now available in the search- and drawer-scripts
 * `search` action now accepts initial text
 
 ### 6.2.0
@@ -46,30 +48,6 @@ The type of script is determined by the line (meta tag) at the beginning of the 
 * Added `files:pick_file()` method
 * Added `profiles:current()` method
 * `http:get()` now returns headers
-
-### 5.8.0
-
-* Rich UI has added functions for managing margins and for precise positioning of elements
-* AIO now supports the fa-fw: icon prefix for rendering icons in a fixed box
-
-### 5.7.1
-
-* Added `tags` field to the app table
-* Added `system:tz()` method
-
-### 5.7.0
-
-* Added `ui:show_image(uri)` method
-* Many changes in the `notify` module
-
-### 5.6.1
-
-* Added `ui:set_expandable()` and `ui:is_expanded()` methods
-
-### 5.6.0
-
-* Added `ui:set_edit_mode_buttons()` method
-* Added size argument to `widgets:request_updates()` method
 
 [Full changelog](CHANGELOG.md)
 
@@ -226,8 +204,6 @@ The `ui:show_buttons()` function supports FontAwesome icons. Simply specify `fa:
 *Note: AIO only supports icons up to FontAwesome 6.3.0.*
 
 ## Dialogs
-
-_Available only in widget scripts._
 
 * `dialogs:show_dialog(title, text, [button1_text], [button2_text])` - show dialog, the first argument is the title, the second is the text, button1\_text is the name of the first button, button2\_text is the name of the second button;
 * `dialogs:show_edit_dialog(title, [text], [default_value])` - show the dialog with the input field: title - title, text - signature, default\_value - standard value of the input field;
@@ -437,6 +413,7 @@ Intent table format (all fields are optional):
 * `aio:open_notifications_panel()` - opens the system notifications panel (same as swiping down the status bar);
 * `aio:open_side_menu()` - opens the launcher’s app drawer;
 * `aio:open_search([query])` - opens the launcher search screen; if `query` is provided, the search field will be pre-filled with this text;
+* `aio:show_toast(string)` - shows informational message in Android style;
 * `aio:launcher_info()` - returns basic information about the AIO Launcher build:
 
 ```lua

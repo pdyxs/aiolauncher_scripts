@@ -1,3 +1,27 @@
+### 5.8.0
+
+* Rich UI has added functions for managing margins and for precise positioning of elements
+* AIO now supports the fa-fw: icon prefix for rendering icons in a fixed box
+
+### 5.7.1
+
+* Added `tags` field to the app table
+* Added `system:tz()` method
+
+### 5.7.0
+
+* Added `ui:show_image(uri)` method
+* Many changes in the `notify` module
+
+### 5.6.1
+
+* Added `ui:set_expandable()` and `ui:is_expanded()` methods
+
+### 5.6.0
+
+* Added `ui:set_edit_mode_buttons()` method
+* Added size argument to `widgets:request_updates()` method
+
 ### 5.5.4
 
 * Added `icon` meta tag
