@@ -50,17 +50,30 @@ function get_parsed_file_content()
     return parsed_content
 end
 
+function show_debug_text(text, has_rendered)
+    if not has_rendered then
+        ui:show_text(text)
+    end
+end
+
 function load_and_render()
+    local has_parsed_content = false
+    if prefs.parsed_content then
+        render(prefs.parsed_content)
+        has_parsed_content = true
+    end
+
     if not prefs.markdown_file_uri then
-        ui:show_text("No markdown file URI set")
+        show_debug_text("No markdown file URI set", has_parsed_content)
         return
     end
-    ui:show_text("Loading file")
+    show_debug_text("Loading file " .. prefs.markdown_file_name, has_parsed_content)
     local content = files:read_uri(prefs.markdown_file_uri)
-    ui:show_text("Parsing file")
+    show_debug_text("Parsing file " .. prefs.markdown_file_name, has_parsed_content)
     parsed_content = markdown_parser.parse(content)
 
     if parsed_content then
+        prefs.parsed_content = parsed_content
         render(parsed_content)
     end
 end
