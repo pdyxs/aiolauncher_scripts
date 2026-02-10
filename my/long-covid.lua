@@ -240,7 +240,7 @@ function create_dialogs_for_items(name, get_items, override_log, override_logs)
                 return todo_parser.parse_todo_list(parsed_todos, completions, get_current_capacity())
             end,
             handle_result = function(results, dialogs, loggables)
-                return do_logs(loggables, #results[#results].options)
+                return do_logs(loggables, results[#results].options)
             end
         }
     }
@@ -668,13 +668,13 @@ function on_long_click(idx)
 
     local elem_text = element[2]
     if latest_intervention and elem_text == latest_intervention.text then
-        logger.store_ignore(INTERVENTION, latest_intervention.value, latest_intervention.detail)
+        logger.store_ignore(INTERVENTION, latest_intervention.value, latest_intervention.meta.detail)
         render_widget()
         return
     end
 
     if latest_activity and elem_text == latest_activity.text then
-        logger.store_ignore(ACTIVITY, latest_activity.value, latest_activity.detail)
+        logger.store_ignore(ACTIVITY, latest_activity.value, latest_activity.meta.detail)
         render_widget()
         return
     end
