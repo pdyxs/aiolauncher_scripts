@@ -58,6 +58,28 @@ When user click on a result, one of the following functions will be executed:
 
 Both functions gets index of the clicked element (starting with 1) as an argument. Each function can return `true` or `false`, depending on whether the script wants to close the search window or not.
 
+## Chat mode in search scripts
+
+Search scripts can switch the search UI into a chat mode and handle a question-answer loop.
+
+* `search:chat_start([label], [initial_message], [icon])` - enable chat mode. `label` sets the chat header. `initial_message` (optional) is shown as the first assistant message. `icon` (optional) is a FontAwesome icon name like `fa:comment` and is used for the chat FAB button.
+* `search:chat_stop()` - disable chat mode and return to normal search results.
+
+The chat callback:
+
+* `on_chat(messages)` - called when user submits a message in chat mode. `messages` is a table of message tables, each with:
+  * `role` - `"user"`, `"assistant"`, `"system"`, or `"error"`;
+  * `content` - message text;
+  * `context` - optional extra context string.
+
+Return value of `on_chat`:
+
+* a string (single assistant reply), or
+* a table of strings (multiple assistant replies), or
+* a table of message tables `{ role = "...", content = "...", context = "..." }` to append multiple messages with explicit roles.
+
+To exit chat mode on a command, call `search:chat_stop()`.
+
 If you want the script to respond only to search queries that have a word in the beginning (prefix), use the appropriate meta tag. For example:
 
 ```
@@ -455,7 +477,7 @@ Intent table format (all fields are optional):
 * `aio:fold_widget(string, [boolean])` - fold/unfold widget (if you do not specify the second argument the state will be switched);
 * `aio:is_widget_added(string)` - checks if the widget is added to the screen;
 * `aio:self_name()` - returns current script file name;
-* `aio:send_message(value, [script_name])` - sends lua value to other script or scripts;
+* `aio:send_message(value, [script_name], [offline])` - sends lua value to other script or scripts; if `offline` is true and the target search/drawer script is not active, the last message will be stored and delivered when the script starts (only works when `script_name` is provided);
 * `aio:colors()` - returns table with current theme colors;
 * `aio:do_action(string)` - performs an AIO action ([more](https://aiolauncher.app/api.html));
 * `aio:actions()` - returns a list of available actions;
