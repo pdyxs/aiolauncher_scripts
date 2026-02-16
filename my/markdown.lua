@@ -20,6 +20,7 @@ local widget_bridges = {} -- Maps widget names to their bridges
 local widget_ids = {}     -- Maps widget providers to their widget IDs
 
 local parsed_content = nil
+local CACHE_FILE = "markdown_cache.md"
 
 local selecting_link_name = nil
 local selecting_link_callback = nil
@@ -58,9 +59,15 @@ end
 
 function load_and_render()
     local has_parsed_content = false
-    if prefs.parsed_content then
-        render(prefs.parsed_content)
-        has_parsed_content = true
+
+    -- Try to load from cached markdown file
+    local cached_md = files:read(CACHE_FILE)
+    if cached_md then
+        parsed_content = markdown_parser.parse(cached_md)
+        if parsed_content then
+            render(parsed_content)
+            has_parsed_content = true
+        end
     end
 
     if not prefs.markdown_file_uri then
@@ -73,7 +80,7 @@ function load_and_render()
     parsed_content = markdown_parser.parse(content)
 
     if parsed_content then
-        prefs.parsed_content = parsed_content
+        files:write(CACHE_FILE, content)
         render(parsed_content)
     end
 end
@@ -185,6 +192,7 @@ end
 
 function on_settings()
     prefs = {}
+    files:delete(CACHE_FILE)
     files:pick_file("text/markdown")
 end
 
