@@ -85,42 +85,6 @@ function M.store_ignore(event, value, detail)
     prefs.logs = logs
 end
 
-function M.store_log(event, value, detail)
-    local logs = prefs.logs or {}
-
-    if not logs[event] then
-        logs[event] = { count = 0, values = {} }
-    end
-
-    logs[event].count = (logs[event].count or 0) + 1
-    logs[event].last_logged = time_utils.get_current_timestamp()
-    logs[event].last_value = value
-
-    if not logs[event].values[value] then
-        logs[event].values[value] = { count = 0, details = {} }
-    end
-
-    logs[event].values[value].count = (logs[event].values[value].count or 0) + 1
-    logs[event].values[value].last_logged = time_utils.get_current_timestamp()
-
-    if detail ~= "" and detail ~= nil then
-        logs[event].values[value].last_detail = detail
-
-        if not logs[event].values[value].details then
-            logs[event].values[value].details = {}
-        end
-
-        if not logs[event].values[value].details[detail] then
-            logs[event].values[value].details[detail] = { count = 0 }
-        end
-
-        logs[event].values[value].details[detail].count = (logs[event].values[value].details[detail].count or 0) + 1
-        logs[event].values[value].details[detail].last_logged = time_utils.get_current_timestamp()
-    end
-
-    prefs.logs = logs
-end
-
 function M.store_logs(events)
     local logs = prefs.logs or {}
     local seen_events = {}

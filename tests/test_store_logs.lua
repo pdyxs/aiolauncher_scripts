@@ -45,22 +45,22 @@ local function reset_prefs()
     mock_prefs.logs = nil
 end
 
--- Tests for store_log (single event, existing behavior)
+-- Tests for store_logs
 
-test.add_test("store_log: single event increments all levels", function()
+test.add_test("store_logs: single event increments all levels", function()
     reset_prefs()
-    logger.store_log("Intervention", "physio", "one")
+    logger.store_logs({{"Intervention", "physio", "one"}})
 
     test.assert_equals(mock_prefs.logs["Intervention"].count, 1, "event count")
     test.assert_equals(mock_prefs.logs["Intervention"].values["physio"].count, 1, "value count")
     test.assert_equals(mock_prefs.logs["Intervention"].values["physio"].details["one"].count, 1, "detail count")
 end)
 
-test.add_test("store_log: repeated calls increment all levels each time", function()
+test.add_test("store_logs: repeated single-item calls increment parent each time", function()
     reset_prefs()
-    logger.store_log("Intervention", "physio", "one")
-    logger.store_log("Intervention", "physio", "two")
-    logger.store_log("Intervention", "physio", "three")
+    logger.store_logs({{"Intervention", "physio", "one"}})
+    logger.store_logs({{"Intervention", "physio", "two"}})
+    logger.store_logs({{"Intervention", "physio", "three"}})
 
     test.assert_equals(mock_prefs.logs["Intervention"].count, 3, "event count should be 3")
     test.assert_equals(mock_prefs.logs["Intervention"].values["physio"].count, 3, "value count should be 3")
@@ -68,8 +68,6 @@ test.add_test("store_log: repeated calls increment all levels each time", functi
     test.assert_equals(mock_prefs.logs["Intervention"].values["physio"].details["two"].count, 1, "detail two count")
     test.assert_equals(mock_prefs.logs["Intervention"].values["physio"].details["three"].count, 1, "detail three count")
 end)
-
--- Tests for store_logs (batch, deduplicated behavior)
 
 test.add_test("store_logs: same event+value with different details increments parent only once", function()
     reset_prefs()
@@ -86,7 +84,7 @@ test.add_test("store_logs: same event+value with different details increments pa
     test.assert_equals(mock_prefs.logs["Intervention"].values["physio"].details["three"].count, 1, "detail three count")
 end)
 
-test.add_test("store_logs: single event behaves same as store_log", function()
+test.add_test("store_logs: single event in batch", function()
     reset_prefs()
     logger.store_logs({
         { "Intervention", "physio", "one" },

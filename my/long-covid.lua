@@ -94,7 +94,7 @@ local capacity_buttons = {
 }
 
 function reset_capacity()
-    logger.store_log("Capacity", "reset")
+    logger.store_logs({{"Capacity", "reset"}})
     render_widget()
 end
 
@@ -167,7 +167,7 @@ function handle_main_dialog_result(results, dialogs, loggables, name, override_l
     if result.meta.children and #result.meta.children > 0 then
         local childlogs = util.map(result.meta.children, get_loggable)
         if override_logs then return override_logs(childlogs) end
-        logger.store_log(name, result.value, result.meta.detail)
+        logger.store_logs({{name, result.value, result.meta.detail}})
         return execute_logs(name, loggables, childlogs)
     end
 
