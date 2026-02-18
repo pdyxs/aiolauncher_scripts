@@ -51,8 +51,8 @@ function M.log_events_to_spreadsheet(events, ui_callback)
     local message = "✓ Logged:"
     for k, event in pairs(data) do
         message = message .. "\n" .. table.concat(event, " - ")
-        M.store_log(event[1], event[2], event[3])
     end
+    M.store_logs(data)
 
     ui_callback(message)
 end
@@ -85,37 +85,51 @@ function M.store_ignore(event, value, detail)
     prefs.logs = logs
 end
 
-function M.store_log(event, value, detail)
+function M.store_logs(events)
     local logs = prefs.logs or {}
+    local seen_events = {}
+    local seen_values = {}
+    local timestamp = time_utils.get_current_timestamp()
 
-    if not logs[event] then
-        logs[event] = { count = 0, values = {} }
-    end
+    for _, event_data in ipairs(events) do
+        local event, value, detail = event_data[1], event_data[2], event_data[3]
 
-    logs[event].count = (logs[event].count or 0) + 1
-    logs[event].last_logged = time_utils.get_current_timestamp()
-    logs[event].last_value = value
-
-    if not logs[event].values[value] then
-        logs[event].values[value] = { count = 0, details = {} }
-    end
-
-    logs[event].values[value].count = (logs[event].values[value].count or 0) + 1
-    logs[event].values[value].last_logged = time_utils.get_current_timestamp()
-
-    if detail ~= "" and detail ~= nil then
-        logs[event].values[value].last_detail = detail
-
-        if not logs[event].values[value].details then
-            logs[event].values[value].details = {}
+        if not logs[event] then
+            logs[event] = { count = 0, values = {} }
         end
 
-        if not logs[event].values[value].details[detail] then
-            logs[event].values[value].details[detail] = { count = 0 }
+        if not seen_events[event] then
+            logs[event].count = (logs[event].count or 0) + 1
+            seen_events[event] = true
+        end
+        logs[event].last_logged = timestamp
+        logs[event].last_value = value
+
+        if not logs[event].values[value] then
+            logs[event].values[value] = { count = 0, details = {} }
         end
 
-        logs[event].values[value].details[detail].count = (logs[event].values[value].details[detail].count or 0) + 1
-        logs[event].values[value].details[detail].last_logged = time_utils.get_current_timestamp()
+        local value_key = event .. "\0" .. value
+        if not seen_values[value_key] then
+            logs[event].values[value].count = (logs[event].values[value].count or 0) + 1
+            seen_values[value_key] = true
+        end
+        logs[event].values[value].last_logged = timestamp
+
+        if detail ~= "" and detail ~= nil then
+            logs[event].values[value].last_detail = detail
+
+            if not logs[event].values[value].details then
+                logs[event].values[value].details = {}
+            end
+
+            if not logs[event].values[value].details[detail] then
+                logs[event].values[value].details[detail] = { count = 0 }
+            end
+
+            logs[event].values[value].details[detail].count = (logs[event].values[value].details[detail].count or 0) + 1
+            logs[event].values[value].details[detail].last_logged = timestamp
+        end
     end
 
     prefs.logs = logs
