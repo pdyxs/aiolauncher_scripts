@@ -58,6 +58,28 @@ When user click on a result, one of the following functions will be executed:
 
 Both functions gets index of the clicked element (starting with 1) as an argument. Each function can return `true` or `false`, depending on whether the script wants to close the search window or not.
 
+## Chat mode in search scripts
+
+Search scripts can switch the search UI into a chat mode and handle a question-answer loop.
+
+* `search:chat_start([label], [initial_message], [icon])` - enable chat mode. `label` sets the chat header. `initial_message` (optional) is shown as the first assistant message. `icon` (optional) is a FontAwesome icon name like `fa:comment` and is used for the chat FAB button.
+* `search:chat_stop()` - disable chat mode and return to normal search results.
+
+The chat callback:
+
+* `on_chat(messages)` - called when user submits a message in chat mode. `messages` is a table of message tables, each with:
+  * `role` - `"user"`, `"assistant"`, `"system"`, or `"error"`;
+  * `content` - message text;
+  * `context` - optional extra context string.
+
+Return value of `on_chat`:
+
+* a string (single assistant reply), or
+* a table of strings (multiple assistant replies), or
+* a table of message tables `{ role = "...", content = "...", context = "..." }` to append multiple messages with explicit roles.
+
+To exit chat mode on a command, call `search:chat_stop()`.
+
 If you want the script to respond only to search queries that have a word in the beginning (prefix), use the appropriate meta tag. For example:
 
 ```
@@ -455,7 +477,7 @@ Intent table format (all fields are optional):
 * `aio:fold_widget(string, [boolean])` - fold/unfold widget (if you do not specify the second argument the state will be switched);
 * `aio:is_widget_added(string)` - checks if the widget is added to the screen;
 * `aio:self_name()` - returns current script file name;
-* `aio:send_message(value, [script_name])` - sends lua value to other script or scripts;
+* `aio:send_message(value, [script_name], [offline])` - sends lua value to other script or scripts; if `offline` is true and the target search/drawer script is not active, the last message will be stored and delivered when the script starts (only works when `script_name` is provided);
 * `aio:colors()` - returns table with current theme colors;
 * `aio:do_action(string)` - performs an AIO action ([more](https://aiolauncher.app/api.html));
 * `aio:actions()` - returns a list of available actions;
@@ -465,6 +487,7 @@ Intent table format (all fields are optional):
 * `aio:open_notifications_panel()` - opens the system notifications panel (same as swiping down the status bar);
 * `aio:open_side_menu()` - opens the launcher’s app drawer;
 * `aio:open_search([query])` - opens the launcher search screen; if `query` is provided, the search field will be pre-filled with this text;
+* `aio:show_toast(string)` - shows informational message in Android style;
 * `aio:launcher_info()` - returns basic information about the AIO Launcher build:
 
 ```lua
@@ -529,7 +552,7 @@ screen_off
 screen_off_root
 refresh
 notify
-search
+search:[text]
 dialer
 camera
 flashlight
@@ -542,6 +565,7 @@ scroll_down
 scroll_up_or_search
 shortcuts
 one_handed
+right_handed
 add_note:[text]
 add_task:[text]:[YYYY-MM-DD-HH-MM]
 add_purchase:[amount][currency]:[comment]
@@ -842,6 +866,133 @@ The format of the note table:
 `color` - note color ID;
 `position` - note position on the screen.
 ```
+
+## Timers
+
+* `timer:start(milliseconds)` - starts a timer for the specified duration in milliseconds;
+* `timer:stop_all()` - stops all active timers;
+* `timer:list()` - returns a table of timers;
+* `timer:is_active()` - returns `true` if at least one timer is active.
+
+Timer table format:
+
+```
+`total_ms` - timer duration in milliseconds;
+`current_ms` - remaining time in milliseconds;
+`active` - `true` if timer is running;
+`auto_destroy` - `true` if timer will be removed automatically after finish.
+```
+
+`timer:start(...)` returns a status table:
+
+```
+`ok` - `true` on success, `false` on error;
+`error` - error string when `ok` is `false` (for example: `invalid_duration`).
+```
+
+## Player
+
+* `player:state()` - returns current media player state;
+* `player:play_pause()` - toggles play/pause;
+* `player:next()` - skips to next track;
+* `player:prev()` - skips to previous track;
+* `player:stop()` - stops playback.
+
+Player state table format:
+
+```
+`is_playing` - `true` if media is playing now;
+`package` - package name of active player app (or empty string);
+`song` - current track title (or empty string);
+`custom_actions_count` - number of available custom media actions.
+```
+
+## Currencies
+
+* `currencies:supported()` - returns a list of supported currency codes (`"USD"`, `"EUR"`, etc.);
+* `currencies:rate(from, to, [amount])` - returns converted amount or `nil` if rate is unavailable;
+* `currencies:refresh([id])` - updates rates asynchronously.
+
+`currencies:rate(...)` notes:
+
+* `from` and `to` should be 3-letter currency codes;
+* `amount` defaults to `1.0`;
+* if rate is not found, function returns `nil`.
+
+`currencies:refresh(...)` callback:
+
+* without id: `on_currencies_result(result)`
+* with id: `on_currencies_result_<id>(result)`
+
+Result table format:
+
+```
+`ok` - `true` on success;
+`updated_count` - number of loaded rates;
+`last_update` - last update timestamp in seconds;
+`error` - error message when `ok` is `false`.
+```
+
+## Finance
+
+* `finance:price(symbol)` - returns current ticker price as number or `nil` if unavailable;
+* `finance:search(query, [id])` - searches symbols asynchronously;
+* `finance:company(symbol, [id])` - loads company info asynchronously;
+* `finance:chart(symbol, [id])` - loads chart data asynchronously.
+
+Callbacks:
+
+* `on_finance_search[_<id>](result)`
+* `on_finance_company[_<id>](result)`
+* `on_finance_chart[_<id>](result)`
+
+Callback result format:
+
+```
+`ok` - `true` on success;
+`data` - payload for search/company/chart;
+`error` - error message when `ok` is `false`.
+```
+
+## Recorder
+
+* `recorder:request_permission()` - requests microphone recording permission;
+* `recorder:state()` - returns recorder state;
+* `recorder:list()` - returns list of recordings;
+* `recorder:start()` - starts recording;
+* `recorder:stop_all()` - stops all active recordings;
+* `recorder:rename(id, name)` - renames recording;
+* `recorder:set_color(id, color)` - changes recording color.
+
+Recorder state table format:
+
+```
+`active` - `true` if recorder is active (recording or playing);
+`records_count` - number of available records.
+```
+
+Recording item format:
+
+```
+`id` - recording id (string, based on start time);
+`name` - display name;
+`duration` - duration in milliseconds;
+`recorded` - `true` if recording is completed;
+`recording` - `true` if currently recording;
+`playing` - `true` if currently playing;
+`color` - color id/int.
+```
+
+Mutating methods (`start`, `rename`, `set_color`) return status table:
+
+```
+`ok` - `true` on success;
+`error` - error code/message when `ok` is `false` (for example: `permission_denied`, `record_not_found`).
+```
+
+Permission callback:
+
+`on_permission_granted()` - called after user grants recording permission.
 
 ## Weather
 
