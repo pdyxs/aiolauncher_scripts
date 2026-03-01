@@ -387,6 +387,37 @@ function get_latest_required(event, items)
     return best
 end
 
+function get_best_ignored_required(event, items)
+    local best = nil
+    local best_start = nil
+
+    for _, item in ipairs(items) do
+        if is_item_required(event, item) and is_item_ignored(event, item) then
+            local start_minutes = nil
+            if item.meta.specifiers.Required then
+                for _, param in ipairs(item.meta.specifiers.Required) do
+                    local p = param:lower()
+                    local range_start = p:match("^(%d+:%d%d)%-%d+:%d%d$")
+                    local time_str = range_start or p:match("^%d+:%d%d$")
+                    if time_str then
+                        local h, m = time_utils.parse_time(time_str)
+                        if h then
+                            start_minutes = h * 60 + m
+                        end
+                    end
+                end
+            end
+
+            if best == nil or (start_minutes ~= nil and (best_start == nil or start_minutes < best_start)) then
+                best = item
+                best_start = start_minutes
+            end
+        end
+    end
+
+    return best
+end
+
 function get_modified_item_text(event, item)
     local text = item.text
     if is_item_required(event, item) then
@@ -579,6 +610,8 @@ end
 
 local latest_intervention = nil
 local latest_activity = nil
+local latest_intervention_ignored = false
+local latest_activity_ignored = false
 
 function render_capacity_selected()
     local current_capacity = get_current_capacity()
@@ -594,7 +627,18 @@ function render_capacity_selected()
 
     if selected_button then
         latest_intervention = get_latest_required(INTERVENTION, prefs.intervention_items)
+        latest_intervention_ignored = false
+        if not latest_intervention then
+            latest_intervention = get_best_ignored_required(INTERVENTION, prefs.intervention_items)
+            latest_intervention_ignored = latest_intervention ~= nil
+        end
+
         latest_activity = get_latest_required(ACTIVITY, prefs.activity_items)
+        latest_activity_ignored = false
+        if not latest_activity then
+            latest_activity = get_best_ignored_required(ACTIVITY, prefs.activity_items)
+            latest_activity_ignored = latest_activity ~= nil
+        end
 
         local buildingGui = {
             { "button", selected_button.label,             { color = COLOR_TERTIARY } },
@@ -604,7 +648,7 @@ function render_capacity_selected()
 
         if latest_activity then
             table.insert(buildingGui,
-                { "text", latest_activity.text, { margin = "4dp", color = COLOR_PRIMARY, gravity = "center_v|anchor_prev" } })
+                { "text", latest_activity.text, { margin = "4dp", color = latest_activity_ignored and COLOR_SECONDARY or COLOR_PRIMARY, gravity = "center_v|anchor_prev" } })
         end
 
         table.insert(buildingGui,
@@ -612,7 +656,7 @@ function render_capacity_selected()
 
         if latest_intervention then
             table.insert(buildingGui,
-                { "text", latest_intervention.text, { margin = "4dp", color = COLOR_PRIMARY, gravity = "center_v" } })
+                { "text", latest_intervention.text, { margin = "4dp", color = latest_intervention_ignored and COLOR_SECONDARY or COLOR_PRIMARY, gravity = "center_v" } })
         end
 
         my_gui = gui(buildingGui)
