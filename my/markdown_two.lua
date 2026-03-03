@@ -76,6 +76,10 @@ function load_and_render()
     end
     show_debug_text("Loading file " .. prefs.markdown_file_name, has_parsed_content)
     local content = files:read_uri(prefs.markdown_file_uri)
+    if not content then
+        show_debug_text("Could not read file " .. prefs.markdown_file_name, has_parsed_content)
+        return
+    end
     show_debug_text("Parsing file " .. prefs.markdown_file_name, has_parsed_content)
     parsed_content = markdown_parser.parse(content)
 
