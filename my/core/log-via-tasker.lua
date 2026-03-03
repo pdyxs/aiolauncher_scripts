@@ -6,6 +6,17 @@ local time_utils = require "core.time-utils"
 local util = require "core.util"
 local prefs = require "prefs"
 
+local logs_cache = nil
+
+local function get_logs()
+    if logs_cache == nil then
+        logs_cache = prefs.logs or {}
+    end
+    return logs_cache
+end
+
+M.get_logs = get_logs
+
 -- Log data to spreadsheet via Tasker with 4-column support
 -- Parameters:
 --   event - Event type (e.g., "Capacity", "Symptom", "Activity", "Intervention", "Energy", "Note")
@@ -58,7 +69,7 @@ function M.log_events_to_spreadsheet(events, ui_callback)
 end
 
 function M.store_ignore(event, value, detail)
-    local logs = prefs.logs or {}
+    local logs = get_logs()
 
     if not logs[event] then
         logs[event] = { count = 0, values = {} }
@@ -83,10 +94,11 @@ function M.store_ignore(event, value, detail)
     end
 
     prefs.logs = logs
+    logs_cache = logs
 end
 
 function M.store_logs(events)
-    local logs = prefs.logs or {}
+    local logs = get_logs()
     local seen_events = {}
     local seen_values = {}
     local timestamp = time_utils.get_current_timestamp()
@@ -133,79 +145,85 @@ function M.store_logs(events)
     end
 
     prefs.logs = logs
+    logs_cache = logs
 end
 
 function M.last_ignored(event, value, detail)
-    if prefs.logs == nil or prefs.logs[event] == nil then
+    local logs = get_logs()
+    if logs[event] == nil then
         return 0
     end
 
-    if value == nil or prefs.logs[event].values[value] == nil then
+    if value == nil or logs[event].values[value] == nil then
         return 0
     end
 
     if detail == nil or detail == "" then
-        return prefs.logs[event].values[value].last_ignored
+        return logs[event].values[value].last_ignored
     end
 
-    if prefs.logs[event].values[value].details == nil or prefs.logs[event].values[value].details[detail] == nil then
+    if logs[event].values[value].details == nil or logs[event].values[value].details[detail] == nil then
         return 0
     end
 
-    return prefs.logs[event].values[value].details[detail].last_ignored
+    return logs[event].values[value].details[detail].last_ignored
 end
 
 function M.log_count(event, value)
-    if prefs.logs == nil or prefs.logs[event] == nil then
+    local logs = get_logs()
+    if logs[event] == nil then
         return 0
     end
 
     if value == nil then
-        return prefs.logs[event].count
+        return logs[event].count
     end
 
-    if prefs.logs[event].values[value] == nil then
+    if logs[event].values[value] == nil then
         return 0
     end
-    return prefs.logs[event].values[value].count
+    return logs[event].values[value].count
 end
 
 function M.last_logged(event, value, detail)
-    if prefs.logs == nil or prefs.logs[event] == nil then
+    local logs = get_logs()
+    if logs[event] == nil then
         return 0
     end
 
     if value == nil then
-        return prefs.logs[event].last_logged
+        return logs[event].last_logged
     end
 
-    if prefs.logs[event].values[value] == nil then
+    if logs[event].values[value] == nil then
         return 0
     end
 
     if detail == nil then
-        return prefs.logs[event].values[value].last_logged
+        return logs[event].values[value].last_logged
     end
 
-    if prefs.logs[event].values[value].details == nil or prefs.logs[event].values[value].details[detail] == nil then
+    if logs[event].values[value].details == nil or logs[event].values[value].details[detail] == nil then
         return 0
     end
 
-    return prefs.logs[event].values[value].details[detail].last_logged
+    return logs[event].values[value].details[detail].last_logged
 end
 
 function M.last_value(event)
-    if prefs.logs == nil or prefs.logs[event] == nil then
+    local logs = get_logs()
+    if logs[event] == nil then
         return nil
     end
-    return prefs.logs[event].last_value
+    return logs[event].last_value
 end
 
 function M.last_detail(event, value)
-    if prefs.logs == nil or prefs.logs[event] == nil or prefs.logs[event].values[value] == nil then
+    local logs = get_logs()
+    if logs[event] == nil or logs[event].values[value] == nil then
         return nil
     end
-    return prefs.logs[event].values[value].last_detail
+    return logs[event].values[value].last_detail
 end
 
 return M

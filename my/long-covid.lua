@@ -348,6 +348,7 @@ function get_loggable_items(filename)
 end
 
 function are_any_required(event, items)
+    if not items then return false end
     for _, item in ipairs(items) do
         if is_item_required(event, item) then
             return true
@@ -357,6 +358,7 @@ function are_any_required(event, items)
 end
 
 function get_latest_required(event, items)
+    if not items then return nil end
     local best = nil
     local best_start = nil
 
@@ -388,6 +390,7 @@ function get_latest_required(event, items)
 end
 
 function get_best_ignored_required(event, items)
+    if not items then return nil end
     local best = nil
     local best_start = nil
 
@@ -483,7 +486,8 @@ end
 
 function get_tracking_symptoms()
     local tracking_symptoms = {}
-    local symptomValues = (prefs.logs and prefs.logs["Symptom"] and prefs.logs["Symptom"].values) or {}
+    local logs = logger.get_logs()
+    local symptomValues = (logs["Symptom"] and logs["Symptom"].values) or {}
     for value, data in pairs(symptomValues) do
         if is_symptom_tracking(value) then
             table.insert(tracking_symptoms, value)
@@ -494,7 +498,8 @@ end
 
 function get_tracking_custom_symptoms(default_symptoms)
     local tracking_symptoms = {}
-    local symptomValues = (prefs.logs and prefs.logs["Symptom"] and prefs.logs["Symptom"].values) or {}
+    local logs = logger.get_logs()
+    local symptomValues = (logs["Symptom"] and logs["Symptom"].values) or {}
     for value, data in pairs(symptomValues) do
         if not util.contains(default_symptoms, value) and is_symptom_tracking(value) then
             table.insert(tracking_symptoms, value)
@@ -507,14 +512,15 @@ function is_symptom_tracking(value)
     if not is_symptom_unresolved(value) then
         return false
     end
-    local data = prefs.logs["Symptom"].values[value]
+    local data = logger.get_logs()["Symptom"].values[value]
     if not time_utils.is_today(data.last_logged) then
         return true
     end
 end
 
 function is_symptom_unresolved(value)
-    local data = prefs.logs["Symptom"].values[value]
+    local symptom_logs = logger.get_logs()["Symptom"]
+    local data = symptom_logs and symptom_logs.values[value]
     if not data then
         return false
     end
@@ -667,7 +673,6 @@ end
 ------ AIO Functions
 
 function on_resume()
-    setup_loggables()
     tasker:run_task("LongCovid_CopyData", {})
     render_widget()
 end
