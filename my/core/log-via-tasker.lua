@@ -68,6 +68,35 @@ function M.log_events_to_spreadsheet(events, ui_callback)
     ui_callback(message)
 end
 
+function M.store_defer(event, value, detail)
+    local logs = get_logs()
+
+    if not logs[event] then
+        logs[event] = { count = 0, values = {} }
+    end
+
+    if not logs[event].values[value] then
+        logs[event].values[value] = { count = 0, details = {} }
+    end
+
+    if detail ~= "" and detail ~= nil then
+        if not logs[event].values[value].details then
+            logs[event].values[value].details = {}
+        end
+
+        if not logs[event].values[value].details[detail] then
+            logs[event].values[value].details[detail] = { count = 0 }
+        end
+
+        logs[event].values[value].details[detail].last_deferred = time_utils.get_current_timestamp()
+    else
+        logs[event].values[value].last_deferred = time_utils.get_current_timestamp()
+    end
+
+    prefs.logs = logs
+    logs_cache = logs
+end
+
 function M.store_ignore(event, value, detail)
     local logs = get_logs()
 
@@ -146,6 +175,27 @@ function M.store_logs(events)
 
     prefs.logs = logs
     logs_cache = logs
+end
+
+function M.last_deferred(event, value, detail)
+    local logs = get_logs()
+    if logs[event] == nil then
+        return 0
+    end
+
+    if value == nil or logs[event].values[value] == nil then
+        return 0
+    end
+
+    if detail == nil or detail == "" then
+        return logs[event].values[value].last_deferred
+    end
+
+    if logs[event].values[value].details == nil or logs[event].values[value].details[detail] == nil then
+        return 0
+    end
+
+    return logs[event].values[value].details[detail].last_deferred
 end
 
 function M.last_ignored(event, value, detail)

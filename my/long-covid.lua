@@ -22,6 +22,7 @@ local dialog_manager = dialog_flow.create_dialog_flow(function() render_widget()
 -- Colors for monochrome display
 local COLOR_PRIMARY = "#333333"   -- Darkest
 local COLOR_SECONDARY = "#666666" -- Middle
+local COLOR_IGNORED = "#999999"   -- For ignored items
 local COLOR_TERTIARY = "#BBBBBB"  -- Lightest
 
 local OBSIDIAN_FILEPATH = "Long Covid/Data/"
@@ -395,7 +396,7 @@ function get_best_ignored_required(event, items)
     local best_start = nil
 
     for _, item in ipairs(items) do
-        if is_item_required(event, item) and is_item_ignored(event, item) then
+        if is_item_required(event, item) and is_item_ignored(event, item) and not is_item_deferred(event, item) then
             local start_minutes = nil
             if item.meta.specifiers.Required then
                 for _, param in ipairs(item.meta.specifiers.Required) do
@@ -448,6 +449,12 @@ function is_item_ignored(event, item)
     local last_ignored = logger.last_ignored(event, item.value, item.meta.detail)
     local now = time_utils.get_current_timestamp()
     return time_utils.is_same_calendar_day(last_ignored, now)
+end
+
+function is_item_deferred(event, item)
+    local last_deferred = logger.last_deferred(event, item.value, item.meta.detail)
+    local now = time_utils.get_current_timestamp()
+    return time_utils.is_same_calendar_day(last_deferred, now)
 end
 
 function is_item_required(event, item)
@@ -654,7 +661,7 @@ function render_capacity_selected()
 
         if latest_activity then
             table.insert(buildingGui,
-                { "text", latest_activity.text, { margin = "4dp", color = latest_activity_ignored and COLOR_SECONDARY or COLOR_PRIMARY, gravity = "center_v|anchor_prev" } })
+                { "text", latest_activity.text, { margin = "4dp", color = latest_activity_ignored and COLOR_IGNORED or COLOR_PRIMARY, gravity = "center_v|anchor_prev" } })
         end
 
         table.insert(buildingGui,
@@ -662,7 +669,7 @@ function render_capacity_selected()
 
         if latest_intervention then
             table.insert(buildingGui,
-                { "text", latest_intervention.text, { margin = "4dp", color = latest_intervention_ignored and COLOR_SECONDARY or COLOR_PRIMARY, gravity = "center_v" } })
+                { "text", latest_intervention.text, { margin = "4dp", color = latest_intervention_ignored and COLOR_IGNORED or COLOR_PRIMARY, gravity = "center_v" } })
         end
 
         my_gui = gui(buildingGui)
@@ -717,13 +724,21 @@ function on_long_click(idx)
 
     local elem_text = element[2]
     if latest_intervention and elem_text == latest_intervention.text then
-        logger.store_ignore(INTERVENTION, latest_intervention.value, latest_intervention.meta.detail)
+        if latest_intervention_ignored then
+            logger.store_defer(INTERVENTION, latest_intervention.value, latest_intervention.meta.detail)
+        else
+            logger.store_ignore(INTERVENTION, latest_intervention.value, latest_intervention.meta.detail)
+        end
         render_widget()
         return
     end
 
     if latest_activity and elem_text == latest_activity.text then
-        logger.store_ignore(ACTIVITY, latest_activity.value, latest_activity.meta.detail)
+        if latest_activity_ignored then
+            logger.store_defer(ACTIVITY, latest_activity.value, latest_activity.meta.detail)
+        else
+            logger.store_ignore(ACTIVITY, latest_activity.value, latest_activity.meta.detail)
+        end
         render_widget()
         return
     end
