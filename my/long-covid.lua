@@ -172,7 +172,7 @@ function handle_main_dialog_result(results, dialogs, loggables, name, override_l
         return execute_logs(name, loggables, childlogs)
     end
 
-    if override_log then return override_logs(log) end
+    if override_log then return override_log(log) end
     return execute_log(name, loggables, log)
 end
 
@@ -254,7 +254,7 @@ local dialog_buttons = util.map(
             long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Symptoms.md") end,
             dialogs = create_dialogs_for_items(
                 SYMPTOM,
-                function() return prefs.symptom_items end,
+                function() return util.to_array(prefs.symptom_items) end,
                 function(loggable)
                     local dialog = {
                         type = "radio",
@@ -288,13 +288,13 @@ local dialog_buttons = util.map(
         log_activity = {
             label = "fa:running",
             long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Activities.md") end,
-            dialogs = create_dialogs_for_items(ACTIVITY, function() return prefs.activity_items end)
+            dialogs = create_dialogs_for_items(ACTIVITY, function() return util.to_array(prefs.activity_items) end)
         },
 
         log_intervention = {
             label = "fa:pills",
             long_callback = function() obsidian.open_file(OBSIDIAN_FILEPATH .. "Interventions.md") end,
-            dialogs = create_dialogs_for_items(INTERVENTION, function() return prefs.intervention_items end),
+            dialogs = create_dialogs_for_items(INTERVENTION, function() return util.to_array(prefs.intervention_items) end),
         },
     },
     function(btn)
@@ -704,7 +704,7 @@ function on_click(idx)
         local next, log = handle_main_dialog_result({ latest_activity }, dialog_buttons.log_activity.dialogs, {},
             ACTIVITY)
         if (log) then
-            dialog_manager:start(dialog_buttons.log_intervention.dialogs, next, { latest_activity }, { log })
+            dialog_manager:start(dialog_buttons.log_activity.dialogs, next, { latest_activity }, { log })
         end
         return
     end

@@ -49,7 +49,12 @@ function M.open_checkbox_dialog(dialog_config, results, loggables)
         if result == -1 then
             return -1
         end
-        return { indices = result, options = util.map(result, function(r) return options[r] end), all_options = options }
+        local selected = {}
+        for _, r in ipairs(result) do
+            local opt = options[r] or options[r + 1]  -- handle 0-based indices from Java
+            if opt then table.insert(selected, opt) end
+        end
+        return { indices = result, options = selected, all_options = options }
     end
 end
 

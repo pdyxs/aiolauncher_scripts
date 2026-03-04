@@ -39,6 +39,23 @@ function util.filter(tbl, predicate)
     return result
 end
 
+-- Normalises a table that may have string-integer keys (e.g. after prefs
+-- round-trip through JSON) into a proper sequential array, ordered by key.
+function util.to_array(tbl)
+    if not tbl then return {} end
+    local keys = {}
+    for k in pairs(tbl) do
+        local n = tonumber(k)
+        if n then table.insert(keys, { k = k, n = n }) end
+    end
+    table.sort(keys, function(a, b) return a.n < b.n end)
+    local result = {}
+    for _, pair in ipairs(keys) do
+        table.insert(result, tbl[pair.k])
+    end
+    return result
+end
+
 function util.concat_arrays(...)
     local result = {}
     for _, array in ipairs({...}) do
