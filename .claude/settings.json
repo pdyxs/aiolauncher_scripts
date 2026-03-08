@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(adb push:*)",
+      "Bash(source:*)"
+    ],
+    "deny": []
+  }
+}
