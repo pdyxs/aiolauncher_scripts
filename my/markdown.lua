@@ -293,6 +293,13 @@ actions = {
         local file_name = node.children[1].text
         obsidian.open_file(file_name)
     end,
+    url = function(node)
+        local target_url = node.children[1].text
+        intent:start_activity{
+            action = "android.intent.action.VIEW",
+            data = target_url
+        }
+    end,
     clickwidget = function(node)
         if node.children and #node.children > 0 then
             -- First child is the widget name, remaining are click actions
