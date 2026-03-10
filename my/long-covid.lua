@@ -45,72 +45,6 @@ local commands = {
     end
 }
 
-------- CAPACITY LOGGING
-
-function handle_capacity_click(button)
-    -- Don't allow setting capacity if one is already set today
-    if get_current_capacity() then
-        return
-    end
-
-    dialog_manager:start({
-        main = {
-            type = "radio",
-            title = "Capacity compared to yesterday",
-            get_options = function()
-                return {
-                    "25%", "50%", "75%", "90%", "100%", "110%", "125%", "150%", "200%"
-                }
-            end,
-            handle_result = function(results)
-                logger.log_events_to_spreadsheet({
-                    { "Capacity",          button.name },
-                    { "Relative Capacity", results[#results].option }
-                })
-                render_widget()
-            end
-        }
-    })
-end
-
-local capacity_buttons = {
-    recovering = {
-        label = "fa:bed",
-        name = "Recovering",
-        callback = handle_capacity_click,
-        long_callback = function(button) reset_capacity() end
-    },
-    maintaining = {
-        label = "fa:balance-scale",
-        name = "Maintaining",
-        callback = handle_capacity_click,
-        long_callback = function(button) reset_capacity() end
-    },
-    engaging = {
-        label = "fa:rocket-launch",
-        name = "Engaging",
-        callback = handle_capacity_click,
-        long_callback = function(button) reset_capacity() end
-    }
-}
-
-function reset_capacity()
-    logger.store_logs({{"Capacity", "reset"}})
-    render_widget()
-end
-
-function get_current_capacity()
-    local today = time_utils.get_current_timestamp()
-    if time_utils.is_same_calendar_day(today, logger.last_logged("Capacity")) then
-        local last = logger.last_value("Capacity")
-        if last == "reset" then
-            return nil
-        end
-        return last
-    end
-    return nil
-end
-
 ------- OTHER LOGGING
 
 local OTHER_TEXT = "Other..."
@@ -238,7 +172,7 @@ function create_dialogs_for_items(name, get_items, override_log, override_logs)
                 local item_name = results[#results].value
                 local parsed_todos = markdown_parser.get_list_items(DATA_PREFIX .. item_name .. ".md")
                 local completions = logger.log_count(name, item_name)
-                return todo_parser.parse_todo_list(parsed_todos, completions, get_current_capacity())
+                return todo_parser.parse_todo_list(parsed_todos, completions)
             end,
             handle_result = function(results, dialogs, loggables)
                 return do_logs(loggables, results[#results].options)
@@ -586,95 +520,48 @@ function get_energy_button_color()
     end
 end
 
-function get_capacity_button_display(button)
-    local current_capacity = get_current_capacity()
-
-    -- Show name if no selection made OR this button is selected
-    if not current_capacity or current_capacity == button.name then
-        return "%%" .. button.label .. "%% " .. button.name
-    else
-        return button.label
-    end
-end
-
 ------- RENDERING
-
-function render_widget()
-    local current_capacity = get_current_capacity()
-
-    if current_capacity then
-        render_capacity_selected()
-    else
-        render_select_capacity()
-    end
-end
-
-function render_select_capacity()
-    -- Show all buttons when no capacity is set
-    my_gui = gui {
-        { "button", get_capacity_button_display(capacity_buttons.recovering),  { color = COLOR_PRIMARY, gravity = "center_h" } },
-        { "spacer", 1 },
-        { "button", get_capacity_button_display(capacity_buttons.maintaining), { color = COLOR_PRIMARY, gravity = "anchor_prev" } },
-        { "spacer", 1 },
-        { "button", get_capacity_button_display(capacity_buttons.engaging),    { color = COLOR_PRIMARY, gravity = "anchor_prev" } }
-    }
-    my_gui.render()
-end
 
 local latest_intervention = nil
 local latest_activity = nil
 local latest_intervention_ignored = false
 local latest_activity_ignored = false
 
-function render_capacity_selected()
-    local current_capacity = get_current_capacity()
-
-    -- Find and show only the selected capacity button
-    local selected_button
-    for _, button in pairs(capacity_buttons) do
-        if button.name == current_capacity then
-            selected_button = button
-            break
-        end
+function render_widget()
+    latest_intervention = get_latest_required(INTERVENTION, prefs.intervention_items)
+    latest_intervention_ignored = false
+    if not latest_intervention then
+        latest_intervention = get_best_ignored_required(INTERVENTION, prefs.intervention_items)
+        latest_intervention_ignored = latest_intervention ~= nil
     end
 
-    if selected_button then
-        latest_intervention = get_latest_required(INTERVENTION, prefs.intervention_items)
-        latest_intervention_ignored = false
-        if not latest_intervention then
-            latest_intervention = get_best_ignored_required(INTERVENTION, prefs.intervention_items)
-            latest_intervention_ignored = latest_intervention ~= nil
-        end
+    latest_activity = get_latest_required(ACTIVITY, prefs.activity_items)
+    latest_activity_ignored = false
+    if not latest_activity then
+        latest_activity = get_best_ignored_required(ACTIVITY, prefs.activity_items)
+        latest_activity_ignored = latest_activity ~= nil
+    end
 
-        latest_activity = get_latest_required(ACTIVITY, prefs.activity_items)
-        latest_activity_ignored = false
-        if not latest_activity then
-            latest_activity = get_best_ignored_required(ACTIVITY, prefs.activity_items)
-            latest_activity_ignored = latest_activity ~= nil
-        end
+    local buildingGui = {
+        { "button", dialog_buttons.log_symptoms.label, { color = get_symptoms_color() } },
+        { "button", dialog_buttons.log_activity.label, { color = get_activity_button_color() } },
+    }
 
-        local buildingGui = {
-            { "button", selected_button.label,             { color = COLOR_TERTIARY } },
-            { "button", dialog_buttons.log_symptoms.label, { color = get_symptoms_color(), gravity = "anchor_prev" } },
-            { "button", dialog_buttons.log_activity.label, { color = get_activity_button_color() } },
-        }
-
-        if latest_activity then
-            table.insert(buildingGui,
-                { "text", latest_activity.text, { margin = "4dp", color = latest_activity_ignored and COLOR_IGNORED or COLOR_PRIMARY, gravity = "center_v|anchor_prev" } })
-        end
-
+    if latest_activity then
         table.insert(buildingGui,
-            { "button", dialog_buttons.log_intervention.label, { color = get_interventions_button_color(), gravity = "right" } })
-
-        if latest_intervention then
-            table.insert(buildingGui,
-                { "text", latest_intervention.text, { margin = "4dp", color = latest_intervention_ignored and COLOR_IGNORED or COLOR_PRIMARY, gravity = "center_v" } })
-        end
-
-        my_gui = gui(buildingGui)
-        my_gui.render()
+            { "text", latest_activity.text, { margin = "4dp", color = latest_activity_ignored and COLOR_IGNORED or COLOR_PRIMARY, gravity = "center_v|anchor_prev" } })
     end
+
+    table.insert(buildingGui,
+        { "button", dialog_buttons.log_intervention.label, { color = get_interventions_button_color(), gravity = "right" } })
+
+    if latest_intervention then
+        table.insert(buildingGui,
+            { "text", latest_intervention.text, { margin = "4dp", color = latest_intervention_ignored and COLOR_IGNORED or COLOR_PRIMARY, gravity = "center_v" } })
+    end
+
+    my_gui = gui(buildingGui)
+    my_gui.render()
 end
 
 ------ AIO Functions
@@ -709,7 +596,7 @@ function on_click(idx)
         return
     end
 
-    ui_core.handle_button_click(element, util.tables_to_array(capacity_buttons, dialog_buttons))
+    ui_core.handle_button_click(element, dialog_buttons)
 end
 
 function on_dialog_action(result)
@@ -743,7 +630,7 @@ function on_long_click(idx)
         return
     end
 
-    ui_core.handle_button_long_click(element, util.tables_to_array(capacity_buttons, dialog_buttons))
+    ui_core.handle_button_long_click(element, dialog_buttons)
 end
 
 function on_command(data)
