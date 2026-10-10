@@ -7,10 +7,12 @@
 --app_pkg = "com.google.android.apps.tasks"
 --app_pkg = "com.android.chrome"
 --app_pkg = "com.whatsapp"
-app_pkg = "com.ticktick.task"
+--app_pkg = "com.ticktick.task"
 --app_pkg = "com.vivaldi.browser"
 --app_pkg = "com.openai.chatgpt"
 --app_pkg = "com.calm.android"
+--app_pkg = "au.com.ingdirect.android"
+app_pkg = "au.com.up.money"
 
 -- Widget size (string from "1x1" to "4x4")
 -- In most cases you can use nil

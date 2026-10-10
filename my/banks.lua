@@ -5,7 +5,7 @@
 -- version = "0.1"
 
 local prefs = require "prefs"
-local ui = require "core.ui"
+local ui_core = require "core.ui"
 
 local w_ing_bridge = nil
 local w_up_bridge = nil
@@ -75,24 +75,50 @@ function on_click(idx)
     local element = my_gui.ui[idx]
     if not element then return end
 
-    ui.handle_button_click(element, buttons)
+    ui_core.handle_button_click(element, buttons)
+end
+
+-- Find a widget provider by package, optionally matching a substring of the
+-- provider name. Returns nil if the package exposes no matching widget.
+local function find_provider(pkg, match)
+    local list = widgets:list(pkg)
+    if list == nil then return nil end
+
+    for _, w in ipairs(list) do
+        if match == nil or w.provider:find(match, 1, true) then
+            return w.provider
+        end
+    end
+
+    return nil
 end
 
 function setup_up_widget()
-    local id = widgets:setup("au.com.up.money/au.com.up.money.widgets.AccountOverviewWidget")
+    local provider = find_provider("au.com.up.money", "AccountOverview")
+    if provider == nil then
+        ui:show_text("Can't find Up widget")
+        return
+    end
+
+    local id = widgets:setup(provider)
     if (id ~= nil) then
         prefs.up_wid = id
     else
-        ui:show_text("Can't add widget")
+        ui:show_text("Can't add Up widget")
     end
 end
 
 function setup_ing_widget()
-    local ing_widgets = widgets:list("au.com.ingdirect.android")
-    local id = widgets:setup(ing_widgets[1].provider)
+    local provider = find_provider("au.com.ingdirect.android")
+    if provider == nil then
+        ui:show_text("Can't find ING widget")
+        return
+    end
+
+    local id = widgets:setup(provider)
     if (id ~= nil) then
         prefs.ing_wid = id
     else
-        ui:show_text("Can't add widget")
+        ui:show_text("Can't add ING widget")
     end
 end
